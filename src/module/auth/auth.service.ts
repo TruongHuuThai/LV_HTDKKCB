@@ -1,0 +1,102 @@
+// src/modules/auth/auth.service.ts
+import {
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import * as bcrypt from 'bcrypt';
+import { AuthRepository } from './auth.repository';
+import { ROLE } from './auth.constants';
+import { createHash, randomBytes } from 'crypto';
+
+@Injectable()
+export class AuthService {
+  constructor(
+    private readonly repo: AuthRepository,
+    private readonly jwt: JwtService,
+  ) {}
+
+  async login(TK_SDT: string, TK_PASS: string) {
+    const acc = await this.repo.findAccountByPhone(TK_SDT);
+    const { raw, hash } = this.makeRefreshToken();
+    const exp = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 ngày
+
+    await this.repo.createRefreshToken({
+      TK_SDT: acc.TK_SDT,
+      RT_HASH: hash,
+      RT_EXPIRES_AT: exp,
+      // optional: user agent, ip lấy từ controller nếu muốn
+    });
+
+    if (!acc || acc.TK_DA_XOA) {
+      throw new UnauthorizedException('Sai tài khoản hoặc mật khẩu');
+    }
+
+    const ok = await bcrypt.compare(TK_PASS, acc.TK_PASS);
+    if (!ok) throw new UnauthorizedException('Sai tài khoản hoặc mật khẩu');
+
+    const token = await this.jwt.signAsync(
+      { sub: acc.TK_SDT, role: acc.TK_VAI_TRO ?? undefined } as any,
+      { expiresIn: process.env.JWT_EXPIRES_IN ?? '7d' } as any,
+    );
+
+    return {
+      access_token: token,
+      refresh_token: raw,
+      user: {
+        TK_SDT: acc.TK_SDT,
+        TK_VAI_TRO: acc.TK_VAI_TRO,
+        // nếu bác sĩ: có BAC_SI, nếu bệnh nhân: có BENH_NHAN (array)
+        BS_MA: acc.BAC_SI?.BS_MA ?? null,
+        BN_MA: acc.BENH_NHAN?.[0]?.BN_MA ?? null,
+      },
+    };
+  }
+
+  async me(TK_SDT: string) {
+    const acc = await this.repo.findAccountByPhone(TK_SDT);
+    if (!acc || acc.TK_DA_XOA) return null;
+
+    return {
+      TK_SDT: acc.TK_SDT,
+      TK_VAI_TRO: acc.TK_VAI_TRO,
+      BS_MA: acc.BAC_SI?.BS_MA ?? null,
+      BN_MA: acc.BENH_NHAN?.[0]?.BN_MA ?? null,
+    };
+  }
+
+  async registerPatient(input: {
+    TK_SDT: string;
+    TK_PASS: string;
+    BN_HO_CHU_LOT?: string;
+    BN_TEN?: string;
+    BN_EMAIL?: string;
+  }) {
+    const existed = await this.repo.findAccountByPhone(input.TK_SDT);
+    if (existed) throw new ConflictException('Số điện thoại đã tồn tại');
+
+    const hash = await bcrypt.hash(input.TK_PASS, 10);
+
+    const acc = await this.repo.createAccount({
+      TK_SDT: input.TK_SDT,
+      TK_PASS: hash,
+      TK_VAI_TRO: ROLE.BENH_NHAN,
+    });
+
+    const bn = await this.repo.createPatientProfile({
+      TK_SDT: acc.TK_SDT,
+      BN_HO_CHU_LOT: input.BN_HO_CHU_LOT,
+      BN_TEN: input.BN_TEN,
+      BN_EMAIL: input.BN_EMAIL,
+    });
+
+    return { TK_SDT: acc.TK_SDT, BN_MA: bn.BN_MA };
+  }
+
+  private makeRefreshToken() {
+    const raw = randomBytes(48).toString('base64url');
+    const hash = createHash('sha256').update(raw).digest('hex');
+    return { raw, hash };
+  }
+}

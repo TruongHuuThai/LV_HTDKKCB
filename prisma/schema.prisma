@@ -316,6 +316,8 @@ model TAI_KHOAN {
   BENH_NHAN        BENH_NHAN[]
   THONG_BAO        THONG_BAO[]
   XAC_THUC_OTP     XAC_THUC_OTP[]
+
+  REFRESH_TOKEN    REFRESH_TOKEN[]
 }
 
 model THANH_TOAN {
@@ -407,4 +409,19 @@ model XA_PHUONG {
   TINH_TP TINH_TP @relation(fields: [TTP_MA], references: [TTP_MA], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([TTP_MA], map: "idx_xp_ttp")
+}
+
+model REFRESH_TOKEN {
+  RT_ID        BigInt   @id @default(autoincrement())
+  TK_SDT       String
+  RT_HASH      String   @unique
+  RT_CREATED_AT DateTime @default(now()) @db.Timestamp(6)
+  RT_EXPIRES_AT DateTime @db.Timestamp(6)
+  RT_REVOKED_AT DateTime? @db.Timestamp(6)
+  RT_USER_AGENT String?
+  RT_IP        String?
+
+  TAI_KHOAN TAI_KHOAN @relation(fields: [TK_SDT], references: [TK_SDT], onDelete: Cascade)
+
+  @@index([TK_SDT, RT_EXPIRES_AT], map: "idx_rt_user_exp")
 }
