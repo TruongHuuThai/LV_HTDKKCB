@@ -1,0 +1,410 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model AP_KV {
+  AK_MA     Int         @id @default(autoincrement())
+  XP_MA     Int
+  AK_TEN    String
+  XA_PHUONG XA_PHUONG   @relation(fields: [XP_MA], references: [XP_MA], onDelete: NoAction, onUpdate: NoAction)
+  BENH_NHAN BENH_NHAN[]
+
+  @@index([XP_MA], map: "idx_ak_xp")
+}
+
+model AUDIT_LOG {
+  AL_ID         BigInt    @id @default(autoincrement())
+  AL_TABLE      String
+  AL_ACTION     String
+  AL_PK         Json?
+  AL_OLD        Json?
+  AL_NEW        Json?
+  AL_CHANGED_BY String?
+  AL_CHANGED_AT DateTime? @default(now()) @db.Timestamp(6)
+
+  @@index([AL_TABLE, AL_CHANGED_AT], map: "idx_audit_table_time")
+}
+
+model BAC_SI {
+  BS_MA            Int         @id @default(autoincrement())
+  CK_MA            Int
+  TK_SDT           String?     @unique
+  BS_EMAIL         String?
+  BS_SDT           String?
+  BS_HOC_HAM       String?
+  BS_NGAY_CAP_NHAT DateTime?   @default(now()) @db.Timestamp(6)
+  BS_DA_XOA        Boolean?    @default(false)
+  BS_HO_TEN        String
+  BS_NGAY_TAO      DateTime?   @default(now()) @db.Timestamp(6)
+  BS_ANH           String?
+  CHUYEN_KHOA      CHUYEN_KHOA @relation(fields: [CK_MA], references: [CK_MA], onDelete: NoAction, onUpdate: NoAction)
+  TAI_KHOAN        TAI_KHOAN?  @relation(fields: [TK_SDT], references: [TK_SDT], onDelete: NoAction, onUpdate: NoAction)
+  LICH_BSK         LICH_BSK[]
+
+  @@index([CK_MA], map: "idx_bs_ck")
+}
+
+model BENH {
+  B_MA_ICD   String      @id
+  B_TEN_BENH String
+  B_MO_TA    String?
+  CHAN_DOAN  CHAN_DOAN[]
+}
+
+model BENH_NHAN {
+  BN_MA           Int               @id @default(autoincrement())
+  TK_SDT          String?
+  AK_MA           Int?
+  BN_LA_NAM       Boolean?
+  BN_HO_CHU_LOT   String?
+  BN_TEN          String?
+  BN_EMAIL        String?
+  BN_CCCD         String?
+  BN_QUOC_GIA     String?
+  BN_DAN_TOC      String?
+  BN_SO_DDCN      String?
+  BN_MOI          Boolean?          @default(false)
+  BN_SDT_DANG_KY  String?
+  BN_ANH          String?
+  AP_KV           AP_KV?            @relation(fields: [AK_MA], references: [AK_MA], onDelete: NoAction, onUpdate: NoAction)
+  TAI_KHOAN       TAI_KHOAN?        @relation(fields: [TK_SDT], references: [TK_SDT], onDelete: NoAction, onUpdate: NoAction)
+  CHI_SO_SUC_KHOE CHI_SO_SUC_KHOE[]
+  DANG_KY         DANG_KY[]
+}
+
+model BIET_DUOC {
+  BD_MA        Int     @id @default(autoincrement())
+  BD_TEN       String
+  BD_CONG_DUNG String?
+  BD_HAM_LUONG String?
+  BD_LIEU_DUNG String?
+  THUOC        THUOC[]
+}
+
+model BUOI {
+  B_TEN          String      @id
+  B_GIO_BAT_DAU  DateTime?   @db.Time(6)
+  B_GIO_KET_THUC DateTime?   @db.Time(6)
+  KHUNG_GIO      KHUNG_GIO[]
+  LICH_BSK       LICH_BSK[]
+}
+
+model CHAN_DOAN {
+  PKB_MA          Int
+  B_MA_ICD        String
+  BENH            BENH            @relation(fields: [B_MA_ICD], references: [B_MA_ICD], onDelete: NoAction, onUpdate: NoAction)
+  PHIEU_KHAM_BENH PHIEU_KHAM_BENH @relation(fields: [PKB_MA], references: [PKB_MA], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([PKB_MA, B_MA_ICD])
+}
+
+model CHI_SO_SUC_KHOE {
+  CSSK_MA          Int        @id @default(autoincrement())
+  BN_MA            Int?
+  CSSK_NGAY_DO     DateTime?  @default(now()) @db.Timestamp(6)
+  CSSK_CAN_NANG    Decimal?   @db.Decimal(6, 2)
+  CSSK_CHIEU_CAO   Decimal?   @db.Decimal(6, 2)
+  CSSK_HUYET_AP    String?
+  CSSK_NHIP_TIM    Int?
+  CSSK_NHIET_DO    Decimal?   @db.Decimal(4, 2)
+  CSSK_DUONG_HUYET Decimal?   @db.Decimal(6, 2)
+  CSSK_GHI_CHU     String?
+  BENH_NHAN        BENH_NHAN? @relation(fields: [BN_MA], references: [BN_MA], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([BN_MA], map: "idx_cssk_bn")
+}
+
+model CHI_TIET_DON_THUOC {
+  DT_MA          Int
+  T_MA           Int
+  CTDT_LIEU_DUNG String?
+  CTDT_SO_LUONG  Int
+  CTDT_CACH_DUNG String?
+  DON_THUOC      DON_THUOC @relation(fields: [DT_MA], references: [DT_MA], onDelete: NoAction, onUpdate: NoAction)
+  THUOC          THUOC     @relation(fields: [T_MA], references: [T_MA], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([DT_MA, T_MA])
+}
+
+model CHUYEN_KHOA {
+  CK_MA             Int              @id @default(autoincrement())
+  CK_TEN            String
+  CK_MO_TA          String?
+  CK_DOI_TUONG_KHAM String?
+  BAC_SI            BAC_SI[]
+  LOAI_HINH_KHAM    LOAI_HINH_KHAM[]
+  PHONG             PHONG[]
+}
+
+model DANG_KY {
+  DK_MA            Int              @id @default(autoincrement())
+  BN_MA            Int
+  LHK_MA           Int?
+  BS_MA            Int
+  N_NGAY           DateTime         @db.Date
+  B_TEN            String
+  KG_MA            Int
+  DK_TRANG_THAI    String?          @default("CHO_KHAM")
+  DK_STT           Int?
+  DK_LY_DO_HUY     String?
+  DK_THOI_GIAN_TAO DateTime?        @default(now()) @db.Timestamp(6)
+  BENH_NHAN        BENH_NHAN        @relation(fields: [BN_MA], references: [BN_MA], onDelete: NoAction, onUpdate: NoAction)
+  KHUNG_GIO        KHUNG_GIO        @relation(fields: [KG_MA], references: [KG_MA], onDelete: NoAction, onUpdate: NoAction)
+  LOAI_HINH_KHAM   LOAI_HINH_KHAM?  @relation(fields: [LHK_MA], references: [LHK_MA], onDelete: NoAction, onUpdate: NoAction)
+  LICH_BSK         LICH_BSK         @relation(fields: [BS_MA, N_NGAY, B_TEN], references: [BS_MA, N_NGAY, B_TEN], onDelete: NoAction, onUpdate: NoAction, map: "fk_dk_lichbsk")
+  PHIEU_KHAM_BENH  PHIEU_KHAM_BENH?
+  THANH_TOAN       THANH_TOAN[]
+
+  @@unique([BS_MA, N_NGAY, B_TEN, KG_MA], map: "uq_dk_slot", where: raw("(\"DK_TRANG_THAI\" <> 'HUY'::text)"))
+  @@index([BN_MA], map: "idx_dk_bn")
+  @@index([BS_MA, N_NGAY, B_TEN], map: "idx_dk_lich")
+}
+
+model DICHVU {
+  DVCLS_MA     Int        @id @default(autoincrement())
+  DVCLS_TEN    String
+  DVCLS_LOAI   String?
+  DVCLS_GIA_DV Decimal?   @default(0) @db.Decimal(12, 2)
+  THUCHIEN     THUCHIEN[]
+}
+
+model DON_THUOC {
+  DT_MA              Int                  @id @default(autoincrement())
+  PKB_MA             Int?
+  DT_NGAY_TAO        DateTime?            @default(now()) @db.Timestamp(6)
+  DT_GHI_CHU         String?
+  DT_SO_NGAY_SUNG    Int?
+  CHI_TIET_DON_THUOC CHI_TIET_DON_THUOC[]
+  PHIEU_KHAM_BENH    PHIEU_KHAM_BENH?     @relation(fields: [PKB_MA], references: [PKB_MA], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model DON_VI_TINH {
+  DVT_MA  Int     @id @default(autoincrement())
+  DVT_TEN String
+  THUOC   THUOC[]
+}
+
+model KET_QUA_CAN_LAM_SAN {
+  PCD_MA         Int
+  DVCLS_MA       Int
+  KQCLS_HINH_ANH String?
+  KQCLS_NHAN_XET String?
+  KQCLS_CHI_SO   Json?
+  THUCHIEN       THUCHIEN @relation(fields: [PCD_MA, DVCLS_MA], references: [PCD_MA, DVCLS_MA], onDelete: NoAction, onUpdate: NoAction, map: "fk_kqcls_th")
+
+  @@id([PCD_MA, DVCLS_MA])
+}
+
+model KHUNG_GIO {
+  KG_MA       Int       @id @default(autoincrement())
+  B_TEN       String
+  KG_BAT_DAU  DateTime  @db.Time(6)
+  KG_KET_THUC DateTime  @db.Time(6)
+  DANG_KY     DANG_KY[]
+  BUOI        BUOI      @relation(fields: [B_TEN], references: [B_TEN], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([B_TEN], map: "idx_kg_buoi")
+}
+
+model LICH_BSK {
+  BS_MA        Int
+  P_MA         Int
+  N_NGAY       DateTime  @db.Date
+  B_TEN        String
+  LBSK_GHI_CHU String?
+  DANG_KY      DANG_KY[]
+  BAC_SI       BAC_SI    @relation(fields: [BS_MA], references: [BS_MA], onDelete: NoAction, onUpdate: NoAction)
+  BUOI         BUOI      @relation(fields: [B_TEN], references: [B_TEN], onDelete: NoAction, onUpdate: NoAction)
+  NGAY         NGAY      @relation(fields: [N_NGAY], references: [N_NGAY], onDelete: NoAction, onUpdate: NoAction)
+  PHONG        PHONG     @relation(fields: [P_MA], references: [P_MA], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([BS_MA, N_NGAY, B_TEN])
+  @@unique([P_MA, N_NGAY, B_TEN], map: "uq_lich_phong_ngay_buoi")
+}
+
+model LIEU_DUNG_HOAT_CHAT {
+  LD_ID             Int     @id @default(autoincrement())
+  LD_HOAT_CHAT      String
+  LD_DUONG_DUNG     String?
+  LD_LIEU_NGUOI_LON String?
+  LD_LIEU_TRE_EM    String?
+  LD_CHI_DINH       String?
+  LD_GHI_CHU        String?
+  LD_NGUON          String?
+
+  @@index([LD_HOAT_CHAT], map: "idx_ld_hoatchat")
+}
+
+model LOAI_HINH_KHAM {
+  LHK_MA      Int         @id @default(autoincrement())
+  CK_MA       Int
+  LHK_TEN     String
+  LHK_GIA     Decimal     @default(0) @db.Decimal(12, 2)
+  LHK_MO_TA   String?
+  DANG_KY     DANG_KY[]
+  CHUYEN_KHOA CHUYEN_KHOA @relation(fields: [CK_MA], references: [CK_MA], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([CK_MA], map: "idx_lhk_ck")
+}
+
+model NGAY {
+  N_NGAY        DateTime   @id @db.Date
+  N_LA_NGAY_LAM Boolean    @default(true)
+  N_GHI_CHU     String?
+  LICH_BSK      LICH_BSK[]
+}
+
+model NHA_SAN_XUAT {
+  NSX_MA            Int     @id @default(autoincrement())
+  NSX_TEN           String
+  NSX_NUOC_SAN_XUAT String?
+  THUOC             THUOC[]
+}
+
+model NHOM_THUOC {
+  NT_MA  Int     @id @default(autoincrement())
+  NT_TEN String
+  THUOC  THUOC[]
+}
+
+model PHIEU_CDCLS {
+  PCD_MA          Int              @id @default(autoincrement())
+  PKB_MA          Int?
+  PCD_GIO_IN      DateTime?        @default(now()) @db.Timestamp(6)
+  PHIEU_KHAM_BENH PHIEU_KHAM_BENH? @relation(fields: [PKB_MA], references: [PKB_MA], onDelete: NoAction, onUpdate: NoAction)
+  THUCHIEN        THUCHIEN[]
+}
+
+model PHIEU_KHAM_BENH {
+  PKB_MA          Int           @id @default(autoincrement())
+  DK_MA           Int?          @unique
+  PKB_TRIEU_CHUNG String?
+  PKB_KET_LUAN    String?
+  PKB_LAN_KHAM    Int?
+  PKB_LOI_DAN     String?
+  CHAN_DOAN       CHAN_DOAN[]
+  DON_THUOC       DON_THUOC[]
+  PHIEU_CDCLS     PHIEU_CDCLS[]
+  DANG_KY         DANG_KY?      @relation(fields: [DK_MA], references: [DK_MA], onDelete: NoAction, onUpdate: NoAction)
+  THANH_TOAN      THANH_TOAN[]
+}
+
+model PHONG {
+  P_MA        Int         @id @default(autoincrement())
+  CK_MA       Int
+  P_TEN       String
+  P_VI_TRI    String?
+  LICH_BSK    LICH_BSK[]
+  CHUYEN_KHOA CHUYEN_KHOA @relation(fields: [CK_MA], references: [CK_MA], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([CK_MA], map: "idx_phong_ck")
+}
+
+model TAI_KHOAN {
+  TK_SDT           String         @id
+  TK_PASS          String
+  TK_NGAY_TAO      DateTime?      @default(now()) @db.Timestamp(6)
+  TK_NGAY_CAP_NHAT DateTime?      @default(now()) @db.Timestamp(6)
+  TK_DA_XOA        Boolean?       @default(false)
+  TK_VAI_TRO       String?
+  BAC_SI           BAC_SI?
+  BENH_NHAN        BENH_NHAN[]
+  THONG_BAO        THONG_BAO[]
+  XAC_THUC_OTP     XAC_THUC_OTP[]
+}
+
+model THANH_TOAN {
+  TT_MA             Int              @id @default(autoincrement())
+  DK_MA             Int?
+  PKB_MA            Int?
+  TT_LOAI           String?
+  TT_PHUONG_THUC    String?
+  TT_PHUONG_THUC_TT String?
+  TT_TIEN_KHAM      Decimal?         @default(0) @db.Decimal(12, 2)
+  TT_PHI_TIEN_ICH   Decimal?         @default(0) @db.Decimal(12, 2)
+  TT_TONG_TIEN      Decimal?         @default(0) @db.Decimal(12, 2)
+  TT_TRANG_THAI     String?
+  TT_MIEN_GIAM      Decimal?         @default(0) @db.Decimal(12, 2)
+  TT_THUC_THU       Decimal?         @default(0) @db.Decimal(12, 2)
+  TT_MA_GIAO_DICH   String?
+  TT_THOI_GIAN      DateTime?        @default(now()) @db.Timestamp(6)
+  DANG_KY           DANG_KY?         @relation(fields: [DK_MA], references: [DK_MA], onDelete: NoAction, onUpdate: NoAction)
+  PHIEU_KHAM_BENH   PHIEU_KHAM_BENH? @relation(fields: [PKB_MA], references: [PKB_MA], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model THONG_BAO {
+  TB_MA         Int        @id @default(autoincrement())
+  TK_SDT        String?
+  TB_TIEU_DE    String?
+  TB_LOAI       String?
+  TB_NOI_DUNG   String?
+  TB_TRANG_THAI String?
+  TB_THOI_GIAN  DateTime?  @default(now()) @db.Timestamp(6)
+  TAI_KHOAN     TAI_KHOAN? @relation(fields: [TK_SDT], references: [TK_SDT], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([TK_SDT], map: "idx_tb_tk")
+}
+
+model THUCHIEN {
+  PCD_MA                 Int
+  DVCLS_MA               Int
+  CTCD_LAN_THUC_HIEN     Int?                 @default(1)
+  CTCD_DA_THUC_HIEN      Boolean?             @default(false)
+  CTCD_THOI_GIAN_CHECKIN DateTime?            @db.Timestamp(6)
+  KET_QUA_CAN_LAM_SAN    KET_QUA_CAN_LAM_SAN?
+  DICHVU                 DICHVU               @relation(fields: [DVCLS_MA], references: [DVCLS_MA], onDelete: NoAction, onUpdate: NoAction)
+  PHIEU_CDCLS            PHIEU_CDCLS          @relation(fields: [PCD_MA], references: [PCD_MA], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([PCD_MA, DVCLS_MA])
+}
+
+model THUOC {
+  T_MA               Int                  @id @default(autoincrement())
+  BD_MA              Int?
+  DVT_MA             Int?
+  NT_MA              Int?
+  NSX_MA             Int?
+  T_TEN_THUOC        String
+  T_DA_XOA           Boolean?             @default(false)
+  T_GIA_THUOC        Decimal?             @default(0) @db.Decimal(12, 2)
+  T_HAN_SU_DUNG      DateTime?            @db.Date
+  CHI_TIET_DON_THUOC CHI_TIET_DON_THUOC[]
+  BIET_DUOC          BIET_DUOC?           @relation(fields: [BD_MA], references: [BD_MA], onDelete: NoAction, onUpdate: NoAction)
+  DON_VI_TINH        DON_VI_TINH?         @relation(fields: [DVT_MA], references: [DVT_MA], onDelete: NoAction, onUpdate: NoAction)
+  NHA_SAN_XUAT       NHA_SAN_XUAT?        @relation(fields: [NSX_MA], references: [NSX_MA], onDelete: NoAction, onUpdate: NoAction)
+  NHOM_THUOC         NHOM_THUOC?          @relation(fields: [NT_MA], references: [NT_MA], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model TINH_TP {
+  TTP_MA    Int         @id @default(autoincrement())
+  TTP_TEN   String
+  XA_PHUONG XA_PHUONG[]
+}
+
+model XAC_THUC_OTP {
+  OTP_MA            Int        @id @default(autoincrement())
+  TK_SDT            String?
+  OTP_CODE          String
+  OTP_LOAI          String?
+  OTP_THOI_GIAN_TAO DateTime?  @default(now()) @db.Timestamp(6)
+  OTP_HET_HAN       DateTime?  @db.Timestamp(6)
+  OTP_TRANG_THAI    String?
+  TAI_KHOAN         TAI_KHOAN? @relation(fields: [TK_SDT], references: [TK_SDT], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([TK_SDT], map: "idx_otp_tk")
+}
+
+model XA_PHUONG {
+  XP_MA   Int     @id @default(autoincrement())
+  TTP_MA  Int
+  XP_TEN  String
+  AP_KV   AP_KV[]
+  TINH_TP TINH_TP @relation(fields: [TTP_MA], references: [TTP_MA], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([TTP_MA], map: "idx_xp_ttp")
+}
