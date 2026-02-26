@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UMC Clinic - Test API (Phase 0)</title>
+    <!-- Use Tailwind CSS for quick styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        .fade-enter-active, .fade-leave-active {
+            transition: opacity 0.3s;
+        }
+        .fade-enter-from, .fade-leave-to {
+            opacity: 0;
+        }
+        body {
+            background-color: #f3f4f6;
+        }
+    </style>
+</head>
+<body>
+    <div id="app" class="max-w-6xl mx-auto p-4 space-y-6">
+        <header class="bg-blue-600 text-white p-6 rounded-xl shadow-lg flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold">UMC Clinic API Tester</h1>
+                <p class="text-blue-100 mt-1">Giao diện test Phase 0 (Auth, Users, Schedules)</p>
+            </div>
+            <div class="text-right">
+                <p v-if="token" class="text-green-300 font-semibold mb-1">✅ Đã Đăng Nhập</p>
+                <p v-else class="text-gray-300 font-semibold mb-1">❌ Chưa Đăng Nhập</p>
+                <p class="text-sm">Role hiện tại: <span class="font-bold font-mono bg-blue-800 px-2 py-1 rounded">{{ currentRole || 'N/A' }}</span></p>
+                <div class="mt-2 space-x-2">
+                    <button @click="setAdminToken" class="text-xs bg-red-500 hover:bg-red-600 px-2 py-1 rounded">Fake Admin Token</button>
+                    <button @click="logout" v-if="token" class="text-xs bg-gray-500 hover:bg-gray-600 px-2 py-1 rounded">Logout</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Response Alert -->
+        <transition name="fade">
+            <div v-if="alert.show" :class="`p-4 rounded-xl shadow-md border-l-4 ${alert.type === 'success' ? 'bg-green-50 border-green-500 text-green-700' : 'bg-red-50 border-red-500 text-red-700'}`">
+                <div class="flex justify-between items-start">
+                    <pre class="whitespace-pre-wrap text-sm font-mono flex-1 overflow-x-auto">{{ alert.msg }}</pre>
+                    <button @click="alert.show = false" class="ml-4 font-bold text-lg leading-none">&times;</button>
+                </div>
+            </div>
+        </transition>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            <!-- ====== CARD 1: ĐĂNG KÝ BỆNH NHÂN ====== -->
+            <div class="bg-white p-6 rounded-xl shadow border border-gray-100">
+                <div class="border-b pb-2 mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">1. Đăng ký Bệnh nhân</h2>
+                    <p class="text-xs text-gray-500 uppercase font-mono mt-1">POST /auth/register</p>
+                </div>
+                <form @submit.prevent="registerPatient" class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Họ lót</label>
+                            <input v-model="forms.register.BN_HO_CHU_LOT" type="text" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Tên <span class="text-red-500">*</span></label>
+                            <input v-model="forms.register.BN_TEN" type="text" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Số điện thoại (ID) <span class="text-red-500">*</span></label>
+                        <input v-model="forms.register.TK_SDT" type="text" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Mật khẩu <span class="text-red-500">*</span></label>
+                        <input v-model="forms.register.TK_PASS" type="password" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2">
+                    </div>
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition">Tạo Bệnh Nhân</button>
+                </form>
+            </div>
+
+            <!-- ====== CARD 2: ĐĂNG NHẬP ====== -->
+            <div class="bg-white p-6 rounded-xl shadow border border-gray-100">
+                <div class="border-b pb-2 mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">2. Đăng nhập (Lấy Token)</h2>
+                    <p class="text-xs text-gray-500 uppercase font-mono mt-1">POST /auth/login</p>
+                </div>
+                <form @submit.prevent="login" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Số điện thoại <span class="text-red-500">*</span></label>
+                        <input v-model="forms.login.TK_SDT" type="text" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Mật khẩu <span class="text-red-500">*</span></label>
+                        <input v-model="forms.login.TK_PASS" type="password" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2">
+                    </div>
+                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded transition">Đăng nhập</button>
+                </form>
+            </div>
+
+            <!-- ====== CARD 3: ADMIN TẠO BÁC SĨ ====== -->
+            <div class="bg-white p-6 rounded-xl shadow border border-red-200 border-l-4 border-l-red-500 relative">
+                <div class="absolute top-0 right-0 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-bl">Requires ADMIN</div>
+                <div class="border-b pb-2 mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">3. Admin tạo tài khoản Bác sĩ</h2>
+                    <p class="text-xs text-gray-500 uppercase font-mono mt-1">POST /users/doctors</p>
+                </div>
+                <form @submit.prevent="createDoctor" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Họ Tên Bác sĩ <span class="text-red-500">*</span></label>
+                        <input v-model="forms.doctor.BS_HO_TEN" type="text" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 border p-2">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">SĐT (Dùng login) <span class="text-red-500">*</span></label>
+                            <input v-model="forms.doctor.TK_SDT" type="text" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 border p-2">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Mật khẩu <span class="text-red-500">*</span></label>
+                            <input v-model="forms.doctor.TK_PASS" type="password" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 border p-2">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Mã Chuyên khoa (CK_MA) <span class="text-red-500">*</span></label>
+                            <input v-model.number="forms.doctor.CK_MA" type="number" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 border p-2" placeholder="Ví dụ: 1">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Danh xưng (Học hàm)</label>
+                            <input v-model="forms.doctor.BS_HOC_HAM" type="text" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 border p-2" placeholder="ThS. BS...">
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition">Cấp tài khoản Bác Sĩ</button>
+                    <div class="text-xs text-gray-500 mt-2">
+                        <p>* Nút <span class="font-bold">Fake Admin Token</span> trên Header giúp đổi JWT Role thành ADMIN để gọi API này (yêu cầu sửa DB hoặc JWT mock để test).</p>
+                    </div>
+                </form>
+            </div>
+
+            <!-- ====== CARD 4: BÁC SĨ ĐĂNG KÝ LỊCH TRỰC ====== -->
+            <div class="bg-white p-6 rounded-xl shadow border border-teal-200 border-l-4 border-l-teal-500 relative">
+                <div class="absolute top-0 right-0 bg-teal-500 text-white text-xs font-bold px-2 py-1 rounded-bl">Requires BAC_SI</div>
+                <div class="border-b pb-2 mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">4. Bác sĩ đăng ký lịch làm việc</h2>
+                    <p class="text-xs text-gray-500 uppercase font-mono mt-1">POST /schedules/register</p>
+                </div>
+                <form @submit.prevent="registerSchedule" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Ngày đăng ký (YYYY-MM-DD) <span class="text-red-500">*</span></label>
+                        <input v-model="forms.schedule.N_NGAY" type="date" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 border p-2">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Buổi <span class="text-red-500">*</span></label>
+                            <select v-model="forms.schedule.B_TEN" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 border p-2 bg-white">
+                                <option value="SANG">Sáng</option>
+                                <option value="CHIEU">Chiều</option>
+                                <option value="TOI">Tối</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Mã Phòng (P_MA) <span class="text-red-500">*</span></label>
+                            <input v-model.number="forms.schedule.P_MA" type="number" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 border p-2" placeholder="Ví dụ: 1">
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded transition">Lưu lịch trực</button>
+                    
+                    <hr class="my-4">
+                    <button type="button" @click="getMySchedules" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded transition border border-gray-300">Xem danh sách lịch của tôi</button>
+                    <p class="text-xs text-center mt-1 font-mono text-gray-500">GET /schedules/my-schedules</p>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        const API_BASE = 'http://localhost:3000'; // Đảm bảo backend Nest chạy cổng này
+
+        createApp({
+            data() {
+                return {
+                    token: localStorage.getItem('jwt_token') || '',
+                    currentRole: localStorage.getItem('jwt_role') || '',
+                    alert: { show: false, type: 'success', msg: '' },
+                    forms: {
+                        register: { TK_SDT: '', TK_PASS: '', BN_HO_CHU_LOT: '', BN_TEN: '' },
+                        login: { TK_SDT: '', TK_PASS: '' },
+                        doctor: { TK_SDT: '', TK_PASS: '', BS_HO_TEN: '', CK_MA: null, BS_HOC_HAM: '' },
+                        schedule: { N_NGAY: new Date().toISOString().split('T')[0], B_TEN: 'SANG', P_MA: null }
+                    }
+                }
+            },
+            methods: {
+                showAlert(msg, type = 'success') {
+                    this.alert = { show: true, type, msg: typeof msg === 'object' ? JSON.stringify(msg, null, 2) : msg };
+                    // Tự động tắt sau 7s nếu là success
+                    if (type === 'success') {
+                        setTimeout(() => { this.alert.show = false; }, 7000);
+                    }
+                },
+                getHeaders() {
+                    return this.token ? { Authorization: `Bearer ${this.token}` } : {};
+                },
+                
+                async registerPatient() {
+                    try {
+                        const res = await axios.post(`${API_BASE}/auth/register`, this.forms.register);
+                        this.showAlert({ message: "Đăng ký Bệnh nhân thành công!", data: res.data });
+                    } catch (e) {
+                        this.showAlert(e.response?.data || e.message, 'error');
+                    }
+                },
+                
+                async login() {
+                    try {
+                        const res = await axios.post(`${API_BASE}/auth/login`, this.forms.login);
+                        this.token = res.data.access_token;
+                        this.currentRole = res.data.user?.TK_VAI_TRO;
+                        localStorage.setItem('jwt_token', this.token);
+                        localStorage.setItem('jwt_role', this.currentRole);
+                        this.showAlert({ message: "Đăng nhập thành công!", data: res.data });
+                    } catch (e) {
+                        this.showAlert(e.response?.data || e.message, 'error');
+                    }
+                },
+
+                async createDoctor() {
+                    try {
+                        const res = await axios.post(`${API_BASE}/users/doctors`, this.forms.doctor, { headers: this.getHeaders() });
+                        this.showAlert({ message: "Tạo Bác sĩ thành công!", data: res.data });
+                    } catch (e) {
+                        this.showAlert(e.response?.data || e.message, 'error');
+                    }
+                },
+
+                async registerSchedule() {
+                    try {
+                        const res = await axios.post(`${API_BASE}/schedules/register`, this.forms.schedule, { headers: this.getHeaders() });
+                        this.showAlert({ message: "Đăng ký lịch thành công!", data: res.data });
+                    } catch (e) {
+                        this.showAlert(e.response?.data || e.message, 'error');
+                    }
+                },
+
+                async getMySchedules() {
+                    try {
+                        const res = await axios.get(`${API_BASE}/schedules/my-schedules`, { headers: this.getHeaders() });
+                        this.showAlert({ message: "Danh sách lịch trình của bạn:", data: res.data });
+                    } catch (e) {
+                        this.showAlert(e.response?.data || e.message, 'error');
+                    }
+                },
+
+                logout() {
+                    this.token = '';
+                    this.currentRole = '';
+                    localStorage.removeItem('jwt_token');
+                    localStorage.removeItem('jwt_role');
+                    this.showAlert("Đã Logout");
+                },
+
+                // Hacker mode để test UI Admin khi mới dev, thực tế bạn phải tạo tài khoản admin trong DB
+                setAdminToken() {
+                    // Để gọi API Admin (nếu JWT guard phân Role chặt) -> Bạn phải dùng tài khoản ADMIN thực sự từ DB. 
+                    // Nút này chỉ nhắc nhở bạn. 
+                    alert("Cần tài khoản có ROLE='ADMIN' trong DB để lấy token hợp lệ. Mời bạn insert vào DB một acc admin, rồi dùng form Đăng nhập (thẻ số 2) để lấy Token nhé!");
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
