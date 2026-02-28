@@ -17,6 +17,11 @@ async function bootstrap() {
 
   app.enableCors();
 
+  // Chèn dòng này ngay sau khi import hoặc đầu hàm bootstrap
+  console.log('--- KIỂM TRA BIẾN MÔI TRƯỜNG ---');
+  console.log('Database URL:', process.env.DATABASE_URL);
+  console.log('--------------------------------');
+
   await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();

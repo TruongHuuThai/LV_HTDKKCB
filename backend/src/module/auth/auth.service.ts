@@ -19,21 +19,16 @@ export class AuthService {
 
   async login(TK_SDT: string, TK_PASS: string) {
     const acc = await this.repo.findAccountByPhone(TK_SDT);
-    const { raw, hash } = this.makeRefreshToken();
-    const exp = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 ngày
-
-    await this.repo.createRefreshToken({
-      TK_SDT: acc.TK_SDT,
-      RT_HASH: hash,
-      RT_EXPIRES_AT: exp,
-      // optional: user agent, ip lấy từ controller nếu muốn
-    });
 
     if (!acc || acc.TK_DA_XOA) {
       throw new UnauthorizedException('Sai tài khoản hoặc mật khẩu');
     }
 
-    const ok = await bcrypt.compare(TK_PASS, acc.TK_PASS);
+    // Hỗ trợ cả password plain text (dữ liệu seed cũ) và password đã bcrypt
+    const isBcryptHash = acc.TK_PASS?.startsWith('$2b$') || acc.TK_PASS?.startsWith('$2a$');
+    const ok = isBcryptHash
+      ? await bcrypt.compare(TK_PASS, acc.TK_PASS)
+      : TK_PASS === acc.TK_PASS;
     if (!ok) throw new UnauthorizedException('Sai tài khoản hoặc mật khẩu');
 
     const token = await this.jwt.signAsync(
@@ -41,13 +36,20 @@ export class AuthService {
       { expiresIn: process.env.JWT_EXPIRES_IN ?? '7d' } as any,
     );
 
+    const { raw, hash } = this.makeRefreshToken();
+    const exp = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 ngày
+    await this.repo.createRefreshToken({
+      TK_SDT: acc.TK_SDT,
+      RT_HASH: hash,
+      RT_EXPIRES_AT: exp,
+    });
+
     return {
       access_token: token,
       refresh_token: raw,
       user: {
         TK_SDT: acc.TK_SDT,
         TK_VAI_TRO: acc.TK_VAI_TRO,
-        // nếu bác sĩ: có BAC_SI, nếu bệnh nhân: có BENH_NHAN (array)
         BS_MA: acc.BAC_SI?.BS_MA ?? null,
         BN_MA: acc.BENH_NHAN?.[0]?.BN_MA ?? null,
       },
@@ -150,12 +152,9 @@ export class AuthService {
     if (!ok) throw new UnauthorizedException('Mật khẩu cũ không chính xác');
 
     const newHash = await bcrypt.hash(new_pass, 10);
+    await this.repo.updatePassword(TK_SDT, newHash);
 
-    // Using prisma context directly here just for update password since repo doesn't have it
-    // Wait, the auth.repository.ts might not have updatePassword. I should add it or use repo's update?
-    // Let's use `createAccount` style but it's an update. Wait, I should add `updatePassword` to `auth.repository.ts`.
-    // I will temporarily leave a prisma call here, but it's better to update repo.
-    throw new Error('Please add updatePassword to repo first');
+    return { message: 'Đổi mật khẩu thành công' };
   }
 
   private makeRefreshToken() {
