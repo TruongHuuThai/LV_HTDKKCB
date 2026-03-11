@@ -10,9 +10,12 @@ export class UsersRepository {
   constructor(private readonly prisma: PrismaService) { }
 
   // ===== BAC_SI =====
-  listDoctors() {
+  listDoctors(specialtyId?: number) {
     return this.prisma.bAC_SI.findMany({
-      where: { BS_DA_XOA: false },
+      where: {
+        BS_DA_XOA: false,
+        ...(specialtyId ? { CK_MA: specialtyId } : {}),
+      },
       include: { CHUYEN_KHOA: true },
       orderBy: { BS_MA: 'asc' },
     });

@@ -91,10 +91,36 @@ export interface Specialty {
     CK_TEN: string;
     CK_MO_TA?: string | null;
     CK_ANH?: string | null;
+    CK_DOI_TUONG_KHAM?: string | null;
 }
 
 export const getSpecialties = async (): Promise<Specialty[]> => {
     const res = await api.get<Specialty[]>('/users/specialties');
+    return res.data;
+};
+
+// ─── Doctor ─────────────────────────────────────────────────────────────────────────
+export interface Doctor {
+    BS_MA: number;
+    BS_HO_TEN: string;
+    BS_HOC_HAM: string | null;
+    BS_ANH: string | null;
+    BS_EMAIL: string | null;
+    BS_SDT: string | null;
+    CK_MA: number;
+    CHUYEN_KHOA: Specialty & {
+        CK_DOI_TUONG_KHAM?: string | null;
+    };
+}
+
+export const getDoctors = async (specialtyId?: number): Promise<Doctor[]> => {
+    const params = specialtyId ? { specialtyId } : {};
+    const res = await api.get<Doctor[]>('/users/doctors', { params });
+    return res.data;
+};
+
+export const getDoctorDetail = async (id: number): Promise<Doctor> => {
+    const res = await api.get<Doctor>(`/users/doctors/${id}`);
     return res.data;
 };
 

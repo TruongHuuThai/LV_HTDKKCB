@@ -24,7 +24,7 @@ export default function HomePage() {
                         </div>
                         <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6">
                             Đặt lịch khám <br />
-                            <span className="text-[hsl(195,100%,85%)]">nhanh chóng</span> &<br />
+                            <span className="text-[hsl(195,100%,85%)]">nhanh chóng</span> và<br />
                             tiện lợi
                         </h1>
                         <p className="text-lg text-white/80 mb-8 leading-relaxed">
@@ -32,13 +32,13 @@ export default function HomePage() {
                             bác sĩ chuyên khoa hàng đầu chỉ trong vài bước đơn giản.
                         </p>
                         <div className="flex flex-wrap gap-3">
-                            <Button size="lg" className="bg-white text-[hsl(var(--primary))] hover:bg-white/90 shadow-lg" asChild>
+                            <Button size="lg" className="bg-white text-[hsl(var(--primary))] border border-white shadow-lg hover:bg-white/20 hover:text-white hover:border-white hover:scale-[1.03] transition-all duration-200" asChild>
                                 <Link to="/booking">
                                     <Calendar className="w-5 h-5 mr-2" />
                                     Đặt lịch ngay
                                 </Link>
                             </Button>
-                            <Button size="lg" variant="outline" className="border-white/40 text-white hover:bg-white/10" asChild>
+                            <Button size="lg" className="bg-white text-[hsl(var(--primary))] border border-white shadow-lg hover:bg-white/20 hover:text-white hover:border-white hover:scale-[1.03] transition-all duration-200" asChild>
                                 <Link to="/doctors">
                                     Xem bác sĩ <ArrowRight className="w-4 h-4 ml-1" />
                                 </Link>

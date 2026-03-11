@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateDoctorDto } from './dto/create-doctor.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -11,8 +11,9 @@ export class UsersController {
     constructor(private readonly usersService: UsersService) { }
 
     @Get('doctors')
-    async getDoctors() {
-        return this.usersService.getDoctors();
+    async getDoctors(@Query('specialtyId') specialtyId?: string) {
+        const ckMa = specialtyId ? parseInt(specialtyId, 10) : undefined;
+        return this.usersService.getDoctors(ckMa);
     }
 
     @Get('doctors/:id')

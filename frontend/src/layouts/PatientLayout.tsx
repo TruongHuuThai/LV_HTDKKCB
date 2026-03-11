@@ -51,9 +51,9 @@ export default function PatientLayout() {
                         <div>
                             <h4 className="font-semibold mb-3 text-[hsl(var(--sidebar-primary))]">Liên hệ</h4>
                             <ul className="space-y-2 text-sm text-[hsl(var(--sidebar-foreground))/0.7]">
-                                <li>📍 201B Nguyễn Chí Thanh, Q5, TP.HCM</li>
-                                <li>📞 (028) 3855 4269</li>
-                                <li>✉️ info@umc.edu.vn</li>
+                                <li>📍 3/2 Xuân Khánh, Ninh Kiều, Cần Thơ, Vietnam</li>
+                                <li>📞 (084) 867 504 590</li>
+                                <li>✉️ thaib2203469@student.ctu.edu.vn</li>
                             </ul>
                         </div>
                     </div>

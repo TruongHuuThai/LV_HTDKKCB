@@ -1,5 +1,5 @@
 // src/components/layout/Header.tsx
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
     Heart, Menu, ChevronDown, LogOut, User,
@@ -12,7 +12,9 @@ import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/useAuthStore';
 import { authService } from '@/services/authService';
 import { useSpecialties } from '@/hooks/useSpecialties';
-import { cn } from '@/lib/utils';
+import { cn, toSlug } from '@/lib/utils';
+import { SERVICES } from '@/data/servicesData';
+import { SPECIALTIES_DATA } from '@/data/specialtiesData';
 
 // ─── Mock fallback khi DB chưa có dữ liệu ──────────────────────────────────
 const MOCK_SPECIALTIES = [
@@ -43,29 +45,21 @@ const MENU_GROUPS: MenuGroup[] = [
         id: 'dich-vu',
         label: 'Dịch vụ',
         icon: Briefcase,
-        items: [
-            { title: 'Khám tổng quát', href: '/dich-vu/kham-tong-quat', desc: 'Kiểm tra sức khỏe định kỳ' },
-            { title: 'Xét nghiệm', href: '/dich-vu/xet-nghiem', desc: 'Máu, nước tiểu và các chỉ số' },
-            { title: 'Chẩn đoán hình ảnh', href: '/dich-vu/chan-doan', desc: 'X-quang, siêu âm, MRI' },
-            { title: 'Tiêm chủng', href: '/dich-vu/tiem-chung', desc: 'Vắc-xin phòng dịch' },
-        ],
-    },
-    {
-        id: 'doi-ngu',
-        label: 'Đội ngũ bác sĩ',
-        icon: User,
-        items: [
-            { title: 'Tất cả bác sĩ', href: '/doctors', desc: 'Danh sách bác sĩ chuyên khoa' },
-            { title: 'Bác sĩ nổi bật', href: '/doctors?featured=true', desc: 'Chuyên gia hàng đầu UMC' },
-        ],
+        // Dynamically built from SERVICES data
+        items: SERVICES.map((s) => ({
+            title: s.title,
+            href: `/dich-vu/${s.id}`,
+            desc: s.shortDesc,
+        })),
     },
     {
         id: 'tin-tuc',
         label: 'Tin tức',
         icon: Newspaper,
         items: [
-            { title: 'Tin y tế', href: '/tin-tuc', desc: 'Cập nhật từ ngành y tế' },
-            { title: 'Sức khỏe đời sống', href: '/tin-tuc/suc-khoe', desc: 'Lời khuyên sống khỏe' },
+            { title: 'Y học thường thức', href: '/tin-tuc/y-hoc-thuong-thuc', desc: 'Kiến thức y tế hữu ích cho sức khỏe hàng ngày' },
+            { title: 'Tin tức sự kiện', href: '/tin-tuc/tin-tuc-su-kien', desc: 'Tin tức, sự kiện mới nhất từ UMC Clinic' },
+            { title: 'Hỏi đáp y khoa', href: '/tin-tuc/hoi-dap-y-khoa', desc: 'Bác sĩ giải đáp các thắc mắc y tế thường gặp' },
         ],
     },
     {
@@ -73,9 +67,9 @@ const MENU_GROUPS: MenuGroup[] = [
         label: 'Hướng dẫn',
         icon: BookOpen,
         items: [
-            { title: 'Quy trình đặt lịch', href: '/huong-dan/dat-lich', desc: 'Hướng dẫn từng bước' },
-            { title: 'Chuẩn bị khám', href: '/huong-dan/chuan-bi', desc: 'Những điều cần lưu ý' },
-            { title: 'Thanh toán & Bảo hiểm', href: '/huong-dan/thanh-toan', desc: 'Hình thức thanh toán' },
+            { title: 'Quy trình đặt lịch', href: '/huong-dan/quy-trinh-dat-lich', desc: 'Hướng dẫn từng bước đặt lịch khám trực tuyến' },
+            { title: 'Chuẩn bị khám', href: '/huong-dan/chuan-bi-kham', desc: 'Giấy tờ và lưu ý trước khi đến khám' },
+            { title: 'Thanh toán và bảo hiểm', href: '/huong-dan/thanh-toan-va-bao-hiem', desc: 'Hình thức thanh toán và quyền lợi BHYT' },
         ],
     },
 ];
@@ -113,26 +107,28 @@ function HoverDropdown({ group }: { group: MenuGroup }) {
 
             {open && (
                 <div
-                    className="absolute left-0 top-full pt-1 z-[60] min-w-[240px]"
+                    className="absolute left-0 top-full pt-2 z-[60] min-w-[240px]"
                     onMouseEnter={show}
                     onMouseLeave={hide}
                 >
-                    <div className="bg-blue-700 rounded-xl shadow-xl shadow-blue-900/20 overflow-hidden border border-blue-600">
-                        {group.items.map((item) => (
-                            <Link
-                                key={item.href}
-                                to={item.href}
-                                onClick={() => setOpen(false)}
-                                className="flex flex-col px-4 py-3 hover:bg-blue-600 transition-colors group"
-                            >
-                                <span className="text-sm font-medium text-white group-hover:text-blue-100">
-                                    {item.title}
-                                </span>
-                                <span className="text-xs text-blue-200/70 mt-0.5 leading-relaxed">
-                                    {item.desc}
-                                </span>
-                            </Link>
-                        ))}
+                    <div className="bg-white/95 backdrop-blur-md rounded-xl shadow-xl shadow-blue-500/15 border border-blue-100 overflow-hidden">
+                        <div className="overflow-y-auto max-h-[70vh]">
+                            {group.items.map((item) => (
+                                <Link
+                                    key={item.href}
+                                    to={item.href}
+                                    onClick={() => setOpen(false)}
+                                    className="flex flex-col px-4 py-3 hover:bg-blue-50 transition-colors group border-b border-blue-50 last:border-0"
+                                >
+                                    <span className="text-sm font-semibold text-gray-800 group-hover:text-blue-700 transition-colors">
+                                        {item.title}
+                                    </span>
+                                    <span className="text-xs text-gray-400 mt-0.5 leading-relaxed">
+                                        {item.desc}
+                                    </span>
+                                </Link>
+                            ))}
+                        </div>
                     </div>
                 </div>
             )}
@@ -140,32 +136,33 @@ function HoverDropdown({ group }: { group: MenuGroup }) {
     );
 }
 
-// ─── SpecialtiesDropdown — dynamic từ API ────────────────────────────────────
+// ─── SpecialtiesDropdown — real API data, slug-based links ───────────────────
 function SpecialtiesDropdown() {
     const [open, setOpen] = useState(false);
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const { data: specialties, isLoading, isError } = useSpecialties();
 
-    const show = () => {
-        if (timerRef.current) clearTimeout(timerRef.current);
-        setOpen(true);
-    };
-    const hide = () => {
-        timerRef.current = setTimeout(() => setOpen(false), 120);
-    };
+    const show = () => { if (timerRef.current) clearTimeout(timerRef.current); setOpen(true); };
+    const hide = () => { timerRef.current = setTimeout(() => setOpen(false), 120); };
 
-    // Dùng mock nếu API chưa có dữ liệu
-    const displayData = (specialties && specialties.length > 0) ? specialties : MOCK_SPECIALTIES;
-    const isMock = !specialties || specialties.length === 0;
+    // Use API data; fall back to SPECIALTIES_DATA names when API empty
+    const items = useMemo(() => {
+        if (specialties && specialties.length > 0) {
+            return specialties.map((ck) => ({
+                key: String(ck.CK_MA),
+                name: ck.CK_TEN,
+                slug: toSlug(ck.CK_TEN),
+            }));
+        }
+        return SPECIALTIES_DATA.map((s) => ({ key: s.id, name: s.name, slug: s.slug }));
+    }, [specialties]);
 
     return (
         <div className="relative" onMouseEnter={show} onMouseLeave={hide}>
             <button
                 className={cn(
                     'flex items-center gap-1 px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap',
-                    open
-                        ? 'bg-blue-700 text-white'
-                        : 'text-gray-700 hover:bg-blue-50 hover:text-blue-700',
+                    open ? 'bg-blue-700 text-white' : 'text-gray-700 hover:bg-blue-50 hover:text-blue-700',
                 )}
             >
                 Chuyên khoa
@@ -174,74 +171,172 @@ function SpecialtiesDropdown() {
 
             {open && (
                 <div
-                    className="absolute left-0 top-full pt-1 z-[60] w-[480px]"
+                    className="absolute left-0 top-full pt-2 z-[60] w-[480px]"
                     onMouseEnter={show}
                     onMouseLeave={hide}
                 >
-                    <div className="bg-blue-700 rounded-xl shadow-xl shadow-blue-900/20 border border-blue-600 overflow-hidden">
-                        {/* Header của dropdown */}
-                        <div className="px-4 py-2.5 bg-blue-800 border-b border-blue-600 flex items-center justify-between">
-                            <span className="text-xs font-semibold text-blue-200 uppercase tracking-wider">
+                    <div className="bg-white/95 backdrop-blur-md rounded-xl shadow-xl shadow-blue-500/15 border border-blue-100 overflow-hidden">
+                        {/* Header */}
+                        <div className="px-4 py-2.5 bg-gradient-to-r from-blue-50 to-blue-100/60 border-b border-blue-100 flex items-center justify-between">
+                            <span className="text-xs font-semibold text-blue-500 uppercase tracking-wider">
                                 Danh mục chuyên khoa
                             </span>
-                            {isMock && !isLoading && (
-                                <span className="text-[10px] text-blue-300/60">Dữ liệu mẫu</span>
+                            {isError && (
+                                <span className="text-[10px] text-gray-400">Dữ liệu mẫu</span>
                             )}
                         </div>
 
                         {/* Content */}
                         <div className="p-3">
                             {isLoading ? (
-                                /* Skeleton loading */
                                 <div className="grid grid-cols-2 gap-1.5">
                                     {Array.from({ length: 6 }).map((_, i) => (
                                         <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg animate-pulse">
-                                            <div className="w-6 h-6 rounded-md bg-blue-600" />
-                                            <div className="h-3 bg-blue-600 rounded flex-1" />
+                                            <div className="w-6 h-6 rounded-md bg-blue-100" />
+                                            <div className="h-3 bg-blue-100 rounded flex-1" />
                                         </div>
                                     ))}
                                 </div>
-                            ) : isError ? (
-                                /* Error state */
-                                <div className="flex flex-col items-center gap-2 py-4 text-center">
-                                    <AlertCircle className="w-8 h-8 text-blue-300/60" />
-                                    <p className="text-sm text-blue-200">Không thể tải danh sách chuyên khoa</p>
-                                    <p className="text-xs text-blue-300/60">Hiển thị dữ liệu mẫu bên dưới</p>
-                                </div>
-                            ) : null}
-
-                            {/* Grid chuyên khoa (dù loading/error vẫn hiện mock) */}
-                            <ul className={cn('grid grid-cols-2 gap-1', isLoading && 'mt-2 border-t border-blue-600 pt-2')}>
-                                {(isLoading ? MOCK_SPECIALTIES : displayData).map((ck, i) => (
-                                    <li key={ck.CK_MA || i}>
-                                        <Link
-                                            to={ck.CK_MA ? `/chuyen-khoa/${ck.CK_MA}` : '#'}
-                                            onClick={() => setOpen(false)}
-                                            className={cn(
-                                                'flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-blue-600 transition-colors group',
-                                                isLoading && 'opacity-40 pointer-events-none'
-                                            )}
-                                        >
-                                            <div className="w-7 h-7 rounded-md bg-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-500 transition-colors">
-                                                <Stethoscope className="w-3.5 h-3.5 text-blue-200" />
-                                            </div>
-                                            <span className="text-sm text-white group-hover:text-blue-100 truncate">
-                                                {ck.CK_TEN}
-                                            </span>
-                                        </Link>
-                                    </li>
-                                ))}
-                            </ul>
+                            ) : (
+                                <ul className="grid grid-cols-2 gap-1">
+                                    {items.map((item) => (
+                                        <li key={item.key}>
+                                            <Link
+                                                to={`/chuyen-khoa/${item.slug}`}
+                                                onClick={() => setOpen(false)}
+                                                className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-blue-50 transition-colors group"
+                                            >
+                                                <div className="w-7 h-7 rounded-md bg-blue-100 flex items-center justify-center shrink-0 group-hover:bg-blue-200 transition-colors">
+                                                    <Stethoscope className="w-3.5 h-3.5 text-blue-500" />
+                                                </div>
+                                                <span className="text-sm text-gray-700 group-hover:text-blue-700 truncate font-medium">
+                                                    {item.name}
+                                                </span>
+                                            </Link>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
                         </div>
 
                         {/* Footer */}
-                        <div className="px-4 py-2.5 bg-blue-800 border-t border-blue-600">
+                        <div className="px-4 py-2.5 bg-gradient-to-r from-blue-50 to-blue-100/60 border-t border-blue-100">
                             <Link
                                 to="/chuyen-khoa"
                                 onClick={() => setOpen(false)}
-                                className="flex items-center justify-center gap-1 text-xs text-blue-200 hover:text-white font-medium transition-colors"
+                                className="flex items-center justify-center gap-1 text-xs text-blue-500 hover:text-blue-700 font-semibold transition-colors"
                             >
                                 Xem tất cả chuyên khoa →
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+
+
+// ─── DoctorsDropdown — dynamic by specialty from API ─────────────────────────
+function DoctorsDropdown() {
+    const [open, setOpen] = useState(false);
+    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const { data: specialties, isLoading } = useSpecialties();
+
+    const show = () => { if (timerRef.current) clearTimeout(timerRef.current); setOpen(true); };
+    const hide = () => { timerRef.current = setTimeout(() => setOpen(false), 120); };
+
+    // Convert API specialties to slug-form, fall back to MOCK_SPECIALTIES
+    const items = (() => {
+        const src = (specialties && specialties.length > 0) ? specialties : MOCK_SPECIALTIES;
+        return src.map((ck) => ({
+            id: ck.CK_MA,
+            name: ck.CK_TEN,
+            slug: ck.CK_TEN
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/đ/g, 'd')
+                .replace(/\s+/g, '-'),
+        }));
+    })();
+
+    return (
+        <div className="relative" onMouseEnter={show} onMouseLeave={hide}>
+            <button
+                className={cn(
+                    'flex items-center gap-1 px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap',
+                    open ? 'bg-blue-700 text-white' : 'text-gray-700 hover:bg-blue-50 hover:text-blue-700',
+                )}
+            >
+                Đội ngũ bác sĩ
+                <ChevronDown className={cn('w-3.5 h-3.5 transition-transform duration-200', open && 'rotate-180')} />
+            </button>
+
+            {open && (
+                <div
+                    className="absolute left-0 top-full pt-2 z-[60] w-[400px]"
+                    onMouseEnter={show}
+                    onMouseLeave={hide}
+                >
+                    <div className="bg-white/95 backdrop-blur-md rounded-xl shadow-xl shadow-blue-500/15 border border-blue-100 overflow-hidden">
+                        {/* Header */}
+                        <div className="px-4 py-2.5 bg-gradient-to-r from-blue-50 to-blue-100/60 border-b border-blue-100 flex items-center justify-between">
+                            <span className="text-xs font-semibold text-blue-500 uppercase tracking-wider">Theo chuyên khoa</span>
+                        </div>
+
+                        {/* All doctors link */}
+                        <Link
+                            to="/doi-ngu-bac-si"
+                            onClick={() => setOpen(false)}
+                            className="flex items-center gap-2.5 px-4 py-3 hover:bg-blue-50 transition-colors border-b border-blue-100 group"
+                        >
+                            <div className="w-7 h-7 rounded-md bg-blue-100 flex items-center justify-center shrink-0 group-hover:bg-blue-200 transition-colors">
+                                <User className="w-3.5 h-3.5 text-blue-500" />
+                            </div>
+                            <span className="text-sm font-semibold text-gray-800 group-hover:text-blue-700">Tất cả bác sĩ</span>
+                        </Link>
+
+                        {/* Specialty list */}
+                        <div className="overflow-y-auto max-h-[60vh]">
+                            {isLoading ? (
+                                <div className="grid grid-cols-2 gap-1.5 p-3">
+                                    {Array.from({ length: 6 }).map((_, i) => (
+                                        <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg animate-pulse">
+                                            <div className="w-6 h-6 rounded-md bg-blue-100" />
+                                            <div className="h-3 bg-blue-100 rounded flex-1" />
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <ul className="grid grid-cols-2 gap-1 p-3">
+                                    {items.map((item, i) => (
+                                        <li key={item.id || i}>
+                                            <Link
+                                                to={`/doi-ngu-bac-si/${item.slug}`}
+                                                onClick={() => setOpen(false)}
+                                                className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-blue-50 transition-colors group"
+                                            >
+                                                <div className="w-7 h-7 rounded-md bg-blue-100 flex items-center justify-center shrink-0 group-hover:bg-blue-200 transition-colors">
+                                                    <Stethoscope className="w-3.5 h-3.5 text-blue-500" />
+                                                </div>
+                                                <span className="text-sm text-gray-700 group-hover:text-blue-700 truncate font-medium">{item.name}</span>
+                                            </Link>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-4 py-2.5 bg-gradient-to-r from-blue-50 to-blue-100/60 border-t border-blue-100">
+                            <Link
+                                to="/doi-ngu-bac-si"
+                                onClick={() => setOpen(false)}
+                                className="flex items-center justify-center gap-1 text-xs text-blue-500 hover:text-blue-700 font-semibold transition-colors"
+                            >
+                                Xem tất cả bác sĩ →
                             </Link>
                         </div>
                     </div>
@@ -295,6 +390,7 @@ export default function Header() {
                         {MENU_GROUPS.map((group) => (
                             <HoverDropdown key={group.id} group={group} />
                         ))}
+                        <DoctorsDropdown />
                         <SpecialtiesDropdown />
                         {/* Liên hệ — link đơn, không dropdown */}
                         <Link
@@ -328,19 +424,23 @@ export default function Header() {
                                 <Link to="/login">Đăng nhập</Link>
                             </Button>
                         )}
-                        <Button size="sm" asChild className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm font-medium">
-                            <Link to="/booking">
-                                <Calendar className="w-4 h-4 mr-1.5" />
-                                Đặt lịch ngay
-                            </Link>
-                        </Button>
+                        <Link
+                            to="/booking"
+                            className="inline-flex items-center gap-1.5 h-8 px-3 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm transition-colors whitespace-nowrap"
+                        >
+                            <Calendar className="w-4 h-4" />
+                            Đặt lịch ngay
+                        </Link>
                     </div>
 
                     {/* ── Mobile ────────────────────────────── */}
                     <div className="flex lg:hidden items-center gap-2 ml-auto">
-                        <Button size="sm" asChild className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-8 px-3">
-                            <Link to="/booking">Đặt lịch</Link>
-                        </Button>
+                        <Link
+                            to="/booking"
+                            className="inline-flex items-center h-8 px-3 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors whitespace-nowrap"
+                        >
+                            Đặt lịch
+                        </Link>
                         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
                             <SheetTrigger asChild>
                                 <button className="p-2 rounded-lg hover:bg-gray-100 transition-colors" aria-label="Menu">
@@ -424,38 +524,22 @@ export default function Header() {
 
 // ─── Mobile Specialties section ──────────────────────────────────────────────
 function MobileSpecialties({ onNavigate }: { onNavigate: () => void }) {
-    const { data: specialties, isLoading } = useSpecialties();
-    const displayData = (specialties && specialties.length > 0) ? specialties : MOCK_SPECIALTIES;
-
     return (
         <div className="mt-2 pt-2 border-t border-gray-100">
             <p className="px-3 text-xs text-gray-400 font-semibold uppercase tracking-wider mb-2">Chuyên khoa</p>
-            {isLoading ? (
-                <p className="px-3 text-xs text-gray-400 py-2 animate-pulse">Đang tải...</p>
-            ) : (
-                <div className="space-y-0.5">
-                    {displayData.slice(0, 8).map((ck, i) => (
-                        <Link
-                            key={ck.CK_MA || i}
-                            to={ck.CK_MA ? `/chuyen-khoa/${ck.CK_MA}` : '#'}
-                            onClick={onNavigate}
-                            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-700"
-                        >
-                            <Stethoscope className="w-3.5 h-3.5 shrink-0 text-blue-400" />
-                            {ck.CK_TEN}
-                        </Link>
-                    ))}
-                    {displayData.length > 8 && (
-                        <Link
-                            to="/chuyen-khoa"
-                            onClick={onNavigate}
-                            className="px-3 py-1.5 text-xs text-blue-600 font-medium flex items-center"
-                        >
-                            Xem thêm {displayData.length - 8} chuyên khoa...
-                        </Link>
-                    )}
-                </div>
-            )}
+            <div className="space-y-0.5">
+                {SPECIALTIES_DATA.map((sp) => (
+                    <Link
+                        key={sp.id}
+                        to={`/chuyen-khoa/${sp.slug}`}
+                        onClick={onNavigate}
+                        className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-700"
+                    >
+                        <Stethoscope className="w-3.5 h-3.5 shrink-0 text-blue-400" />
+                        {sp.name}
+                    </Link>
+                ))}
+            </div>
         </div>
     );
 }

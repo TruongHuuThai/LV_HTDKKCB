@@ -2,6 +2,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { getSpecialties } from '@/services/api';
 
+// Re-export for convenience
+export type { Specialty } from '@/services/api';
+
 export function useSpecialties() {
     return useQuery({
         queryKey: ['specialties'],

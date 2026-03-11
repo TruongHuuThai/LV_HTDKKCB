@@ -19,9 +19,9 @@ export class UsersService {
     }
   }
 
-  async getDoctors() {
+  async getDoctors(specialtyId?: number) {
     try {
-      return await this.repo.listDoctors();
+      return await this.repo.listDoctors(specialtyId);
     } catch (e) {
       mapPrismaError(e);
     }

@@ -10,16 +10,32 @@ import ProtectedRoute from './ProtectedRoute';
 
 // Pages – Public
 import HomePage from '@/pages/HomePage';
-import DoctorsPage from '@/pages/DoctorsPage';
+import DoctorsPage from '@/pages/doctors/DoctorsPage';
 import BookingPage from '@/pages/BookingPage';
 import ProfilePage from '@/pages/ProfilePage';
-import SpecialtyPage from '@/pages/SpecialtyPage';
 import NotFoundPage from '@/pages/NotFoundPage';
+
+// Pages – Specialty
+import SpecialtyListPage from '@/pages/specialty/SpecialtyListPage';
+import SpecialtyDetailPage from '@/pages/specialty/SpecialtyDetailPage';
 
 // Pages – About
 import AboutPage from '@/pages/about/AboutPage';
 import WhyChooseUsPage from '@/pages/about/WhyChooseUsPage';
 import FacilitiesPage from '@/pages/about/FacilitiesPage';
+
+// Pages – Services
+import ServiceDetailPage from '@/pages/services/ServiceDetailPage';
+import ServicePackageDetailPage from '@/pages/services/ServicePackageDetailPage';
+
+// Pages – News
+import NewsCategoryPage from '@/pages/news/NewsCategoryPage';
+
+// Pages – Guides
+import GuideDetailPage from '@/pages/guide/GuideDetailPage';
+
+// Pages – Contact
+import ContactPage from '@/pages/contact/ContactPage';
 
 // Pages – Doctor
 import DoctorDashboardPage from '@/pages/DoctorDashboardPage';
@@ -47,14 +63,26 @@ const router = createBrowserRouter([
         children: [
             { path: '/', element: <HomePage /> },
             { path: '/doctors', element: <DoctorsPage /> },
+            { path: '/doi-ngu-bac-si', element: <DoctorsPage /> },
+            { path: '/doi-ngu-bac-si/:slug', element: <DoctorsPage /> },
             { path: '/booking', element: <BookingPage /> },
             { path: '/profile', element: <ProfilePage /> },
-            { path: '/chuyen-khoa', element: <DoctorsPage /> },
-            { path: '/chuyen-khoa/:id', element: <SpecialtyPage /> },
+            // Specialty pages
+            { path: '/chuyen-khoa', element: <SpecialtyListPage /> },
+            { path: '/chuyen-khoa/:slug', element: <SpecialtyDetailPage /> },
             // About pages
             { path: '/gioi-thieu/ve-chung-toi', element: <AboutPage /> },
             { path: '/gioi-thieu/tai-sao-chon-chung-toi', element: <WhyChooseUsPage /> },
             { path: '/gioi-thieu/co-so-vat-chat', element: <FacilitiesPage /> },
+            // Service pages – dynamic slug routing (specific before general)
+            { path: '/dich-vu/:categorySlug/:packageSlug', element: <ServicePackageDetailPage /> },
+            { path: '/dich-vu/:slug', element: <ServiceDetailPage /> },
+            // News pages
+            { path: '/tin-tuc/:categorySlug', element: <NewsCategoryPage /> },
+            // Guide pages
+            { path: '/huong-dan/:slug', element: <GuideDetailPage /> },
+            // Contact page
+            { path: '/lien-he', element: <ContactPage /> },
         ],
     },
 
