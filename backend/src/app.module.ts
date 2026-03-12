@@ -8,6 +8,7 @@ import { UsersModule } from './module/users/users.module';
 import { SchedulesModule } from './module/schedules/schedules.module';
 import { BookingModule } from './module/booking/booking.module';
 import { PaymentModule } from './module/payment/payment.module';
+import { AdminModule } from './module/admin/admin.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 
@@ -23,6 +24,7 @@ import { APP_GUARD } from '@nestjs/core';
     SchedulesModule,
     BookingModule,
     PaymentModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],

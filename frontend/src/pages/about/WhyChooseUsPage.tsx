@@ -22,39 +22,32 @@ function Breadcrumb({ items }: { items: { label: string; href?: string }[] }) {
     );
 }
 
+import { whyChooseUsData } from '@/data/aboutData';
+
 const FEATURES = [
     {
-        id: 1,
+        id: 'thiet-bi',
         icon: Cpu,
-        title: 'Trang thiết bị hiện đại',
         subtitle: 'Công nghệ đỉnh cao',
-        desc: 'UMC trang bị hệ thống máy MRI 3.0 Tesla, CT 256 lát cắt và hệ thống phẫu thuật robot Da Vinci Xi — thuộc hàng hiếm có tại Việt Nam.',
         points: ['Máy MRI 3.0 Tesla thế hệ mới', 'CT Scan 256 lát cắt', 'Robot phẫu thuật Da Vinci Xi', 'Lab xét nghiệm tự động ISO 15189'],
-        img: 'https://placehold.co/600x420/dbeafe/1e40af?text=Máy+MRI+CT+Hiện+Đại',
         imgAlt: 'Thiết bị MRI hiện đại',
         badge: 'Công nghệ tiên tiến',
         badgeColor: 'bg-blue-100 text-blue-700',
     },
     {
-        id: 2,
+        id: 'bac-si',
         icon: GraduationCap,
-        title: 'Bác sĩ chuyên môn cao',
         subtitle: 'Đội ngũ hàng đầu',
-        desc: 'Hơn 2.000 bác sĩ và chuyên gia đầu ngành được đào tạo từ các trường y khoa uy tín trong và ngoài nước, nhiều người tu nghiệp tại Mỹ, Pháp, Nhật Bản.',
         points: ['Giáo sư, Phó Giáo sư đầu ngành', 'Tu nghiệp quốc tế Mỹ, Pháp, Nhật', 'Liên tục cập nhật phác đồ mới', 'Hội chẩn đa chuyên khoa'],
-        img: 'https://placehold.co/600x420/f0fdf4/15803d?text=Bác+Sĩ+Chuyên+Môn+Cao',
         imgAlt: 'Bác sĩ chuyên gia',
         badge: 'Đội ngũ xuất sắc',
         badgeColor: 'bg-green-100 text-green-700',
     },
     {
-        id: 3,
+        id: 'dich-vu',
         icon: Award,
-        title: 'Dịch vụ chuẩn quốc tế',
         subtitle: 'Tiêu chuẩn JCI',
-        desc: 'UMC là một trong số ít bệnh viện tại Việt Nam đạt chứng nhận JCI (Joint Commission International) — tiêu chuẩn chất lượng y tế cao nhất thế giới.',
         points: ['Chứng nhận JCI quốc tế', 'Không gian bệnh viện 5 sao', 'Đặt lịch & tư vấn online 24/7', 'Phiên dịch đa ngôn ngữ'],
-        img: 'https://placehold.co/600x420/fef3c7/92400e?text=Không+Gian+Chuẩn+Quốc+Tế',
         imgAlt: 'Không gian sang trọng',
         badge: 'Chuẩn JCI',
         badgeColor: 'bg-amber-100 text-amber-700',
@@ -85,6 +78,8 @@ export default function WhyChooseUsPage() {
                 <div className="space-y-20">
                     {FEATURES.map((f, idx) => {
                         const reverse = idx % 2 === 1;
+                        const defaultData = whyChooseUsData.find(item => item.id === f.id) || whyChooseUsData[0];
+
                         return (
                             <div
                                 key={f.id}
@@ -92,7 +87,7 @@ export default function WhyChooseUsPage() {
                             >
                                 {/* Image — order changes by reverse */}
                                 <div className={`rounded-2xl overflow-hidden shadow-lg ${reverse ? 'lg:order-last' : ''}`}>
-                                    <img src={f.img} alt={f.imgAlt} className="w-full object-cover aspect-[4/3]" />
+                                    <img src={defaultData.imageUrl} alt={f.imgAlt} className="w-full object-cover aspect-[4/3]" />
                                 </div>
 
                                 {/* Text */}
@@ -109,9 +104,9 @@ export default function WhyChooseUsPage() {
                                     </div>
                                     <div>
                                         <p className="text-blue-600 text-sm font-semibold uppercase tracking-wider mb-1">{f.subtitle}</p>
-                                        <h2 className="text-2xl font-bold text-gray-900">{f.title}</h2>
+                                        <h2 className="text-2xl font-bold text-gray-900">{defaultData.title}</h2>
                                     </div>
-                                    <p className="text-gray-600 leading-relaxed">{f.desc}</p>
+                                    <p className="text-gray-600 leading-relaxed">{defaultData.description}</p>
                                     <ul className="space-y-2.5">
                                         {f.points.map((p) => (
                                             <li key={p} className="flex items-center gap-2.5 text-gray-700">
@@ -121,7 +116,7 @@ export default function WhyChooseUsPage() {
                                         ))}
                                     </ul>
                                     <Button asChild size="sm" className="bg-blue-600 hover:bg-blue-700 mt-2">
-                                        <Link to="/dich-vu">
+                                        <Link to={defaultData.linkTo}>
                                             Xem chi tiết <ArrowRight className="w-4 h-4 ml-1" />
                                         </Link>
                                     </Button>

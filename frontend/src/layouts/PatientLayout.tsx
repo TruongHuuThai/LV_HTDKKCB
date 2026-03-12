@@ -1,20 +1,9 @@
 // src/layouts/PatientLayout.tsx
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import { Heart } from 'lucide-react';
 import Header from '@/components/layout/Header';
-import { useAuthStore } from '@/store/useAuthStore';
-import { authService } from '@/services/authService';
 
 export default function PatientLayout() {
-    const { refreshToken, clearAuth } = useAuthStore();
-    const navigate = useNavigate();
-
-    // Kept for potential use by child components
-    const _handleLogout = async () => {
-        try { if (refreshToken) await authService.logout(refreshToken); }
-        finally { clearAuth(); navigate('/login'); }
-    };
-
     return (
         <div className="min-h-screen flex flex-col bg-[hsl(var(--background))]">
             {/* ─── Header (Sticky, NavigationMenu) ──────────────── */}

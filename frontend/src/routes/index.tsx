@@ -5,8 +5,8 @@ import { createBrowserRouter } from 'react-router-dom';
 import AuthLayout from '@/layouts/AuthLayout';
 import PatientLayout from '@/layouts/PatientLayout';
 import DoctorLayout from '@/layouts/DoctorLayout';
-import AdminLayout from '@/layouts/AdminLayout';
 import ProtectedRoute from './ProtectedRoute';
+import { adminRoutes } from './adminRoutes';
 
 // Pages – Public
 import HomePage from '@/pages/HomePage';
@@ -23,13 +23,16 @@ import SpecialtyDetailPage from '@/pages/specialty/SpecialtyDetailPage';
 import AboutPage from '@/pages/about/AboutPage';
 import WhyChooseUsPage from '@/pages/about/WhyChooseUsPage';
 import FacilitiesPage from '@/pages/about/FacilitiesPage';
+import EquipmentInfoPage from '@/pages/facilities/EquipmentInfoPage';
 
 // Pages – Services
-import ServiceDetailPage from '@/pages/services/ServiceDetailPage';
+import AllServicesOverviewPage from '@/pages/services/AllServicesOverviewPage';
+import ServiceCategoryPage from '@/pages/services/ServiceCategoryPage';
 import ServicePackageDetailPage from '@/pages/services/ServicePackageDetailPage';
 
 // Pages – News
 import NewsCategoryPage from '@/pages/news/NewsCategoryPage';
+import NewsDetailPage from '@/pages/news/NewsDetailPage';
 
 // Pages – Guides
 import GuideDetailPage from '@/pages/guide/GuideDetailPage';
@@ -39,9 +42,6 @@ import ContactPage from '@/pages/contact/ContactPage';
 
 // Pages – Doctor
 import DoctorDashboardPage from '@/pages/DoctorDashboardPage';
-
-// Pages – Admin
-import AdminDashboardPage from '@/pages/AdminDashboardPage';
 
 // Pages – Auth
 import LoginPage from '@/pages/auth/LoginPage';
@@ -74,10 +74,13 @@ const router = createBrowserRouter([
             { path: '/gioi-thieu/ve-chung-toi', element: <AboutPage /> },
             { path: '/gioi-thieu/tai-sao-chon-chung-toi', element: <WhyChooseUsPage /> },
             { path: '/gioi-thieu/co-so-vat-chat', element: <FacilitiesPage /> },
-            // Service pages – dynamic slug routing (specific before general)
+            { path: '/co-so-vat-chat/trang-thiet-bi', element: <EquipmentInfoPage /> },
+            // Service pages – 2-level routing: /dich-vu/:categorySlug AND /dich-vu/:categorySlug/:packageSlug
+            { path: '/dich-vu/tat-ca', element: <AllServicesOverviewPage /> },
             { path: '/dich-vu/:categorySlug/:packageSlug', element: <ServicePackageDetailPage /> },
-            { path: '/dich-vu/:slug', element: <ServiceDetailPage /> },
+            { path: '/dich-vu/:categorySlug', element: <ServiceCategoryPage /> },
             // News pages
+            { path: '/tin-tuc/:categorySlug/:articleSlug', element: <NewsDetailPage /> },
             { path: '/tin-tuc/:categorySlug', element: <NewsCategoryPage /> },
             // Guide pages
             { path: '/huong-dan/:slug', element: <GuideDetailPage /> },
@@ -103,15 +106,7 @@ const router = createBrowserRouter([
     // ── Admin private routes ────────────────────────────────
     {
         element: <ProtectedRoute allowedRoles={['ADMIN']} />,
-        children: [
-            {
-                element: <AdminLayout />,
-                children: [
-                    { path: '/admin/dashboard', element: <AdminDashboardPage /> },
-                    // Future: /admin/doctors, /admin/patients, /admin/specialties
-                ],
-            },
-        ],
+        children: [adminRoutes],
     },
 
     // ── 404 ────────────────────────────────────────────────

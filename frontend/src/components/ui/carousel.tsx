@@ -229,6 +229,7 @@ function CarouselNext({
   )
 }
 
+/* eslint-disable react-refresh/only-export-components */
 export {
   type CarouselApi,
   Carousel,

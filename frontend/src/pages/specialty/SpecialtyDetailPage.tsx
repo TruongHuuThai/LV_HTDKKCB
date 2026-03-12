@@ -2,7 +2,7 @@
 import { useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-    ChevronRight, Home, Stethoscope,
+    ChevronRight, Home, Stethoscope, User,
     Heart, Scissors, Baby, ScanLine,
     ActivitySquare, Brain, Sparkles, Loader2, AlertCircle,
 } from 'lucide-react';
@@ -20,14 +20,10 @@ const ICON_MAP: Record<string, React.ElementType> = {
     Heart, Scissors, Baby, ScanLine, ActivitySquare, Brain, Sparkles, Stethoscope,
 };
 
-function getIcon(slug: string): React.ElementType {
+function renderSpecialtyIcon(slug: string, className?: string) {
     const match = SPECIALTIES_DATA.find((s) => s.slug === slug);
-    return match ? (ICON_MAP[match.iconName] ?? Stethoscope) : Stethoscope;
-}
-
-function SpecialtyIcon({ slug, className }: { slug: string; className?: string }) {
-    const Icon = getIcon(slug);
-    return <Icon className={className ?? 'w-7 h-7 text-white'} />;
+    const IconType = match ? (ICON_MAP[match.iconName] ?? Stethoscope) : Stethoscope;
+    return <IconType className={className ?? 'w-7 h-7 text-white'} />;
 }
 
 // ─── Not Found ────────────────────────────────────────────────────────────────
@@ -97,7 +93,7 @@ export default function SpecialtyDetailPage() {
     const currentSlug = slug ?? '';
 
     // Build description content
-    const hasRichDesc = Boolean(enrichment?.description);
+    const hasRichHtml = Boolean(enrichment?.htmlContent);
     const hasDbDesc = Boolean(specialty.CK_MO_TA);
     const hasDbTarget = Boolean(specialty.CK_DOI_TUONG_KHAM);
 
@@ -107,7 +103,7 @@ export default function SpecialtyDetailPage() {
             <section className="bg-gradient-to-br from-blue-700 via-blue-600 to-blue-500 py-14 text-center text-white">
                 <div className="max-w-3xl mx-auto px-4">
                     <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center mx-auto mb-4">
-                        <SpecialtyIcon slug={currentSlug} />
+                        {renderSpecialtyIcon(currentSlug)}
                     </div>
                     <h1 className="text-3xl md:text-4xl font-bold tracking-tight uppercase">
                         {specialty.CK_TEN}
@@ -133,18 +129,11 @@ export default function SpecialtyDetailPage() {
 
                 {/* ── Content Card ── */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8 mb-8">
-                    {hasRichDesc ? (
+                    {hasRichHtml ? (
                         // Rich HTML description from mock enrichment
                         <div
-                            className="
-                                prose prose-blue max-w-none
-                                [&_h2]:text-blue-800 [&_h2]:font-bold [&_h2]:text-lg [&_h2]:mt-6 [&_h2]:mb-3 [&_h2]:border-l-4 [&_h2]:border-blue-500 [&_h2]:pl-3
-                                [&_p]:text-gray-600 [&_p]:leading-relaxed [&_p]:mb-4
-                                [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:space-y-1.5 [&_ul]:mb-4
-                                [&_li]:text-gray-600 [&_li]:leading-relaxed
-                                [&_h2:first-child]:mt-0
-                            "
-                            dangerouslySetInnerHTML={{ __html: enrichment!.description }}
+                            className="prose prose-blue max-w-none prose-headings:text-blue-900 prose-img:rounded-xl prose-img:w-full prose-li:text-gray-700"
+                            dangerouslySetInnerHTML={{ __html: enrichment!.htmlContent }}
                         />
                     ) : (
                         // Fallback: show DB fields
@@ -170,52 +159,23 @@ export default function SpecialtyDetailPage() {
                             )}
                         </div>
                     )}
-                </div>
 
-                {/* ── Image Carousel (from enrichment) ── */}
-                {enrichment?.images && enrichment.images.length > 0 && (
-                    <div className="mb-10">
-                        <h2 className="text-base font-bold text-blue-900 uppercase tracking-wide mb-4 flex items-center gap-2">
-                            <span className="w-1 h-5 bg-blue-600 rounded-full inline-block" />
-                            Cơ sở vật chất
-                        </h2>
-                        <Carousel opts={{ align: 'start', loop: true }} className="w-full">
-                            <CarouselContent className="-ml-3">
-                                {enrichment.images.map((src, i) => (
-                                    <CarouselItem key={i} className="pl-3 basis-full sm:basis-1/2 lg:basis-1/3">
-                                        <div className="rounded-xl overflow-hidden shadow-sm border border-gray-100">
-                                            <img
-                                                src={src}
-                                                alt={`${specialty.CK_TEN} - ảnh ${i + 1}`}
-                                                className="w-full h-48 object-cover"
-                                            />
-                                        </div>
-                                    </CarouselItem>
-                                ))}
-                            </CarouselContent>
-                            <div className="flex justify-center gap-3 mt-4">
-                                <CarouselPrevious className="static translate-y-0 bg-white border-gray-200 hover:bg-blue-50 hover:border-blue-300 text-blue-700" />
-                                <CarouselNext className="static translate-y-0 bg-white border-gray-200 hover:bg-blue-50 hover:border-blue-300 text-blue-700" />
-                            </div>
-                        </Carousel>
+                    {/* ── CTA ── */}
+                    <div className="flex flex-wrap gap-3 mt-8 pt-6 border-t border-gray-100">
+                        <Link
+                            to={`/doi-ngu-bac-si/${currentSlug}`}
+                            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-semibold transition-colors shadow-sm"
+                        >
+                            <User className="w-5 h-5" />
+                            Xem bác sĩ chuyên khoa
+                        </Link>
+                        <Link
+                            to="/booking"
+                            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-cyan-400 hover:bg-cyan-500 text-white font-semibold transition-colors shadow-sm"
+                        >
+                            Đặt lịch khám ngay
+                        </Link>
                     </div>
-                )}
-
-                {/* ── CTA ── */}
-                <div className="flex flex-wrap gap-3 mb-12">
-                    <Link
-                        to={`/doi-ngu-bac-si/${currentSlug}`}
-                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold transition-colors shadow-sm"
-                    >
-                        <Stethoscope className="w-4 h-4" />
-                        Xem bác sĩ chuyên khoa
-                    </Link>
-                    <Link
-                        to="/booking"
-                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-cyan-400 hover:bg-cyan-500 text-white text-sm font-semibold transition-colors shadow-sm"
-                    >
-                        Đặt lịch khám ngay
-                    </Link>
                 </div>
 
                 {/* ── Other Specialties Carousel (from API) ── */}
@@ -234,7 +194,6 @@ export default function SpecialtyDetailPage() {
                             <CarouselContent className="-ml-3">
                                 {others.map((sp) => {
                                     const spSlug = toSlug(sp.CK_TEN);
-                                    const SpIcon = getIcon(spSlug);
                                     return (
                                         <CarouselItem key={sp.CK_MA} className="pl-3 basis-1/2 sm:basis-1/3 lg:basis-1/4">
                                             <Link
@@ -243,7 +202,7 @@ export default function SpecialtyDetailPage() {
                                                            hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 text-center"
                                             >
                                                 <div className="w-11 h-11 rounded-xl bg-blue-700 group-hover:bg-blue-600 flex items-center justify-center transition-colors shadow-sm">
-                                                    <SpIcon className="w-5 h-5 text-white" />
+                                                    {renderSpecialtyIcon(spSlug, "w-5 h-5 text-white")}
                                                 </div>
                                                 <span className="text-xs font-semibold text-blue-800 uppercase leading-snug group-hover:text-blue-600 transition-colors">
                                                     {sp.CK_TEN}

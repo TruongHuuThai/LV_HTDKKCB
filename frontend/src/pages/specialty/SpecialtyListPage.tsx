@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
     Heart, Scissors, Baby, ScanLine,
     ActivitySquare, Brain, Sparkles, Stethoscope,
-    Loader2, AlertCircle,
+    AlertCircle,
 } from 'lucide-react';
 import { useSpecialties } from '@/hooks/useSpecialties';
 import { SPECIALTIES_DATA } from '@/data/specialtiesData';
@@ -16,15 +16,15 @@ const ICON_MAP: Record<string, React.ElementType> = {
     ActivitySquare, Brain, Sparkles, Stethoscope,
 };
 
-function getIconForSpecialty(slug: string): React.ElementType {
+function renderSpecialtyIcon(slug: string, className?: string) {
     const match = SPECIALTIES_DATA.find((s) => s.slug === slug);
-    return match ? (ICON_MAP[match.iconName] ?? Stethoscope) : Stethoscope;
+    const IconType = match ? (ICON_MAP[match.iconName] ?? Stethoscope) : Stethoscope;
+    return <IconType className={className ?? 'w-6 h-6 text-white'} />;
 }
 
 // ─── Card ─────────────────────────────────────────────────────────────────────
 function SpecialtyCard({ specialty }: { specialty: Specialty }) {
     const slug = toSlug(specialty.CK_TEN);
-    const Icon = getIconForSpecialty(slug);
 
     return (
         <Link
@@ -35,7 +35,7 @@ function SpecialtyCard({ specialty }: { specialty: Specialty }) {
             {/* Icon box */}
             <div className="shrink-0 w-12 h-12 rounded-lg bg-blue-700 flex items-center justify-center
                             group-hover:bg-blue-600 transition-colors shadow-sm">
-                <Icon className="w-6 h-6 text-white" />
+                {renderSpecialtyIcon(slug)}
             </div>
 
             {/* Text */}

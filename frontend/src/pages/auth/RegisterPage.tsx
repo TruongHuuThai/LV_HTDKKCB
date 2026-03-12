@@ -102,7 +102,7 @@ export default function RegisterPage() {
         },
     });
 
-    const passwordValue = watch('TK_PASS');
+
 
     const onSubmit = async (data: RegisterFormData) => {
         setServerError(null);
@@ -264,7 +264,8 @@ export default function RegisterPage() {
                                 </button>
                             </div>
                             <FieldError message={errors.TK_PASS?.message} />
-                            <PasswordStrength password={passwordValue} />
+                            {/* eslint-disable-next-line react-hooks/incompatible-library */}
+                            <PasswordStrength password={watch('TK_PASS')} />
                         </div>
 
                         {/* Confirm password */}

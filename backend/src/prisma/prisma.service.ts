@@ -5,6 +5,7 @@ import { Pool } from 'pg';
 
 @Injectable()
 export class PrismaService implements OnModuleInit, OnModuleDestroy {
+  get tHONG_BAO() { return this.prismaClient.tHONG_BAO; }
   // Expose all model delegates so Repository classes can call this.prisma.xAC_THUC_OTP etc.
   get xAC_THUC_OTP() { return this.prismaClient.xAC_THUC_OTP; }
   get dANG_KY() { return this.prismaClient.dANG_KY; }

@@ -112,7 +112,7 @@ export default function FacilitiesPage() {
                                 )}
                             </div>
                             {/* 4 small images right */}
-                            {currentGroup.slice(1, 5).map((img, i) => (
+                            {currentGroup.slice(1, 5).map((img) => (
                                 <div
                                     key={img.id}
                                     className="rounded-xl overflow-hidden cursor-pointer group relative"

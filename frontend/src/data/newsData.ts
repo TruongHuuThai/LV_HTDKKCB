@@ -9,7 +9,47 @@ export interface NewsArticle {
     imageUrl: string; // URL từ CMS/DB — không import file tĩnh
     publishedAt: string; // VD: '21/01/2025'
     isFeatured?: boolean;
+    htmlContent?: string;
 }
+
+const TEMPLATE_HTML = (title: string, index: number) => `
+  <p><strong>${title}</strong> là một chủ đề được nhiều độc giả quan tâm. Bài viết này sẽ phân tích từ góc nhìn chuyên môn y khoa, cung cấp những kiến thức cần thiết để chăm sóc sức khỏe chủ động.</p>
+  
+  <h2>1. Nguyên nhân và yếu tố nguy cơ</h2>
+  <p>Tại UMC Clinic, hiện tượng này bắt nguồn từ sự kết hợp của nhiều yếu tố khác nhau như thói quen sinh hoạt, chế độ dinh dưỡng, và đôi khi là yếu tố di truyền. Việc nhận biết sớm đóng vai trò then chốt.</p>
+  <img src="https://placehold.co/800x450/e0f2fe/0369a1?text=Hinh+Minh+Hoa+${index}" alt="Hình minh họa ${index}" />
+
+  <h2>2. Phương pháp phòng ngừa hiệu quả</h2>
+  <p>Đội ngũ bác sĩ khuyên mọi người nên tuân thủ các nguyên tắc sau:</p>
+  <ul>
+    <li>Thực hiện khám sức khỏe định kỳ mỗi 6 tháng một lần.</li>
+    <li>Ăn uống theo chế độ cân bằng dưỡng chất, tăng cường rau xanh.</li>
+    <li>Tập luyện thể thao đều đặn ít nhất 30 phút mỗi ngày.</li>
+  </ul>
+
+  <h2>3. Tham vấn ý kiến chuyên gia (UMC Clinic)</h2>
+  <p>Nếu bạn hoặc người thân gặp phải các triệu chứng kéo dài không thuyên giảm, đừng ngần ngại đăng ký tư vấn với <strong>Bác sĩ chuyên khoa tại UMC</strong> để được cá nhân hóa phác đồ điều trị.</p>
+`;
+
+// Hàm sinh data ngẫu nhiên cho 1 danh mục
+const generateNews = (categorySlug: 'y-hoc-thuong-thuc' | 'tin-tuc-su-kien' | 'hoi-dap-y-khoa', count: number, startIndex = 1): NewsArticle[] => {
+    return Array.from({ length: count }).map((_, i) => {
+        const id = startIndex + i;
+        const indexStr = id.toString().padStart(3, '0');
+        const title = `[${categorySlug.toUpperCase()}] Kiến thức bài ${indexStr}: Cập nhật quan trọng`;
+        
+        return {
+            id: `${categorySlug}-${indexStr}`,
+            categorySlug,
+            slug: `bai-viet-so-${id}`,
+            title,
+            summary: `Tóm tắt nhanh cho bài viết số ${id} thuộc danh mục ${categorySlug}. Bài viết này cung cấp những kiến thức cơ bản và chuyên sâu giúp bạn hiểu rõ hơn về tình trạng y khoa này.`,
+            imageUrl: `https://placehold.co/800x450/f8fafc/0f172a?text=News+${indexStr}`,
+            publishedAt: `2026-03-${((id % 28) + 1).toString().padStart(2, '0')}`,
+            htmlContent: TEMPLATE_HTML(title, id),
+        };
+    });
+};
 
 export const NEWS_ARTICLES: NewsArticle[] = [
     // ── Y học thường thức ──────────────────────────────
@@ -23,6 +63,7 @@ export const NEWS_ARTICLES: NewsArticle[] = [
         imageUrl: 'https://placehold.co/800x400/1d4ed8/ffffff?text=Dinh+Duong+Nguoi+Cao+Tuoi',
         publishedAt: '15/01/2025',
         isFeatured: true,
+        htmlContent: TEMPLATE_HTML('CHẾ ĐỘ DINH DƯỠNG LÀNH MẠNH CHO NGƯỜI CAO TUỔI', 1),
     },
     {
         id: 'yhtt-002',
@@ -33,27 +74,9 @@ export const NEWS_ARTICLES: NewsArticle[] = [
             'Đột quỵ là một trong những nguyên nhân gây tử vong và tàn tật hàng đầu. Nhận biết sớm dấu hiệu và thực hiện các biện pháp phòng ngừa có thể cứu sống hàng nghìn người mỗi năm.',
         imageUrl: 'https://placehold.co/400x300/1e40af/ffffff?text=Phong+Ngua+Dot+Quy',
         publishedAt: '10/01/2025',
+        htmlContent: TEMPLATE_HTML('PHÒNG NGỪA ĐỘT QUỴ: NHỮNG ĐIỀU BẠN CẦN BIẾT', 2),
     },
-    {
-        id: 'yhtt-003',
-        categorySlug: 'y-hoc-thuong-thuc',
-        title: 'LỢI ÍCH CỦA VIỆC TẬP THỂ DỤC MỖI NGÀY 30 PHÚT',
-        slug: 'loi-ich-cua-viec-tap-the-duc-moi-ngay-30-phut',
-        summary:
-            'Chỉ cần 30 phút vận động mỗi ngày có thể cải thiện đáng kể sức khỏe tim mạch, kiểm soát cân nặng và tăng cường tâm trạng. Tìm hiểu các bài tập phù hợp cho từng độ tuổi.',
-        imageUrl: 'https://placehold.co/400x300/1e3a8a/ffffff?text=Tap+The+Duc',
-        publishedAt: '05/01/2025',
-    },
-    {
-        id: 'yhtt-004',
-        categorySlug: 'y-hoc-thuong-thuc',
-        title: 'HIỂU ĐÚNG VỀ BỆNH TIỂU ĐƯỜNG TYPE 2',
-        slug: 'hieu-dung-ve-benh-tieu-duong-type-2',
-        summary:
-            'Bệnh tiểu đường type 2 ngày càng phổ biến trong xã hội hiện đại. Bài viết giải thích cơ chế bệnh, yếu tố nguy cơ và các phương pháp kiểm soát đường huyết hiệu quả.',
-        imageUrl: 'https://placehold.co/400x300/1e40af/ffffff?text=Benh+Tieu+Duong',
-        publishedAt: '02/01/2025',
-    },
+    ...generateNews('y-hoc-thuong-thuc', 14, 3),
 
     // ── Tin tức sự kiện ────────────────────────────────
     {
@@ -66,27 +89,9 @@ export const NEWS_ARTICLES: NewsArticle[] = [
         imageUrl: 'https://placehold.co/800x400/1d4ed8/ffffff?text=UMC+Khai+Truong+Can+Tho',
         publishedAt: '01/01/2025',
         isFeatured: true,
+        htmlContent: TEMPLATE_HTML('UMC CLINIC KHAI TRƯƠNG CƠ SỞ MỚI TẠI CẦN THƠ', 5),
     },
-    {
-        id: 'ttsk-002',
-        categorySlug: 'tin-tuc-su-kien',
-        title: 'HỘI THẢO KHOA HỌC VỀ UNG THƯ VÚ NĂM 2025',
-        slug: 'hoi-thao-khoa-hoc-ve-ung-thu-vu-nam-2025',
-        summary:
-            'UMC Clinic phối hợp với Bộ Y tế tổ chức hội thảo khoa học quốc tế về ung thư vú, quy tụ hơn 200 chuyên gia y tế từ 15 quốc gia chia sẻ những phương pháp điều trị tiên tiến nhất.',
-        imageUrl: 'https://placehold.co/400x300/1e40af/ffffff?text=Hoi+Thao+Ung+Thu',
-        publishedAt: '20/12/2024',
-    },
-    {
-        id: 'ttsk-003',
-        categorySlug: 'tin-tuc-su-kien',
-        title: 'CHIẾN DỊCH KHÁM MIỄN PHÍ CHO 1000 BỆNH NHÂN KHÓ KHĂN',
-        slug: 'chien-dich-kham-mien-phi-cho-1000-benh-nhan-kho-khan',
-        summary:
-            'Nhân dịp Tết Nguyên Đán 2025, UMC Clinic triển khai chương trình khám bệnh và cấp thuốc miễn phí cho 1.000 hộ gia đình có hoàn cảnh khó khăn tại Cần Thơ.',
-        imageUrl: 'https://placehold.co/400x300/1e3a8a/ffffff?text=Kham+Mien+Phi',
-        publishedAt: '18/12/2024',
-    },
+    ...generateNews('tin-tuc-su-kien', 5, 6),
 
     // ── Hỏi đáp y khoa ────────────────────────────────
     {
@@ -99,27 +104,9 @@ export const NEWS_ARTICLES: NewsArticle[] = [
         imageUrl: 'https://placehold.co/800x400/1d4ed8/ffffff?text=Be+Hay+Bi+Sot+Ve+Dem',
         publishedAt: '08/01/2025',
         isFeatured: true,
+        htmlContent: TEMPLATE_HTML('TẠI SAO BÉ HAY BỊ SỐT VỀ ĐÊM', 10),
     },
-    {
-        id: 'hdyk-002',
-        categorySlug: 'hoi-dap-y-khoa',
-        title: 'HỎI ĐÁP: ĂN GÌ ĐỂ HẠ CHOLESTEROL MÁU?',
-        slug: 'hoi-dap-an-gi-de-ha-cholesterol-mau',
-        summary:
-            'Cholesterol cao là yếu tố nguy cơ hàng đầu của bệnh tim mạch. BS. Trần Thị Bình tư vấn thực phẩm nên ăn và nên tránh, cùng những thay đổi lối sống giúp kiểm soát cholesterol tự nhiên.',
-        imageUrl: 'https://placehold.co/400x300/1e40af/ffffff?text=Ha+Cholesterol',
-        publishedAt: '06/01/2025',
-    },
-    {
-        id: 'hdyk-003',
-        categorySlug: 'hoi-dap-y-khoa',
-        title: 'HỎI ĐÁP: ĐAU ĐẦU THƯỜNG XUYÊN CÓ NGUY HIỂM KHÔNG?',
-        slug: 'hoi-dap-dau-dau-thuong-xuyen-co-nguy-hiem-khong',
-        summary:
-            'Đau đầu mãn tính có thể là dấu hiệu của nhiều bệnh lý khác nhau. PGS.TS Lê Văn Cường phân tích các loại đau đầu thường gặp, khi nào là bình thường và khi nào cần đi khám ngay.',
-        imageUrl: 'https://placehold.co/400x300/1e3a8a/ffffff?text=Dau+Dau+Thuong+Xuyen',
-        publishedAt: '03/01/2025',
-    },
+    ...generateNews('hoi-dap-y-khoa', 5, 11),
 ];
 
 export const NEWS_CATEGORIES = [

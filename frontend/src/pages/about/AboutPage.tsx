@@ -1,6 +1,6 @@
 // src/pages/about/AboutPage.tsx
 import { Link } from 'react-router-dom';
-import { Eye, Heart, Zap, Users, Shield, Star, ChevronRight, Home } from 'lucide-react';
+import { Eye, Heart, Zap, Shield, Star, ChevronRight, Home } from 'lucide-react';
 
 // ─── Breadcrumb ─────────────────────────────────────────────────────────────
 function Breadcrumb({ items }: { items: { label: string; href?: string }[] }) {

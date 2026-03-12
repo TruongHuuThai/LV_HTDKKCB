@@ -136,26 +136,12 @@ export default function ServicePackageDetailPage() {
 
                 {/* ── Main prose content (WYSIWYG rendered) ─────────────── */}
                 <div
-                    className="
-                        prose prose-blue max-w-none
-                        prose-headings:text-blue-900 prose-headings:font-bold
-                        prose-h2:text-xl prose-h2:mt-8 prose-h2:mb-4 prose-h2:border-b prose-h2:border-blue-100 prose-h2:pb-2
-                        prose-h3:text-lg prose-h3:mt-6 prose-h3:mb-3
-                        prose-p:text-gray-700 prose-p:leading-relaxed prose-p:text-sm
-                        prose-li:text-gray-700 prose-li:text-sm prose-li:leading-relaxed
-                        prose-strong:text-blue-900 prose-strong:font-semibold
-                        prose-ul:space-y-1.5 prose-ul:pl-5
-                        prose-img:rounded-xl prose-img:shadow-md prose-img:my-6
-
-                        prose-table:border-collapse prose-table:w-full prose-table:text-sm
-                        prose-thead:bg-blue-50
-                        prose-th:bg-blue-50 prose-th:text-blue-900 prose-th:font-semibold
-                        prose-th:border prose-th:border-blue-200 prose-th:px-3 prose-th:py-2.5
-                        prose-td:border prose-td:border-gray-200 prose-td:px-3 prose-td:py-2.5
-                        prose-td:text-gray-700
-                        even:prose-tr:bg-gray-50
-                        prose-tfoot:bg-blue-50/60 prose-tfoot:font-medium
-                    "
+                    className="prose prose-blue max-w-none
+                             prose-headings:text-blue-900 prose-headings:font-bold
+                             prose-img:rounded-xl prose-img:shadow-sm
+                             prose-table:w-full prose-table:border-collapse prose-table:border prose-table:border-gray-200
+                             prose-th:bg-blue-50 prose-th:text-blue-800 prose-th:border prose-th:border-gray-200 prose-th:p-3
+                             prose-td:border prose-td:border-gray-200 prose-td:p-3"
                     dangerouslySetInnerHTML={{ __html: detail.htmlContent }}
                 />
 

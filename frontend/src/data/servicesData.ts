@@ -9,6 +9,12 @@ export interface ServicePackage {
     description: string;
     thumbnail: string;
     badge?: string;
+    /** CMS-ready: URL ảnh đại diện cho card listing (Admin đổi link là xong) */
+    imageUrl?: string;
+    /** Đánh dấu gói nổi bật — hiển thị dạng card ngang to ở đầu trang */
+    isFeatured?: boolean;
+    /** Mô tả ngắn cho card listing */
+    summary?: string;
 }
 
 export interface ServiceGroup {
@@ -30,7 +36,7 @@ const ph = (w: number, h: number, bg: string, fg: string, text: string) =>
 export const SERVICES: ServiceGroup[] = [
     // ── 1. Khám tổng quát cá nhân ────────────────────────────────────────────
     {
-        id: 'kham-tong-quat-ca-nhan',
+        id: 'kham-suc-khoe-tong-quat-ca-nhan',
         title: 'Khám sức khỏe tổng quát cá nhân',
         shortDesc: 'Gói khám toàn diện cho từng cá nhân',
         heroImage: ph(800, 400, 'bfdbfe', '1e40af', 'Khám%20tổng%20quát%20cá%20nhân'),
@@ -39,46 +45,50 @@ export const SERVICES: ServiceGroup[] = [
             'Chương trình kiểm tra sức khỏe định kỳ toàn diện, kết hợp tầm soát ung thư sớm với trang thiết bị hiện đại và đội ngũ chuyên gia đầu ngành tại UMC Clinic.',
         packages: [
             {
+                id: 'kham-tong-quat-va-tam-soat-ung-thu',
+                name: 'KHÁM SỨC KHỎE TỔNG QUÁT VÀ TẦM SOÁT UNG THƯ',
+                price: '4.500.000đ',
+                priceColor: 'orange',
+                badge: 'Nổi bật',
+                isFeatured: true,
+                imageUrl: ph(800, 450, 'bfdbfe', '1e40af', 'Kham+Tong+Quat+va+Tam+Soat+Ung+Thu'),
+                summary: 'Khám sức khỏe tổng quát và tầm soát ung thư định kỳ đóng vai trò quan trọng trong việc phát hiện sớm các bệnh lý nguy hiểm. Nhiều loại ung thư hoàn toàn không có triệu chứng ở giai đoạn đầu — kiểm tra định kỳ là cách duy nhất để phát hiện và điều trị kịp thời, cải thiện tỷ lệ khỏi bệnh lên đến 90%.',
+                description: 'Gói toàn diện tầm soát ung thư cơ bản (7 loại), nội soi tiêu hóa, CT ngực liều thấp, hơn 40 hạng mục.',
+                thumbnail: ph(400, 300, 'fef9c3', '854d0e', 'VIP+Gold'),
+            },
+            {
                 id: 'co-ban',
-                name: 'Gói Cơ Bản',
+                name: 'GÓI KHÁM SỨC KHỎE TỔNG QUÁT CƠ BẢN',
                 price: '1.200.000đ',
                 priceColor: 'blue',
+                isFeatured: false,
+                imageUrl: ph(400, 280, 'dbeafe', '1e40af', 'Goi+Co+Ban'),
+                summary: 'Bạn nên biết rằng giường bệnh là chiếc giường có chi phí đắt đỏ nhất. Hãy chủ động bảo vệ sức khỏe với gói kiểm tra cơ bản phù hợp cho lần đầu khám tổng quát.',
                 description: 'Tổng phân tích tế bào máu, đo huyết áp, chỉ số BMI, xét nghiệm nước tiểu, tư vấn bác sĩ đa khoa.',
                 thumbnail: ph(400, 300, 'dbeafe', '1e40af', 'Gói%20Cơ%20Bản'),
             },
             {
                 id: 'nang-cao',
-                name: 'Gói Nâng Cao',
-                price: '2.200.000đ',
+                name: 'GÓI KHÁM SỨC KHỎE TỔNG QUÁT NÂNG CAO',
+                price: '2.500.000đ',
                 priceColor: 'blue',
                 badge: 'Phổ biến',
+                isFeatured: false,
+                imageUrl: ph(400, 280, 'e0f2fe', '0369a1', 'Goi+Nang+Cao'),
+                summary: 'Bổ sung siêu âm bụng tổng quát, điện tâm đồ và X-quang ngực thẳng. Được khuyến nghị cho người từ 35 tuổi hoặc có yếu tố nguy cơ tim mạch.',
                 description: 'Toàn bộ gói Cơ bản + siêu âm bụng tổng quát, điện tâm đồ, X-quang ngực thẳng.',
                 thumbnail: ph(400, 300, 'e0f2fe', '0369a1', 'Gói%20Nâng%20Cao'),
             },
             {
                 id: 'chuyen-sau',
-                name: 'Gói Chuyên Sâu',
-                price: '3.500.000đ',
+                name: 'GÓI KHÁM SỨC KHỎE TỔNG QUÁT CHUYÊN SÂU',
+                price: '3.900.000đ',
                 priceColor: 'blue',
-                description: 'Toàn bộ gói Nâng cao + đo mật độ xương, nội soi dạ dày không đau, định lượng hormone tuyến giáp.',
+                isFeatured: false,
+                imageUrl: ph(400, 280, 'e0e7ff', '3730a3', 'Goi+Chuyen+Sau'),
+                summary: 'Kết hợp nâng cao với nội soi dạ dày không đau, marker ung thư (AFP, CEA, PSA/CA125), định lượng đường huyết HbA1c. Khuyến nghị từ 40 tuổi.',
+                description: 'Gói Nâng cao + đo mật độ xương, nội soi dạ dày không đau, định lượng hormone tuyến giáp.',
                 thumbnail: ph(400, 300, 'e0e7ff', '3730a3', 'Gói%20Chuyên%20Sâu'),
-            },
-            {
-                id: 'vip-gold',
-                name: 'Gói VIP Gold',
-                price: '4.500.000đ',
-                priceColor: 'orange',
-                badge: 'Hot',
-                description: 'Kiểm tra toàn diện, tầm soát ung thư cơ bản (7 loại), nội soi tiêu hóa, CT ngực liều thấp.',
-                thumbnail: ph(400, 300, 'fef9c3', '854d0e', 'Gói%20VIP%20Gold'),
-            },
-            {
-                id: 'platinum',
-                name: 'Gói Platinum',
-                price: '8.800.000đ',
-                priceColor: 'orange',
-                description: 'Tầm soát ung thư toàn diện, MRI toàn thân, PET-CT, tư vấn chuyên sâu 1-1 với chuyên gia.',
-                thumbnail: ph(400, 300, 'f3e8ff', '7c3aed', 'Gói%20Platinum'),
             },
         ],
         articleHtmlContent: `
@@ -146,14 +156,6 @@ export const SERVICES: ServiceGroup[] = [
                 </tbody>
             </table>
 
-            <h2>Quy trình khám tại UMC Clinic</h2>
-            <p><strong>Bước 1:</strong> Đặt lịch trực tuyến → nhận xác nhận qua SMS/Email.<br/>
-            <strong>Bước 2:</strong> Đến phòng khám, làm thủ tục check-in tại quầy (5 phút).<br/>
-            <strong>Bước 3:</strong> Thực hiện các xét nghiệm và chẩn đoán hình ảnh theo lộ trình.<br/>
-            <strong>Bước 4:</strong> Nghỉ ngơi, nhận kết quả và nghe bác sĩ chuyên khoa tư vấn.<br/>
-            <strong>Bước 5:</strong> Nhận hồ sơ sức khỏe cá nhân hóa và kế hoạch theo dõi.</p>
-
-            <p><em>⏱ Toàn bộ quy trình thực hiện trong <strong>3–4 giờ</strong>. Kết quả trả trong 24–48 giờ.</em></p>
         `,
     },
 

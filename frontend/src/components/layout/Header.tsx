@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
     Heart, Menu, ChevronDown, LogOut, User,
     Stethoscope, Calendar, Phone, Home, Info,
-    Briefcase, Newspaper, BookOpen, AlertCircle
+    Briefcase, Newspaper, BookOpen
 } from 'lucide-react';
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -46,11 +46,18 @@ const MENU_GROUPS: MenuGroup[] = [
         label: 'Dịch vụ',
         icon: Briefcase,
         // Dynamically built from SERVICES data
-        items: SERVICES.map((s) => ({
-            title: s.title,
-            href: `/dich-vu/${s.id}`,
-            desc: s.shortDesc,
-        })),
+        items: [
+            {
+                title: 'Tất cả dịch vụ',
+                href: '/dich-vu/tat-ca',
+                desc: 'Khám phá tất cả các nhóm dịch vụ y tế và chuyên khoa',
+            },
+            ...SERVICES.map((s) => ({
+                title: s.title,
+                href: `/dich-vu/${s.id}`,
+                desc: s.shortDesc,
+            }))
+        ],
     },
     {
         id: 'tin-tuc',
