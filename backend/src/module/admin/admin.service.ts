@@ -112,4 +112,56 @@ export class AdminService {
       chartData,
     };
   }
+
+  async getChartData(yearStr: string, monthStr: string) {
+    const chartData: { name: string; total: number }[] = [];
+    const year = parseInt(yearStr, 10);
+
+    if (monthStr === 'all') {
+      for (let month = 0; month < 12; month++) {
+        const startDate = new Date(year, month, 1);
+        const endDate = new Date(year, month + 1, 1);
+        
+        const visits = await this.prisma.dANG_KY.count({
+          where: {
+            DK_THOI_GIAN_TAO: {
+              gte: startDate,
+              lt: endDate,
+            },
+          },
+        });
+
+        chartData.push({
+          name: `Tháng ${month + 1}`,
+          total: visits,
+        });
+      }
+    } else {
+      // Specific month selected
+      const monthIndex = parseInt(monthStr, 10) - 1;
+      const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+      
+      for (let day = 1; day <= daysInMonth; day++) {
+        const startDate = new Date(year, monthIndex, day);
+        const endDate = new Date(year, monthIndex, day + 1);
+        
+        const visits = await this.prisma.dANG_KY.count({
+          where: {
+            DK_THOI_GIAN_TAO: {
+              gte: startDate,
+              lt: endDate,
+            },
+          },
+        });
+
+        const name = `${day.toString().padStart(2, '0')}/${(monthIndex + 1).toString().padStart(2, '0')}`;
+        chartData.push({
+          name,
+          total: visits,
+        });
+      }
+    }
+
+    return chartData;
+  }
 }

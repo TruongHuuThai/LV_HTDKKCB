@@ -80,5 +80,10 @@ export const adminApi = {
     getDashboardSummary: async (): Promise<DashboardSummary> => {
         const res = await axiosClient.get<DashboardSummary>('/admin/dashboard/summary');
         return res.data;
+    },
+
+    getChartData: async (year: string, month: string) => {
+        const res = await axiosClient.get(`/admin/dashboard/chart-data`, { params: { year, month } });
+        return res.data;
     }
 };

@@ -4,10 +4,26 @@ import { Users, Stethoscope, PackageSearch, MessageSquare } from 'lucide-react';
 import { adminApi, type DashboardSummary } from '../services/api/adminApi';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function AdminDashboardPage() {
     const [data, setData] = useState<DashboardSummary | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+
+    const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
+    const [selectedMonth, setSelectedMonth] = useState<string>('all');
+    const [chartData, setChartData] = useState<{name: string, total: number}[]>([]);
+    const [isLoadingChart, setIsLoadingChart] = useState(true);
+
+    const years = Array.from({length: 3}).map((_, i) => (new Date().getFullYear() - i).toString());
+    const months = Array.from({length: 12}).map((_, i) => (i + 1).toString());
 
     useEffect(() => {
         let isMounted = true;
@@ -31,6 +47,28 @@ export default function AdminDashboardPage() {
         fetchDashboardData();
         return () => { isMounted = false; };
     }, []);
+
+    useEffect(() => {
+        let isMounted = true;
+        const fetchChartData = async () => {
+            try {
+                setIsLoadingChart(true);
+                const result = await adminApi.getChartData(selectedYear, selectedMonth);
+                if (isMounted) {
+                    setChartData(result as unknown as {name: string, total: number}[]);
+                }
+            } catch (error) {
+                console.error("Failed to fetch chart data:", error);
+            } finally {
+                if (isMounted) {
+                    setIsLoadingChart(false);
+                }
+            }
+        };
+
+        fetchChartData();
+        return () => { isMounted = false; };
+    }, [selectedYear, selectedMonth]);
 
     const statsConfig = [
         {
@@ -106,22 +144,64 @@ export default function AdminDashboardPage() {
             {/* Placeholder for future charts */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 lg:col-span-2 min-h-[400px]">
-                    <h3 className="text-lg font-semibold text-gray-900">Biểu đồ Lượt khám</h3>
-                    {isLoading ? (
-                         <div className="w-full h-[300px] mt-4 bg-gray-100 animate-pulse rounded-lg"></div>
-                    ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center text-gray-500 text-sm mt-4 border-2 border-dashed border-gray-200 rounded-lg min-h-[300px] bg-gray-50">
-                            <span className="text-gray-400 mb-2 mt-4 text-center px-4 max-w-sm">Biểu đồ hiện đang được cập nhật, dữ liệu lượt đăng ký 7 ngày gần nhất:</span>
-                            <div className="flex gap-4 mt-4 flex-wrap justify-center mb-6">
-                                {data?.chartData?.map(d => (
-                                    <div key={d.name} className="flex flex-col items-center bg-white p-3 rounded shadow-sm border relative overflow-hidden group">
-                                        <span className="text-xs text-gray-500 font-medium mb-1 z-10">{d.name}</span>
-                                        <span className="text-lg font-bold text-blue-600 z-10">{d.visits}</span>
-                                    </div>
-                                ))}
-                            </div>
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                        <h3 className="text-lg font-bold text-gray-800">Biểu đồ lượt khám</h3>
+                        <div className="flex items-center gap-3">
+                            {/* Dropdown Chọn Năm */}
+                            <Select value={selectedYear} onValueChange={setSelectedYear}>
+                                <SelectTrigger className="w-[120px] bg-white">
+                                    <SelectValue placeholder="Chọn năm" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-white z-50">
+                                    {years.map(year => (
+                                        <SelectItem key={year} value={year}>Năm {year}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+
+                            {/* Dropdown Chọn Tháng */}
+                            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                                <SelectTrigger className="w-[150px] bg-white">
+                                    <SelectValue placeholder="Chọn tháng" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-white z-50">
+                                    <SelectItem value="all">Tất cả các tháng</SelectItem>
+                                    {months.map(month => (
+                                        <SelectItem key={month} value={month.toString()}>Tháng {month}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
-                    )}
+                    </div>
+
+                    <div className="h-[350px] w-full mt-4">
+                      {isLoadingChart ? (
+                        <div className="w-full h-full bg-gray-100 animate-pulse rounded-lg"></div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={chartData}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                            <XAxis 
+                                dataKey="name" 
+                                stroke="#888888" 
+                                fontSize={12} 
+                                tickLine={false} 
+                                axisLine={false} 
+                                interval={selectedMonth === 'all' ? 0 : 'preserveStartEnd'}
+                            />
+                            <YAxis 
+                                stroke="#888888" 
+                                fontSize={12} 
+                                tickLine={false} 
+                                axisLine={false} 
+                                allowDecimals={false}
+                            />
+                            <Tooltip cursor={{fill: 'transparent'}} contentStyle={{borderRadius: '8px', border: '1px solid #f3f4f6', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
+                            <Bar dataKey="total" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      )}
+                    </div>
                 </div>
                 
                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 min-h-[400px]">

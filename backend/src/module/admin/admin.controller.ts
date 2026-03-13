@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Query,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -21,5 +22,14 @@ export class AdminController {
   @HttpCode(HttpStatus.OK)
   async getDashboardSummary() {
     return this.adminService.getDashboardSummary();
+  }
+
+  @Get('dashboard/chart-data')
+  @HttpCode(HttpStatus.OK)
+  async getChartData(
+    @Query('year') year: string,
+    @Query('month') month: string,
+  ) {
+    return this.adminService.getChartData(year, month);
   }
 }
