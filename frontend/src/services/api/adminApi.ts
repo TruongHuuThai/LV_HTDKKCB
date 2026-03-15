@@ -21,12 +21,67 @@ export interface AdminDoctor {
 export type CreateDoctorInput = Omit<AdminDoctor, 'BS_MA'>;
 export type UpdateDoctorInput = Partial<CreateDoctorInput>;
 
+export interface AdminServiceItem {
+    DVCLS_MA: number;
+    DVCLS_TEN: string;
+    DVCLS_LOAI: string | null;
+    DVCLS_GIA_DV: number | string | null;
+}
+
+export interface CreateServiceInput {
+    DVCLS_TEN: string;
+    DVCLS_LOAI?: string;
+    DVCLS_GIA_DV?: number;
+}
+
+export type UpdateServiceInput = Partial<CreateServiceInput>;
+
+export type ServiceSortBy = 'code' | 'name' | 'price';
+export type ServiceSortOrder = 'asc' | 'desc';
+
+export interface ServiceListMeta {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    sortBy: ServiceSortBy;
+    sortOrder: ServiceSortOrder;
+    search: string;
+    minPrice?: number | null;
+    maxPrice?: number | null;
+    serviceType?: string;
+}
+
+export interface ServiceListResponse {
+    items: AdminServiceItem[];
+    meta: ServiceListMeta;
+}
+
 // ─── DASHBOARD INTERFACES ─────────────────────────────────────
-export interface DashboardStats {
-    totalPatients: number;
-    totalDoctors: number;
-    activeServices: number;
-    newContacts: number;
+export interface DailyOperationsStats {
+    totalPatientsToday: number;
+    pendingVisitsToday: number;
+    completedVisitsToday: number;
+    canceledVisitsToday: number;
+    doctorsOnDutyToday: number;
+}
+
+export interface FinancialStats {
+    todayRevenue: number;
+}
+
+export interface TopDoctor {
+    id: number;
+    name: string;
+    specialty: string;
+    avatar: string | null;
+    visits: number;
+}
+
+export interface ExpiringMedicine {
+    id: number;
+    name: string;
+    expiryDate: string;
 }
 
 export interface RecentActivity {
@@ -42,7 +97,10 @@ export interface ChartDataPoint {
 }
 
 export interface DashboardSummary {
-    stats: DashboardStats;
+    dailyOperations: DailyOperationsStats;
+    financials: FinancialStats;
+    topDoctors: TopDoctor[];
+    expiringMedicines: ExpiringMedicine[];
     recentActivities: RecentActivity[];
     chartData: ChartDataPoint[];
 }
@@ -75,6 +133,40 @@ export const adminApi = {
         await axiosClient.delete(`/admin/doctors/${id}`);
     },
 
+    // ─── SERVICES CRUD ────────────────────────────────────────────
+    getServices: async (params?: {
+        search?: string;
+        page?: number;
+        limit?: number;
+        sortBy?: ServiceSortBy;
+        sortOrder?: ServiceSortOrder;
+        minPrice?: number;
+        maxPrice?: number;
+        serviceType?: string;
+    }): Promise<ServiceListResponse> => {
+        const res = await axiosClient.get<ServiceListResponse>('/admin/services', { params });
+        return res.data;
+    },
+
+    getServiceById: async (id: number): Promise<AdminServiceItem> => {
+        const res = await axiosClient.get<AdminServiceItem>(`/admin/services/${id}`);
+        return res.data;
+    },
+
+    createService: async (data: CreateServiceInput): Promise<AdminServiceItem> => {
+        const res = await axiosClient.post<AdminServiceItem>('/admin/services', data);
+        return res.data;
+    },
+
+    updateService: async (id: number, data: UpdateServiceInput): Promise<AdminServiceItem> => {
+        const res = await axiosClient.put<AdminServiceItem>(`/admin/services/${id}`, data);
+        return res.data;
+    },
+
+    deleteService: async (id: number): Promise<void> => {
+        await axiosClient.delete(`/admin/services/${id}`);
+    },
+
     // ─── DASHBOARD ───────────────────────────────────────────────
     
     getDashboardSummary: async (): Promise<DashboardSummary> => {
@@ -84,6 +176,26 @@ export const adminApi = {
 
     getChartData: async (year: string, month: string) => {
         const res = await axiosClient.get(`/admin/dashboard/chart-data`, { params: { year, month } });
+        return res.data;
+    },
+
+    getDashboardVisits: async (year: string, month: string, specialtyId?: string) => {
+        const res = await axiosClient.get(`/admin/dashboard/visits`, { params: { year, month, specialtyId } });
+        return res.data;
+    },
+
+    getDashboardTimeSlots: async (year: string, month: string) => {
+        const res = await axiosClient.get(`/admin/dashboard/time-slots`, { params: { year, month } });
+        return res.data;
+    },
+
+    getDashboardRevenue: async (year: string, month: string) => {
+        const res = await axiosClient.get(`/admin/dashboard/revenue`, { params: { year, month } });
+        return res.data;
+    },
+
+    getSpecialties: async () => {
+        const res = await axiosClient.get(`/admin/specialties`);
         return res.data;
     }
 };

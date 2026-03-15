@@ -5,6 +5,7 @@ import { Pool } from 'pg';
 
 @Injectable()
 export class PrismaService implements OnModuleInit, OnModuleDestroy {
+  get tHUOC() { return this.prismaClient.tHUOC; }
   get tHONG_BAO() { return this.prismaClient.tHONG_BAO; }
   // Expose all model delegates so Repository classes can call this.prisma.xAC_THUC_OTP etc.
   get xAC_THUC_OTP() { return this.prismaClient.xAC_THUC_OTP; }
@@ -19,6 +20,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get tAI_KHOAN() { return this.prismaClient.tAI_KHOAN; }
   get lICH_BSK() { return this.prismaClient.lICH_BSK; }
   get lOAI_HINH_KHAM() { return this.prismaClient.lOAI_HINH_KHAM; }
+  get dICHVU() { return this.prismaClient.dICHVU; }
   get $transaction() { return this.prismaClient.$transaction.bind(this.prismaClient); }
 
   private prismaClient: PrismaClient;

@@ -1,4 +1,4 @@
-// src/layouts/AdminLayout.tsx
+﻿// src/layouts/AdminLayout.tsx
 import { useState } from 'react';
 import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -41,7 +41,7 @@ const sidebarGroups = [
     {
         title: 'Quản lý Web',
         items: [
-            { label: 'Dịch vụ & Gói khám', to: '/admin/services', icon: PackageSearch },
+            { label: 'Dịch vụ', to: '/admin/services', icon: PackageSearch },
             { label: 'Chuyên khoa', to: '/admin/specialties', icon: BookOpen },
             { label: 'Đội ngũ Bác sĩ', to: '/admin/doctors', icon: Stethoscope },
             { label: 'Tin tức & Hướng dẫn', to: '/admin/news', icon: FileText },
@@ -81,22 +81,19 @@ export default function AdminLayout() {
 
     return (
         <div className="min-h-screen flex bg-gray-50">
-            {/* ─── Sidebar Overlay for Mobile ─────────────────── */}
             {sidebarOpen && (
-                <div 
+                <div
                     className="fixed inset-0 bg-black/50 z-40 md:hidden"
                     onClick={() => setSidebarOpen(false)}
                 />
             )}
 
-            {/* ─── Sidebar ──────────────────────────────────────── */}
-            <aside 
+            <aside
                 className={cn(
-                    "fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-slate-100 flex flex-col shadow-xl transition-transform duration-300 md:translate-x-0 md:static",
-                    sidebarOpen ? "translate-x-0" : "-translate-x-full"
+                    'fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-slate-100 flex flex-col shadow-xl transition-transform duration-300 md:translate-x-0 md:static',
+                    sidebarOpen ? 'translate-x-0' : '-translate-x-full',
                 )}
             >
-                {/* Logo */}
                 <div className="px-6 py-5 border-b border-white/10 shrink-0">
                     <Link to="/admin/dashboard" className="flex items-center gap-2.5">
                         <div className="w-9 h-9 bg-white/10 rounded-xl flex items-center justify-center">
@@ -112,7 +109,6 @@ export default function AdminLayout() {
                     </Link>
                 </div>
 
-                {/* Nav links */}
                 <nav className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
                     {sidebarGroups.map((group, idx) => (
                         <div key={idx}>
@@ -134,7 +130,7 @@ export default function AdminLayout() {
                                                     : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200',
                                             )}
                                         >
-                                            <Icon className={cn("w-4 h-4 shrink-0", active ? "text-blue-400" : "text-slate-400")} />
+                                            <Icon className={cn('w-4 h-4 shrink-0', active ? 'text-blue-400' : 'text-slate-400')} />
                                             <span className="flex-1">{label}</span>
                                             {active && <ChevronRight className="w-3.5 h-3.5 opacity-60" />}
                                         </Link>
@@ -146,19 +142,16 @@ export default function AdminLayout() {
                 </nav>
             </aside>
 
-            {/* ─── Main content wrapper ─────────────────────────── */}
             <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
-                {/* ─── Header ─────────────────────────────────────── */}
                 <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 md:px-6 shrink-0 z-10 shadow-sm">
                     <div className="flex items-center gap-4">
-                        <button 
+                        <button
                             className="md:hidden p-2 -ml-2 text-gray-500 hover:bg-gray-100 rounded-lg"
                             onClick={() => setSidebarOpen(true)}
                         >
                             <Menu className="w-5 h-5" />
                         </button>
-                        
-                        {/* Breadcrumb would go here. For now a simple text. */}
+
                         <div className="hidden sm:flex items-center text-sm font-medium text-gray-500">
                             UMC Administration
                             <ChevronRight className="w-4 h-4 mx-2" />
@@ -169,16 +162,16 @@ export default function AdminLayout() {
                     </div>
 
                     <div className="flex items-center gap-3 md:gap-5">
-                        <Link 
-                            to="/" 
+                        <Link
+                            to="/"
                             target="_blank"
                             className="text-sm font-medium text-gray-600 hover:text-blue-600 flex items-center gap-1.5 transition-colors"
                         >
                             <Globe className="w-4 h-4" />
                             <span className="hidden sm:inline">Xem trang web</span>
                         </Link>
-                        
-                        <div className="w-px h-6 bg-gray-200"></div>
+
+                        <div className="w-px h-6 bg-gray-200" />
 
                         <DropdownMenu>
                             <DropdownMenuTrigger className="flex items-center gap-2 focus:outline-none">
@@ -195,7 +188,10 @@ export default function AdminLayout() {
                             <DropdownMenuContent align="end" className="w-48">
                                 <DropdownMenuLabel>Tài khoản của tôi</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer text-sm">
+                                <DropdownMenuItem
+                                    onClick={handleLogout}
+                                    className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer text-sm"
+                                >
                                     <LogOut className="w-4 h-4 mr-2" />
                                     Đăng xuất
                                 </DropdownMenuItem>
@@ -204,7 +200,6 @@ export default function AdminLayout() {
                     </div>
                 </header>
 
-                {/* ─── Main view ──────────────────────────────────── */}
                 <main className="flex-1 overflow-auto p-4 md:p-6 pb-20">
                     <div className="mx-auto max-w-6xl">
                         <Outlet />
