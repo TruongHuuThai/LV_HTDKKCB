@@ -21,12 +21,12 @@ import {
     FormMessage,
 } from '@/components/ui/form';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+    AdminSelect,
+    AdminSelectContent,
+    AdminSelectItem,
+    AdminSelectTrigger,
+    AdminSelectValue,
+} from '@/components/admin/AdminSelect';
 
 const serviceSchema = z.object({
     DVCLS_TEN: z.string().min(2, 'Tên dịch vụ phải có ít nhất 2 ký tự').max(255),
@@ -166,24 +166,24 @@ export default function ServiceFormPage() {
                                 render={({ field }) => (
                                     <FormItem className="space-y-2">
                                         <FormLabel>Loại dịch vụ</FormLabel>
-                                        <Select
+                                        <AdminSelect
                                             value={field.value || 'NONE'}
                                             onValueChange={(value) => field.onChange(value === 'NONE' ? '' : value)}
                                         >
                                             <FormControl>
-                                                <SelectTrigger className="h-10 w-full bg-white text-left">
-                                                    <SelectValue placeholder="Chọn loại dịch vụ" />
-                                                </SelectTrigger>
+                                                <AdminSelectTrigger>
+                                                    <AdminSelectValue placeholder="Chọn loại dịch vụ" />
+                                                </AdminSelectTrigger>
                                             </FormControl>
-                                            <SelectContent className="z-50 max-h-72 bg-white">
-                                                <SelectItem value="NONE" className="py-2 leading-5">Chưa phân loại</SelectItem>
+                                            <AdminSelectContent className="max-h-72">
+                                                <AdminSelectItem value="NONE" className="leading-5">Chưa phân loại</AdminSelectItem>
                                                 {SERVICE_TYPES.map((serviceType) => (
-                                                    <SelectItem key={serviceType} value={serviceType} className="py-2 leading-5">
+                                                    <AdminSelectItem key={serviceType} value={serviceType} className="leading-5">
                                                         {SERVICE_TYPE_LABELS[serviceType]}
-                                                    </SelectItem>
+                                                    </AdminSelectItem>
                                                 ))}
-                                            </SelectContent>
-                                        </Select>
+                                            </AdminSelectContent>
+                                        </AdminSelect>
                                         <FormMessage />
                                     </FormItem>
                                 )}

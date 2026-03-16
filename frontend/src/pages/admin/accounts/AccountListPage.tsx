@@ -1,17 +1,12 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, ArrowUpDown, Edit, Filter, Plus, Search, Trash2, UserRound } from 'lucide-react';
+import { AlertTriangle, Edit, Plus, Search, Trash2, Users } from 'lucide-react';
 import { toast } from 'sonner';
 
-import {
-    adminApi,
-    type AdminDoctor,
-    type DoctorSortBy,
-    type DoctorSortOrder,
-} from '@/services/api/adminApi';
-import { Input } from '@/components/ui/input';
+import { adminApi } from '@/services/api/adminApi';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
     Table,
     TableBody,
@@ -21,13 +16,6 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import {
-    AdminSelect,
-    AdminSelectContent,
-    AdminSelectItem,
-    AdminSelectTrigger,
-    AdminSelectValue,
-} from '@/components/admin/AdminSelect';
-import {
     Dialog,
     DialogContent,
     DialogDescription,
@@ -35,26 +23,33 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+    AdminSelect,
+    AdminSelectContent,
+    AdminSelectItem,
+    AdminSelectTrigger,
+    AdminSelectValue,
+} from '@/components/admin/AdminSelect';
 
-type SortOption = 'code_asc' | 'code_desc';
+type RoleFilter = 'all' | 'ADMIN' | 'BAC_SI' | 'BENH_NHAN';
+type DeletedFilter = 'all' | 'active' | 'deleted';
 
 const PAGE_SIZE = 10;
 
-const SORT_OPTION_MAP: Record<SortOption, { sortBy: DoctorSortBy; sortOrder: DoctorSortOrder }> = {
-    code_asc: { sortBy: 'code', sortOrder: 'asc' },
-    code_desc: { sortBy: 'code', sortOrder: 'desc' },
+const ROLE_LABELS: Record<string, string> = {
+    ADMIN: 'Quản trị viên',
+    BAC_SI: 'Bác sĩ',
+    BENH_NHAN: 'Bệnh nhân',
 };
 
-export default function DoctorListPage() {
+export default function AccountListPage() {
     const queryClient = useQueryClient();
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
-    const [sortOption, setSortOption] = useState<SortOption>('code_asc');
-    const [specialtyFilter, setSpecialtyFilter] = useState('all');
-    const [academicTitleFilter, setAcademicTitleFilter] = useState('all');
-    const [deleteId, setDeleteId] = useState<number | null>(null);
+    const [roleFilter, setRoleFilter] = useState<RoleFilter>('all');
+    const [deletedFilter, setDeletedFilter] = useState<DeletedFilter>('all');
+    const [deleteId, setDeleteId] = useState<string | null>(null);
     const [deleteErrorMessage, setDeleteErrorMessage] = useState<string | null>(null);
 
     useEffect(() => {
@@ -62,44 +57,27 @@ export default function DoctorListPage() {
             setDebouncedSearch(searchTerm.trim());
             setCurrentPage(1);
         }, 400);
-
         return () => window.clearTimeout(timeout);
     }, [searchTerm]);
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [sortOption, specialtyFilter, academicTitleFilter]);
-
-    const { sortBy, sortOrder } = SORT_OPTION_MAP[sortOption];
-    const selectedSpecialtyId = specialtyFilter === 'all' ? undefined : Number(specialtyFilter);
-    const selectedAcademicTitle = academicTitleFilter === 'all' ? undefined : academicTitleFilter;
-
-    const { data: specialties = [] } = useQuery({
-        queryKey: ['admin-specialties-options'],
-        queryFn: () => adminApi.getSpecialties(),
-    });
-
-    const { data: academicTitles = [] } = useQuery({
-        queryKey: ['admin-doctor-academic-titles'],
-        queryFn: () => adminApi.getDoctorAcademicTitles(),
-    });
+    }, [roleFilter, deletedFilter]);
 
     const { data, isLoading, isError, isFetching } = useQuery({
-        queryKey: ['admin-doctors', debouncedSearch, currentPage, sortBy, sortOrder, selectedSpecialtyId, selectedAcademicTitle],
+        queryKey: ['admin-accounts', debouncedSearch, currentPage, roleFilter, deletedFilter],
         queryFn: () =>
-            adminApi.getDoctors({
+            adminApi.getAccounts({
                 search: debouncedSearch || undefined,
                 page: currentPage,
                 limit: PAGE_SIZE,
-                sortBy,
-                sortOrder,
-                specialtyId: selectedSpecialtyId,
-                academicTitle: selectedAcademicTitle,
+                role: roleFilter,
+                deletedStatus: deletedFilter,
             }),
         placeholderData: (previousData) => previousData,
     });
 
-    const doctors = data?.items ?? [];
+    const accounts = data?.items ?? [];
     const meta = data?.meta;
 
     useEffect(() => {
@@ -109,26 +87,26 @@ export default function DoctorListPage() {
     }, [meta, currentPage]);
 
     const deleteMutation = useMutation({
-        mutationFn: (id: number) => adminApi.deleteDoctor(id),
+        mutationFn: (id: string) => adminApi.deleteAccount(id),
         onSuccess: () => {
-            toast.success('Xóa bác s? thành công');
-            queryClient.invalidateQueries({ queryKey: ['admin-doctors'] });
+            toast.success('Xóa tài khoản thành công');
+            queryClient.invalidateQueries({ queryKey: ['admin-accounts'] });
             setDeleteErrorMessage(null);
             setDeleteId(null);
         },
         onError: (error: any) => {
             const message =
                 error?.response?.data?.message ||
-                'Không thể xóa bác sĩ này vì có dữ liệu liên quan đến bảng khác. Vui lòng xử lý dữ liệu liên quan trước khi thử lại.';
+                'Không thể xóa tài khoản này vì có dữ liệu liên quan.';
             const normalizedMessage = Array.isArray(message) ? message.join(', ') : message;
             setDeleteErrorMessage(normalizedMessage);
             toast.error(normalizedMessage);
         },
     });
 
-    const selectedDoctor = useMemo(
-        () => doctors.find((doctor) => doctor.BS_MA === deleteId),
-        [doctors, deleteId],
+    const selectedAccount = useMemo(
+        () => accounts.find((account) => account.TK_SDT === deleteId),
+        [accounts, deleteId],
     );
 
     const buildPageList = (page: number, totalPages: number) => {
@@ -145,15 +123,13 @@ export default function DoctorListPage() {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Quản lý thông tin bác sĩ</h1>
-                    <p className="text-sm text-gray-500 mt-1">
-                        Quản lý danh sách bác sĩ trong hệ thống
-                    </p>
+                    <h1 className="text-2xl font-bold text-gray-900">Quản lý tài khoản và phân quyền</h1>
+                    <p className="text-sm text-gray-500 mt-1">Quản lý tài khoản đăng nhập, vai trò và hồ sơ bệnh nhân đi kèm</p>
                 </div>
-                <Link to="/admin/doctors/create">
+                <Link to="/admin/accounts/create">
                     <Button className="bg-blue-600 hover:bg-blue-700">
                         <Plus className="w-4 h-4 mr-2" />
-                        Thêm bác s?
+                        Thêm tài khoản
                     </Button>
                 </Link>
             </div>
@@ -163,60 +139,38 @@ export default function DoctorListPage() {
                     <div className="relative w-full md:max-w-md">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                         <Input
-                            placeholder="Tìm theo tên hoặc số điện thoại bác sĩ..."
+                            placeholder="Tìm theo số điện thoại tài khoản..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
+                            autoComplete="off"
                             className="pl-9"
                         />
                     </div>
 
                     <div className="flex w-full flex-col gap-3 sm:flex-row md:w-auto">
                         <div className="w-full sm:w-[220px]">
-                            <AdminSelect value={specialtyFilter} onValueChange={setSpecialtyFilter}>
+                            <AdminSelect value={roleFilter} onValueChange={(val) => setRoleFilter(val as RoleFilter)}>
                                 <AdminSelectTrigger>
-                                    <div className="flex items-center gap-2">
-                                        <Filter className="w-4 h-4 text-gray-400" />
-                                        <AdminSelectValue placeholder="Lọc chuyên khoa" />
-                                    </div>
+                                    <AdminSelectValue placeholder="Lọc vai trò" />
                                 </AdminSelectTrigger>
                                 <AdminSelectContent>
-                                    <AdminSelectItem value="all">Tất cả khoa</AdminSelectItem>
-                                    {specialties.map((specialty) => (
-                                        <AdminSelectItem key={specialty.CK_MA} value={specialty.CK_MA.toString()}>
-                                            {specialty.CK_TEN}
-                                        </AdminSelectItem>
-                                    ))}
+                                    <AdminSelectItem value="all">Tất cả vai trò</AdminSelectItem>
+                                    <AdminSelectItem value="ADMIN">Quản trị viên</AdminSelectItem>
+                                    <AdminSelectItem value="BAC_SI">Bác sĩ</AdminSelectItem>
+                                    <AdminSelectItem value="BENH_NHAN">Bệnh nhân</AdminSelectItem>
                                 </AdminSelectContent>
                             </AdminSelect>
                         </div>
 
                         <div className="w-full sm:w-[220px]">
-                            <AdminSelect value={academicTitleFilter} onValueChange={setAcademicTitleFilter}>
+                            <AdminSelect value={deletedFilter} onValueChange={(val) => setDeletedFilter(val as DeletedFilter)}>
                                 <AdminSelectTrigger>
-                                    <AdminSelectValue placeholder="Lọc học hàm" />
+                                    <AdminSelectValue placeholder="Trạng thái" />
                                 </AdminSelectTrigger>
                                 <AdminSelectContent>
-                                    <AdminSelectItem value="all">Tất cả học hàm</AdminSelectItem>
-                                    {academicTitles.map((title) => (
-                                        <AdminSelectItem key={title} value={title}>
-                                            {title}
-                                        </AdminSelectItem>
-                                    ))}
-                                </AdminSelectContent>
-                            </AdminSelect>
-                        </div>
-
-                        <div className="w-full sm:w-[220px]">
-                            <AdminSelect value={sortOption} onValueChange={(val) => setSortOption(val as SortOption)}>
-                                <AdminSelectTrigger>
-                                    <div className="flex items-center gap-2">
-                                        <ArrowUpDown className="w-4 h-4 text-gray-400" />
-                                        <AdminSelectValue placeholder="Sắp xếp" />
-                                    </div>
-                                </AdminSelectTrigger>
-                                <AdminSelectContent>
-                                    <AdminSelectItem value="code_asc">Mã: tăng dần</AdminSelectItem>
-                                    <AdminSelectItem value="code_desc">Mã: giảm dần</AdminSelectItem>
+                                    <AdminSelectItem value="all">Tất cả trạng thái</AdminSelectItem>
+                                    <AdminSelectItem value="active">Đang hoạt động</AdminSelectItem>
+                                    <AdminSelectItem value="deleted">Đã xóa</AdminSelectItem>
                                 </AdminSelectContent>
                             </AdminSelect>
                         </div>
@@ -228,60 +182,83 @@ export default function DoctorListPage() {
                 <Table>
                     <TableHeader>
                         <TableRow className="bg-gray-50/50 hover:bg-gray-50/50">
-                            <TableHead className="w-[90px]">Mã</TableHead>
-                            <TableHead className="min-w-[260px]">Bác sĩ</TableHead>
-                            <TableHead>Số điện thoại</TableHead>
-                            <TableHead>Chuyên khoa</TableHead>
-                            <TableHead>Học hàm</TableHead>
-                            <TableHead className="text-right w-[120px]">Thao tác</TableHead>
+                            <TableHead>Tài khoản</TableHead>
+                            <TableHead>Thông tin mật khẩu</TableHead>
+                            <TableHead>Vai trò</TableHead>
+                            <TableHead>Trạng thái</TableHead>
+                            <TableHead>Hồ sơ bệnh nhân</TableHead>
+                            <TableHead className="text-right w-[220px]">Thao tác</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {isLoading ? (
                             <TableRow>
                                 <TableCell colSpan={6} className="text-center py-10 text-gray-500">
-                                    Đang tải dữ liệu bác sĩ...
+                                    Đang tải dữ liệu tài khoản...
                                 </TableCell>
                             </TableRow>
                         ) : isError ? (
                             <TableRow>
                                 <TableCell colSpan={6} className="text-center py-10 text-red-600">
-                                    Không thể tải danh sách bác sĩ. Vui lòng thử lại.
+                                    Không thể tải danh sách tài khoản. Vui lòng thử lại.
                                 </TableCell>
                             </TableRow>
-                        ) : doctors.length === 0 ? (
+                        ) : accounts.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={6} className="text-center py-14 text-gray-500">
-                                    {debouncedSearch || specialtyFilter !== 'all' || academicTitleFilter !== 'all'
-                                        ? 'Không tìm thấy bác sĩ phù hợp'
-                                        : 'Chưa có bác sĩ nào'}
+                                    Chưa có tài khoản phù hợp
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            doctors.map((doctor: AdminDoctor) => (
-                                <TableRow key={doctor.BS_MA}>
-                                    <TableCell className="font-medium text-gray-700">{doctor.BS_MA}</TableCell>
+                            accounts.map((account) => (
+                                <TableRow key={account.TK_SDT}>
+                                    <TableCell className="font-medium text-gray-900">{account.TK_SDT}</TableCell>
                                     <TableCell>
-                                        <div className="flex items-center gap-3">
-                                            <Avatar className="h-10 w-10 border border-gray-100">
-                                                <AvatarImage src={doctor.BS_ANH || ''} alt={doctor.BS_HO_TEN} className="object-cover" />
-                                                <AvatarFallback className="bg-blue-50 text-blue-600">
-                                                    <UserRound className="w-5 h-5" />
-                                                </AvatarFallback>
-                                            </Avatar>
-                                            <p className="font-medium text-gray-900">{doctor.BS_HO_TEN}</p>
+                                        <div className="space-y-2">
+                                            <p className="text-xs font-mono text-gray-700">{account.TK_PASS_MASKED || '---'}</p>
                                         </div>
                                     </TableCell>
-                                    <TableCell className="text-gray-700">{doctor.BS_SDT || '-'}</TableCell>
                                     <TableCell>
                                         <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700">
-                                            {doctor.CHUYEN_KHOA?.CK_TEN || '-'}
+                                            {ROLE_LABELS[account.TK_VAI_TRO || ''] || '-'}
                                         </span>
                                     </TableCell>
-                                    <TableCell className="text-gray-600">{doctor.BS_HOC_HAM || '-'}</TableCell>
+                                    <TableCell>
+                                        <span
+                                            className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
+                                                account.TK_DA_XOA
+                                                    ? 'bg-red-50 text-red-700'
+                                                    : 'bg-emerald-50 text-emerald-700'
+                                            }`}
+                                        >
+                                            {account.TK_DA_XOA ? 'Đã xóa' : 'Đang hoạt động'}
+                                        </span>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-2">
+                                            <span
+                                                className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
+                                                    account.managedPatientLimitReached
+                                                        ? 'bg-amber-50 text-amber-700'
+                                                        : 'bg-slate-100 text-slate-700'
+                                                }`}
+                                            >
+                                                {account.managedPatientCount}/10
+                                            </span>
+                                            {account.managedPatientLimitReached ? (
+                                                <span className="text-xs text-amber-700">Đã đạt giới hạn</span>
+                                            ) : null}
+                                        </div>
+                                    </TableCell>
                                     <TableCell>
                                         <div className="flex justify-end gap-2">
-                                            <Link to={`/admin/doctors/edit/${doctor.BS_MA}`}>
+                                            <Link to={`/admin/patients?accountPhone=${encodeURIComponent(account.TK_SDT)}`}>
+                                                <Button variant="outline" size="sm" className="h-8">
+                                                    <Users className="w-4 h-4 mr-1" />
+                                                    Hồ sơ bệnh nhân
+                                                </Button>
+                                            </Link>
+                                            <Link to={`/admin/accounts/edit/${encodeURIComponent(account.TK_SDT)}`}>
                                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-blue-50">
                                                     <Edit className="w-4 h-4" />
                                                 </Button>
@@ -292,7 +269,7 @@ export default function DoctorListPage() {
                                                 className="h-8 w-8 text-slate-500 hover:text-red-600 hover:bg-red-50"
                                                 onClick={() => {
                                                     setDeleteErrorMessage(null);
-                                                    setDeleteId(doctor.BS_MA);
+                                                    setDeleteId(account.TK_SDT);
                                                 }}
                                             >
                                                 <Trash2 className="w-4 h-4" />
@@ -309,7 +286,7 @@ export default function DoctorListPage() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
                 <p className="text-sm text-gray-600">
                     {meta
-                        ? `Hiển thị ${(meta.page - 1) * meta.limit + (doctors.length ? 1 : 0)}-${(meta.page - 1) * meta.limit + doctors.length} / ${meta.total} bác sĩ`
+                        ? `Hiển thị ${(meta.page - 1) * meta.limit + (accounts.length ? 1 : 0)}-${(meta.page - 1) * meta.limit + accounts.length} / ${meta.total} tài khoản`
                         : 'Đang tải dữ liệu...'}
                     {isFetching && !isLoading ? ' • Đang cập nhật...' : ''}
                 </p>
@@ -358,16 +335,12 @@ export default function DoctorListPage() {
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 text-red-600">
                             <AlertTriangle className="h-5 w-5" />
-                            Xác nhận xóa bác sĩ
+                            Xác nhận xóa tài khoản
                         </DialogTitle>
-                        <DialogDescription>
-                            Bạn có chắc chắn muốn xóa bác sĩ này không?
-                        </DialogDescription>
+                        <DialogDescription>Bạn có chắc chắn muốn xóa tài khoản này không?</DialogDescription>
                         <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                            <p className="font-medium text-red-800">
-                                {selectedDoctor?.BS_HO_TEN || `Bác sĩ #${deleteId}`}
-                            </p>
-                            <p>Hành động này không thể hoàn tác.</p>
+                            <p className="font-medium text-red-800">{selectedAccount?.TK_SDT || deleteId}</p>
+                            <p>Hành động này sẽ chuyển tài khoản về trạng thái đã xóa.</p>
                         </div>
                         {deleteErrorMessage ? (
                             <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -384,7 +357,7 @@ export default function DoctorListPage() {
                                 setDeleteErrorMessage(null);
                             }}
                         >
-                            {deleteErrorMessage ? 'Đóng' : 'H?y'}
+                            {deleteErrorMessage ? 'Đóng' : 'Hủy'}
                         </Button>
                         {!deleteErrorMessage ? (
                             <Button

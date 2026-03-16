@@ -19,6 +19,8 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get bENH_NHAN() { return this.prismaClient.bENH_NHAN; }
   get tAI_KHOAN() { return this.prismaClient.tAI_KHOAN; }
   get lICH_BSK() { return this.prismaClient.lICH_BSK; }
+  get pHONG() { return this.prismaClient.pHONG; }
+  get bUOI() { return this.prismaClient.bUOI; }
   get lOAI_HINH_KHAM() { return this.prismaClient.lOAI_HINH_KHAM; }
   get dICHVU() { return this.prismaClient.dICHVU; }
   get $transaction() { return this.prismaClient.$transaction.bind(this.prismaClient); }

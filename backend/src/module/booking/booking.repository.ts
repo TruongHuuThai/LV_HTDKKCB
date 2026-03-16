@@ -1,6 +1,7 @@
 // src/modules/booking/booking.repository.ts
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { parseScheduleStatus } from '../schedules/schedule-status.util';
 
 @Injectable()
 export class BookingRepository {
@@ -16,9 +17,18 @@ export class BookingRepository {
   }
 
   findDoctorSchedule(BS_MA: number, N_NGAY: Date, B_TEN: string) {
-    return this.prisma.lICH_BSK.findUnique({
-      where: { BS_MA_N_NGAY_B_TEN: { BS_MA, N_NGAY, B_TEN } },
+    return this.prisma.lICH_BSK.findFirst({
+      where: {
+        BS_MA,
+        N_NGAY,
+        B_TEN,
+      },
       include: { PHONG: true, BAC_SI: true, BUOI: true },
+    }).then((schedule) => {
+      if (!schedule) return schedule;
+      const { status } = parseScheduleStatus(schedule.LBSK_GHI_CHU);
+      if (status === 'pending' || status === 'rejected') return null;
+      return schedule;
     });
   }
 
@@ -118,14 +128,30 @@ export class BookingRepository {
         ...(date ? {
           LICH_BSK: {
             some: {
-              N_NGAY: date
+              N_NGAY: date,
             }
           }
         } : {})
       },
       include: {
-        CHUYEN_KHOA: true
+        CHUYEN_KHOA: true,
+        ...(date
+          ? {
+              LICH_BSK: {
+                where: { N_NGAY: date },
+                select: { LBSK_GHI_CHU: true },
+              },
+            }
+          : {}),
       }
+    }).then((doctors: any[]) => {
+      if (!date) return doctors;
+      return doctors.filter((doctor) =>
+        (doctor.LICH_BSK || []).some((schedule: any) => {
+          const { status } = parseScheduleStatus(schedule.LBSK_GHI_CHU);
+          return status !== 'pending' && status !== 'rejected';
+        }),
+      );
     });
   }
 
@@ -133,7 +159,12 @@ export class BookingRepository {
     return this.prisma.lICH_BSK.findMany({
       where: { BS_MA, N_NGAY },
       include: { BUOI: { include: { KHUNG_GIO: { orderBy: { KG_BAT_DAU: 'asc' } } } }, PHONG: true }
-    });
+    }).then((schedules) =>
+      schedules.filter((schedule) => {
+        const { status } = parseScheduleStatus(schedule.LBSK_GHI_CHU);
+        return status !== 'pending' && status !== 'rejected';
+      }),
+    );
   }
 
   listBookedSlotsForDate(BS_MA: number, N_NGAY: Date) {

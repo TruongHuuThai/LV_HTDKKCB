@@ -30,12 +30,12 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+    AdminSelect,
+    AdminSelectContent,
+    AdminSelectItem,
+    AdminSelectTrigger,
+    AdminSelectValue,
+} from '@/components/admin/AdminSelect';
 
 type SortOption = 'code_desc' | 'code_asc' | 'name_asc' | 'name_desc' | 'price_asc' | 'price_desc';
 type PriceFilterOption = 'all' | 'lt_100k' | '100k_500k' | '500k_1m' | 'gt_1m';
@@ -65,7 +65,7 @@ export default function ServiceListPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
-    const [sortOption, setSortOption] = useState<SortOption>('code_desc');
+    const [sortOption, setSortOption] = useState<SortOption>('code_asc');
     const [priceFilter, setPriceFilter] = useState<PriceFilterOption>('all');
     const [typeFilter, setTypeFilter] = useState<ServiceTypeFilterOption>('all');
     const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -160,7 +160,7 @@ export default function ServiceListPage() {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Quản lý Dịch vụ</h1>
+                    <h1 className="text-2xl font-bold text-gray-900">Quản lý dịch vụ</h1>
                     <p className="text-sm text-gray-500 mt-1">
                         Quản trị danh sách dịch vụ cận lâm sàng trong hệ thống
                     </p>
@@ -187,56 +187,56 @@ export default function ServiceListPage() {
 
                     <div className="flex w-full flex-col gap-3 sm:flex-row md:w-auto">
                         <div className="w-full sm:w-[220px]">
-                            <Select value={priceFilter} onValueChange={(val) => setPriceFilter(val as PriceFilterOption)}>
-                                <SelectTrigger className="w-full bg-white">
+                            <AdminSelect value={priceFilter} onValueChange={(val) => setPriceFilter(val as PriceFilterOption)}>
+                                <AdminSelectTrigger>
                                     <div className="flex items-center gap-2">
                                         <Filter className="w-4 h-4 text-gray-400" />
-                                        <SelectValue placeholder="Lọc giá" />
+                                        <AdminSelectValue placeholder="Lọc giá" />
                                     </div>
-                                </SelectTrigger>
-                                <SelectContent className="bg-white z-50">
-                                    <SelectItem value="all">Tất cả mức giá</SelectItem>
-                                    <SelectItem value="lt_100k">Dưới 100.000đ</SelectItem>
-                                    <SelectItem value="100k_500k">100.000đ - 500.000đ</SelectItem>
-                                    <SelectItem value="500k_1m">500.000đ - 1.000.000đ</SelectItem>
-                                    <SelectItem value="gt_1m">Trên 1.000.000đ</SelectItem>
-                                </SelectContent>
-                            </Select>
+                                </AdminSelectTrigger>
+                                <AdminSelectContent>
+                                    <AdminSelectItem value="all">Tất cả mức giá</AdminSelectItem>
+                                    <AdminSelectItem value="lt_100k">Dưới 100.000đ</AdminSelectItem>
+                                    <AdminSelectItem value="100k_500k">100.000đ - 500.000đ</AdminSelectItem>
+                                    <AdminSelectItem value="500k_1m">500.000đ - 1.000.000đ</AdminSelectItem>
+                                    <AdminSelectItem value="gt_1m">Trên 1.000.000đ</AdminSelectItem>
+                                </AdminSelectContent>
+                            </AdminSelect>
                         </div>
 
                         <div className="w-full sm:w-[220px]">
-                            <Select value={typeFilter} onValueChange={(val) => setTypeFilter(val as ServiceTypeFilterOption)}>
-                                <SelectTrigger className="w-full bg-white">
-                                    <SelectValue placeholder="Lọc loại dịch vụ" />
-                                </SelectTrigger>
-                                <SelectContent className="bg-white z-50">
-                                    <SelectItem value="all">Tất cả loại</SelectItem>
+                            <AdminSelect value={typeFilter} onValueChange={(val) => setTypeFilter(val as ServiceTypeFilterOption)}>
+                                <AdminSelectTrigger>
+                                    <AdminSelectValue placeholder="Lọc loại dịch vụ" />
+                                </AdminSelectTrigger>
+                                <AdminSelectContent>
+                                    <AdminSelectItem value="all">Tất cả loại</AdminSelectItem>
                                     {SERVICE_TYPES.map((serviceType) => (
-                                        <SelectItem key={serviceType} value={serviceType}>
+                                        <AdminSelectItem key={serviceType} value={serviceType}>
                                             {SERVICE_TYPE_LABELS[serviceType]}
-                                        </SelectItem>
+                                        </AdminSelectItem>
                                     ))}
-                                </SelectContent>
-                            </Select>
+                                </AdminSelectContent>
+                            </AdminSelect>
                         </div>
 
                         <div className="w-full sm:w-[220px]">
-                            <Select value={sortOption} onValueChange={(val) => setSortOption(val as SortOption)}>
-                                <SelectTrigger className="w-full bg-white">
+                            <AdminSelect value={sortOption} onValueChange={(val) => setSortOption(val as SortOption)}>
+                                <AdminSelectTrigger>
                                     <div className="flex items-center gap-2">
                                         <ArrowUpDown className="w-4 h-4 text-gray-400" />
-                                        <SelectValue placeholder="Sắp xếp" />
+                                        <AdminSelectValue placeholder="Sắp xếp" />
                                     </div>
-                                </SelectTrigger>
-                                <SelectContent className="bg-white z-50">
-                                    <SelectItem value="code_asc">Mã: thấp → cao</SelectItem>
-                                    <SelectItem value="code_desc">Mã: cao → thấp</SelectItem>
-                                    <SelectItem value="name_asc">Tên: A → Z</SelectItem>
-                                    <SelectItem value="name_desc">Tên: Z → A</SelectItem>
-                                    <SelectItem value="price_asc">Giá: thấp → cao</SelectItem>
-                                    <SelectItem value="price_desc">Giá: cao → thấp</SelectItem>
-                                </SelectContent>
-                            </Select>
+                                </AdminSelectTrigger>
+                                <AdminSelectContent>
+                                    <AdminSelectItem value="code_asc">Mã: thấp → cao</AdminSelectItem>
+                                    <AdminSelectItem value="code_desc">Mã: cao → thấp</AdminSelectItem>
+                                    <AdminSelectItem value="name_asc">Tên: A → Z</AdminSelectItem>
+                                    <AdminSelectItem value="name_desc">Tên: Z → A</AdminSelectItem>
+                                    <AdminSelectItem value="price_asc">Giá: thấp → cao</AdminSelectItem>
+                                    <AdminSelectItem value="price_desc">Giá: cao → thấp</AdminSelectItem>
+                                </AdminSelectContent>
+                            </AdminSelect>
                         </div>
                     </div>
                 </div>

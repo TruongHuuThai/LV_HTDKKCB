@@ -1,49 +1,73 @@
-// src/pages/admin/doctors/DoctorFormPage.tsx
-import { useEffect } from 'react';
+import { useEffect, useState, type ChangeEvent } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, Save, Loader2 } from 'lucide-react';
+import { ChevronLeft, Save, Loader2, Upload, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { adminApi } from '@/services/api/adminApi';
 import type { CreateDoctorInput, UpdateDoctorInput } from '@/services/api/adminApi';
-import { getSpecialties } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import {
     Form,
     FormControl,
-    FormDescription,
     FormField,
     FormItem,
     FormLabel,
     FormMessage,
 } from '@/components/ui/form';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+    AdminSelect,
+    AdminSelectContent,
+    AdminSelectItem,
+    AdminSelectTrigger,
+    AdminSelectValue,
+} from '@/components/admin/AdminSelect';
 
-// Validation Schema
 const doctorSchema = z.object({
-    BS_HO_TEN: z.string().min(2, 'Họ tên phải có ít nhất 2 ký tự').max(100),
-    CK_MA: z.number({
-        message: 'Vui lòng chọn chuyên khoa'
-    }).min(1, 'Vui lòng chọn chuyên khoa'),
-    BS_HOC_HAM: z.string().optional().nullable(),
-    BS_KINH_NGHIEM: z.number({
-        message: 'Kinh nghiệm phải là số'
-    }).optional().nullable(),
-    BS_GIOI_THIEU: z.string().nullable().optional(),
-    BS_ANH: z.string().url('Link ảnh không hợp lệ').optional().nullable().or(z.literal('')),
-    TRANG_THAI: z.string(),
+    BS_HO_TEN: z
+        .string()
+        .trim()
+        .min(2, 'Họ tên phải có ít nhất 2 ký tự')
+        .max(255, 'Họ tên tối đa 255 ký tự'),
+    CK_MA: z
+        .number({ message: 'Vui lòng chọn chuyên khoa' })
+        .min(1, 'Vui lòng chọn chuyên khoa'),
+    BS_SDT: z
+        .string()
+        .trim()
+        .max(20, 'Số điện thoại tối đa 20 ký tự')
+        .optional()
+        .or(z.literal('')),
+    BS_EMAIL: z
+        .string()
+        .trim()
+        .email('Email không hợp lệ')
+        .max(255, 'Email tối đa 255 ký tự')
+        .optional()
+        .or(z.literal('')),
+    BS_HOC_HAM: z
+        .string()
+        .trim()
+        .max(100, 'Học hàm tối đa 100 ký tự')
+        .optional()
+        .or(z.literal('')),
+    BS_ANH: z
+        .string()
+        .trim()
+        .refine(
+            (value) =>
+                !value ||
+                value.startsWith('http://') ||
+                value.startsWith('https://') ||
+                value.startsWith('data:image/'),
+            { message: 'Ảnh đại diện không hợp lệ' },
+        )
+        .optional()
+        .or(z.literal('')),
 });
 
 type DoctorFormValues = z.infer<typeof doctorSchema>;
@@ -53,88 +77,123 @@ export default function DoctorFormPage() {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     const isEditMode = !!id;
+    const [avatarPreview, setAvatarPreview] = useState('');
+    const [selectedFileName, setSelectedFileName] = useState('');
 
-    // Fetch Specialties
     const { data: specialties = [] } = useQuery({
-        queryKey: ['specialties'],
-        queryFn: getSpecialties,
+        queryKey: ['admin-specialties-options'],
+        queryFn: () => adminApi.getSpecialties(),
     });
 
-    // Fetch Doctor Info if Edit Mode
     const { data: doctorData, isLoading: isLoadingDoctor } = useQuery({
         queryKey: ['admin-doctor', id],
         queryFn: () => adminApi.getDoctorById(Number(id)),
         enabled: isEditMode,
     });
 
-    // Form setup
     const form = useForm<DoctorFormValues>({
         resolver: zodResolver(doctorSchema),
         defaultValues: {
             BS_HO_TEN: '',
-            BS_HOC_HAM: '',
             CK_MA: 0,
-            BS_KINH_NGHIEM: 0,
-            BS_GIOI_THIEU: '',
+            BS_SDT: '',
+            BS_EMAIL: '',
+            BS_HOC_HAM: '',
             BS_ANH: '',
-            TRANG_THAI: 'ACTIVE',
         },
     });
 
-    // Populate form when data is loaded
     useEffect(() => {
         if (doctorData) {
             form.reset({
-                BS_HO_TEN: doctorData.BS_HO_TEN,
+                BS_HO_TEN: doctorData.BS_HO_TEN || '',
+                CK_MA: doctorData.CK_MA || 0,
+                BS_SDT: doctorData.BS_SDT || '',
+                BS_EMAIL: doctorData.BS_EMAIL || '',
                 BS_HOC_HAM: doctorData.BS_HOC_HAM || '',
-                CK_MA: doctorData.CK_MA,
-                BS_KINH_NGHIEM: doctorData.BS_KINH_NGHIEM || 0,
-                BS_GIOI_THIEU: doctorData.BS_GIOI_THIEU || '',
                 BS_ANH: doctorData.BS_ANH || '',
-                TRANG_THAI: doctorData.TRANG_THAI || 'ACTIVE',
             });
+            setAvatarPreview(doctorData.BS_ANH || '');
+            setSelectedFileName('');
         }
     }, [doctorData, form]);
 
-    // Create Mutation
+    const handleAvatarFileChange = (
+        event: ChangeEvent<HTMLInputElement>,
+        onChange: (value: string) => void,
+    ) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            toast.error('Vui lòng chọn tệp ảnh hợp lệ');
+            return;
+        }
+
+        if (file.size > 2 * 1024 * 1024) {
+            toast.error('Kích thước ảnh tối đa 2MB');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = () => {
+            const result = typeof reader.result === 'string' ? reader.result : '';
+            if (!result) {
+                toast.error('Không thể đọc tệp ảnh');
+                return;
+            }
+            onChange(result);
+            setAvatarPreview(result);
+            setSelectedFileName(file.name);
+        };
+        reader.onerror = () => {
+            toast.error('Không thể đọc tệp ảnh');
+        };
+        reader.readAsDataURL(file);
+    };
+
     const createMutation = useMutation({
         mutationFn: (data: CreateDoctorInput) => adminApi.createDoctor(data),
         onSuccess: () => {
-            toast.success('Thêm bác sĩ thành công!');
+            toast.success('Thêm bác sĩ thành công');
             queryClient.invalidateQueries({ queryKey: ['admin-doctors'] });
             navigate('/admin/doctors');
         },
-        onError: () => {
-            toast.error('Có lỗi xảy ra khi thêm dữ liệu');
+        onError: (error: any) => {
+            const message = error?.response?.data?.message || 'Không thể thêm bác sĩ';
+            toast.error(Array.isArray(message) ? message.join(', ') : message);
         },
     });
 
-    // Update Mutation
     const updateMutation = useMutation({
         mutationFn: (data: UpdateDoctorInput) => adminApi.updateDoctor(Number(id), data),
         onSuccess: () => {
-            toast.success('Cập nhật thông tin thành công!');
+            toast.success('Cập nhật bác sĩ thành công');
             queryClient.invalidateQueries({ queryKey: ['admin-doctors'] });
             queryClient.invalidateQueries({ queryKey: ['admin-doctor', id] });
             navigate('/admin/doctors');
         },
-        onError: () => {
-            toast.error('Có lỗi xảy ra khi cập nhật dữ liệu');
+        onError: (error: any) => {
+            const message = error?.response?.data?.message || 'Không thể cập nhật bác sĩ';
+            toast.error(Array.isArray(message) ? message.join(', ') : message);
         },
     });
 
     const onSubmit = (values: DoctorFormValues) => {
-        // Prepare the payload, removing null values if needed or passing them
-        const payload = {
-            ...values,
-            CK_MA: Number(values.CK_MA)
+        const payload: CreateDoctorInput = {
+            BS_HO_TEN: values.BS_HO_TEN.trim(),
+            CK_MA: Number(values.CK_MA),
+            BS_SDT: values.BS_SDT?.trim() || undefined,
+            BS_EMAIL: values.BS_EMAIL?.trim() || undefined,
+            BS_HOC_HAM: values.BS_HOC_HAM?.trim() || undefined,
+            BS_ANH: values.BS_ANH?.trim() || undefined,
         };
 
         if (isEditMode) {
             updateMutation.mutate(payload as UpdateDoctorInput);
-        } else {
-            createMutation.mutate(payload as CreateDoctorInput);
+            return;
         }
+        createMutation.mutate(payload);
     };
 
     const isSubmitting = createMutation.isPending || updateMutation.isPending;
@@ -158,10 +217,10 @@ export default function DoctorFormPage() {
                 </Link>
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">
-                        {isEditMode ? 'Cập nhật Thông tin Bác sĩ' : 'Thêm Bác sĩ Mới'}
+                        {isEditMode ? 'Cập nhật thông tin bác sĩ' : 'Thêm Bác sĩ'}
                     </h1>
                     <p className="text-sm text-gray-500 mt-1">
-                        Điền đầy đủ thông tin để lưu vào hệ thống
+                        Quản lý thông tin bác sĩ theo dữ liệu thực tế trong hệ thống
                     </p>
                 </div>
             </div>
@@ -169,180 +228,135 @@ export default function DoctorFormPage() {
             <div className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-gray-100">
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* Họ Tên */}
-                            <FormField<DoctorFormValues>
+                            <FormField
                                 control={form.control}
                                 name="BS_HO_TEN"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel className="text-gray-700">Họ và Tên <span className="text-red-500">*</span></FormLabel>
+                                        <FormLabel>Họ và Tên <span className="text-red-500">*</span></FormLabel>
                                         <FormControl>
-                                            <Input placeholder="Vd: Nguyễn Văn A" {...field} value={field.value as string || ''} />
+                                            <Input placeholder="Ví dụ: Nguyễn Văn A" {...field} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
                             />
 
-                            {/* Chuyên khoa */}
                             <FormField
                                 control={form.control}
                                 name="CK_MA"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel className="text-gray-700">Chuyên khoa <span className="text-red-500">*</span></FormLabel>
-                                        <Select
+                                        <FormLabel>Chuyên khoa <span className="text-red-500">*</span></FormLabel>
+                                        <AdminSelect
                                             onValueChange={(val) => field.onChange(Number(val))}
-                                            value={field.value ? field.value.toString() : ""}
+                                            value={field.value ? field.value.toString() : ''}
                                         >
                                             <FormControl>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Chọn chuyên khoa hợp lệ" />
-                                                </SelectTrigger>
+                                                <AdminSelectTrigger>
+                                                    <AdminSelectValue placeholder="Chọn chuyên khoa" />
+                                                </AdminSelectTrigger>
                                             </FormControl>
-                                            <SelectContent>
-                                                {specialties.map((sp) => (
-                                                    <SelectItem key={sp.CK_MA} value={sp.CK_MA.toString()}>
-                                                        {sp.CK_TEN}
-                                                    </SelectItem>
+                                            <AdminSelectContent>
+                                                {specialties.map((specialty) => (
+                                                    <AdminSelectItem key={specialty.CK_MA} value={specialty.CK_MA.toString()}>
+                                                        {specialty.CK_TEN}
+                                                    </AdminSelectItem>
                                                 ))}
-                                            </SelectContent>
-                                        </Select>
+                                            </AdminSelectContent>
+                                        </AdminSelect>
                                         <FormMessage />
                                     </FormItem>
                                 )}
                             />
 
-                            {/* Học hàm/Học vị */}
                             <FormField
                                 control={form.control}
-                                name="BS_HOC_HAM"
+                                name="BS_SDT"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel className="text-gray-700">Học hàm / Học vị</FormLabel>
-                                        <Select
-                                            onValueChange={field.onChange}
-                                            value={field.value?.toString() || ""}
-                                        >
-                                            <FormControl>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Chọn học vị" />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                <SelectItem value="BS">Bác sĩ (BS)</SelectItem>
-                                                <SelectItem value="ThS.BS">Thạc sĩ, Bác sĩ (ThS.BS)</SelectItem>
-                                                <SelectItem value="TS.BS">Tiến sĩ, Bác sĩ (TS.BS)</SelectItem>
-                                                <SelectItem value="BSCKI">Bác sĩ CKI (BS.CKI)</SelectItem>
-                                                <SelectItem value="BSCKII">Bác sĩ CKII (BS.CKII)</SelectItem>
-                                                <SelectItem value="PGS.TS.BS">PGS.TS.BS</SelectItem>
-                                                <SelectItem value="GS.TS.BS">GS.TS.BS</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-
-                            {/* Kinh nghiệm */}
-                            <FormField
-                                control={form.control}
-                                name="BS_KINH_NGHIEM"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel className="text-gray-700">Số năm kinh nghiệm</FormLabel>
+                                        <FormLabel>Số điện thoại</FormLabel>
                                         <FormControl>
-                                            <Input
-                                                type="number"
-                                                min="0"
-                                                placeholder="Vd: 10"
-                                                {...field}
-                                                onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
-                                                value={field.value === null || field.value === undefined ? '' : field.value}
-                                            />
+                                            <Input placeholder="Ví dụ: 0901234567" {...field} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
                             />
-                        </div>
 
-                        {/* URL Ảnh */}
-                        <FormField
-                            control={form.control}
-                            name="BS_ANH"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel className="text-gray-700">URL Ảnh đại diện</FormLabel>
-                                    <div className="flex gap-4 items-start">
-                                        <div className="flex-1">
-                                            <FormControl>
-                                                <Input placeholder="https://example.com/image.jpg" {...field} value={(field.value as string) || ''} />
-                                            </FormControl>
-                                            <FormDescription className="mt-1.5">
-                                                Nhập đường dẫn trực tiếp tới ảnh đại diện của bác sĩ.
-                                            </FormDescription>
-                                        </div>
-                                        {field.value && (
-                                            <div className="w-16 h-16 rounded-md border border-gray-200 overflow-hidden shrink-0 mt-1">
-                                                <img src={field.value as string} alt="Preview" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />
-                                            </div>
-                                        )}
-                                    </div>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        {/* Giới thiệu */}
-                        <FormField
-                            control={form.control}
-                            name="BS_GIOI_THIEU"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel className="text-gray-700">Giới thiệu / Tiểu sử</FormLabel>
-                                    <FormControl>
-                                        <Textarea
-                                            placeholder="Tóm tắt về kinh nghiệm chuyên môn, thế mạnh của bác sĩ..."
-                                            className="min-h-[120px] resize-y"
-                                            {...field}
-                                            value={(field.value as string) || ''}
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        {/* Trạng thái (chỉ hiện khi edit) */}
-                        {isEditMode && (
                             <FormField
                                 control={form.control}
-                                name="TRANG_THAI"
+                                name="BS_EMAIL"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel className="text-gray-700">Trạng thái hoạt động</FormLabel>
-                                        <Select
-                                            onValueChange={field.onChange}
-                                            value={field.value as string}
-                                        >
-                                            <FormControl>
-                                                <SelectTrigger className="w-[200px]">
-                                                    <SelectValue placeholder="Trạng thái" />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                <SelectItem value="ACTIVE">Hoạt động (Hiển thị)</SelectItem>
-                                                <SelectItem value="HIDDEN">Đang ẩn</SelectItem>
-                                            </SelectContent>
-                                        </Select>
+                                        <FormLabel>Email</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="Ví dụ: bacsi@umc.vn" {...field} />
+                                        </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
                             />
-                        )}
+
+                            <FormField
+                                control={form.control}
+                                name="BS_HOC_HAM"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Học hàm</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="Ví dụ: PGS.TS.BS" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="BS_ANH"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Ảnh đại diện</FormLabel>
+                                        <FormControl>
+                                            <div className="space-y-3">
+                                                <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50">
+                                                    <Upload className="h-4 w-4" />
+                                                    Chọn ảnh
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*,.png,.jpg,.jpeg,.webp,.gif,.bmp"
+                                                        className="hidden"
+                                                        onClick={(event) => {
+                                                            event.currentTarget.value = '';
+                                                        }}
+                                                        onChange={(event) => handleAvatarFileChange(event, field.onChange)}
+                                                    />
+                                                </label>
+                                                <p className="text-xs text-gray-500">
+                                                    {selectedFileName || 'Hỗ trợ PNG, JPG, JPEG, WEBP, GIF, BMP (tối đa 2MB)'}
+                                                </p>
+                                            </div>
+                                        </FormControl>
+                                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                                            {avatarPreview ? (
+                                                <img
+                                                    src={avatarPreview}
+                                                    alt="Ảnh đại diện bác sĩ"
+                                                    className="h-28 w-28 rounded-md border border-gray-200 bg-white object-cover"
+                                                />
+                                            ) : (
+                                                <div className="flex h-28 w-28 items-center justify-center rounded-md border border-dashed border-gray-300 bg-white text-gray-400">
+                                                    <ImageIcon className="h-6 w-6" />
+                                                </div>
+                                            )}
+                                        </div>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
 
                         <div className="flex justify-end gap-3 pt-6 border-t border-gray-100">
                             <Link to="/admin/doctors">
@@ -359,7 +373,7 @@ export default function DoctorFormPage() {
                                 ) : (
                                     <>
                                         <Save className="w-4 h-4 mr-2" />
-                                        Lưu Thay Đổi
+                                        Lưu thay đổi
                                     </>
                                 )}
                             </Button>

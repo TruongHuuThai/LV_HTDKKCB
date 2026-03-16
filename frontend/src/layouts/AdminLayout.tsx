@@ -18,6 +18,7 @@ import {
     MessageSquare,
     UserCircle,
     PackageSearch,
+    CalendarClock,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { authService } from '@/services/authService';
@@ -52,6 +53,7 @@ const sidebarGroups = [
         title: 'Vận hành',
         items: [
             { label: 'Bệnh nhân', to: '/admin/patients', icon: Users },
+            { label: 'Lịch trực bác sĩ', to: '/admin/schedules', icon: CalendarClock },
             { label: 'Khách hàng Liên hệ', to: '/admin/contacts', icon: MessageSquare },
         ],
     },

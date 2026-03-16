@@ -1,17 +1,16 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, ArrowUpDown, Edit, Filter, Plus, Search, Trash2, UserRound } from 'lucide-react';
+import { AlertTriangle, ArrowUpDown, BookOpen, Edit, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
     adminApi,
-    type AdminDoctor,
-    type DoctorSortBy,
-    type DoctorSortOrder,
+    type SpecialtySortBy,
+    type SpecialtySortOrder,
 } from '@/services/api/adminApi';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
     Table,
     TableBody,
@@ -21,13 +20,6 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import {
-    AdminSelect,
-    AdminSelectContent,
-    AdminSelectItem,
-    AdminSelectTrigger,
-    AdminSelectValue,
-} from '@/components/admin/AdminSelect';
-import {
     Dialog,
     DialogContent,
     DialogDescription,
@@ -35,25 +27,31 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+    AdminSelect,
+    AdminSelectContent,
+    AdminSelectItem,
+    AdminSelectTrigger,
+    AdminSelectValue,
+} from '@/components/admin/AdminSelect';
 
-type SortOption = 'code_asc' | 'code_desc';
+type SortOption = 'name_asc' | 'name_desc' | 'code_asc' | 'code_desc';
 
 const PAGE_SIZE = 10;
 
-const SORT_OPTION_MAP: Record<SortOption, { sortBy: DoctorSortBy; sortOrder: DoctorSortOrder }> = {
+const SORT_OPTION_MAP: Record<SortOption, { sortBy: SpecialtySortBy; sortOrder: SpecialtySortOrder }> = {
+    name_asc: { sortBy: 'name', sortOrder: 'asc' },
+    name_desc: { sortBy: 'name', sortOrder: 'desc' },
     code_asc: { sortBy: 'code', sortOrder: 'asc' },
     code_desc: { sortBy: 'code', sortOrder: 'desc' },
 };
 
-export default function DoctorListPage() {
+export default function SpecialtyListPage() {
     const queryClient = useQueryClient();
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [sortOption, setSortOption] = useState<SortOption>('code_asc');
-    const [specialtyFilter, setSpecialtyFilter] = useState('all');
-    const [academicTitleFilter, setAcademicTitleFilter] = useState('all');
     const [deleteId, setDeleteId] = useState<number | null>(null);
     const [deleteErrorMessage, setDeleteErrorMessage] = useState<string | null>(null);
 
@@ -68,38 +66,24 @@ export default function DoctorListPage() {
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [sortOption, specialtyFilter, academicTitleFilter]);
+    }, [sortOption]);
 
     const { sortBy, sortOrder } = SORT_OPTION_MAP[sortOption];
-    const selectedSpecialtyId = specialtyFilter === 'all' ? undefined : Number(specialtyFilter);
-    const selectedAcademicTitle = academicTitleFilter === 'all' ? undefined : academicTitleFilter;
-
-    const { data: specialties = [] } = useQuery({
-        queryKey: ['admin-specialties-options'],
-        queryFn: () => adminApi.getSpecialties(),
-    });
-
-    const { data: academicTitles = [] } = useQuery({
-        queryKey: ['admin-doctor-academic-titles'],
-        queryFn: () => adminApi.getDoctorAcademicTitles(),
-    });
 
     const { data, isLoading, isError, isFetching } = useQuery({
-        queryKey: ['admin-doctors', debouncedSearch, currentPage, sortBy, sortOrder, selectedSpecialtyId, selectedAcademicTitle],
+        queryKey: ['admin-specialties', debouncedSearch, currentPage, sortBy, sortOrder],
         queryFn: () =>
-            adminApi.getDoctors({
+            adminApi.getSpecialtiesList({
                 search: debouncedSearch || undefined,
                 page: currentPage,
                 limit: PAGE_SIZE,
                 sortBy,
                 sortOrder,
-                specialtyId: selectedSpecialtyId,
-                academicTitle: selectedAcademicTitle,
             }),
         placeholderData: (previousData) => previousData,
     });
 
-    const doctors = data?.items ?? [];
+    const specialties = data?.items ?? [];
     const meta = data?.meta;
 
     useEffect(() => {
@@ -109,26 +93,27 @@ export default function DoctorListPage() {
     }, [meta, currentPage]);
 
     const deleteMutation = useMutation({
-        mutationFn: (id: number) => adminApi.deleteDoctor(id),
+        mutationFn: (id: number) => adminApi.deleteSpecialty(id),
         onSuccess: () => {
-            toast.success('Xóa bác s? thành công');
-            queryClient.invalidateQueries({ queryKey: ['admin-doctors'] });
+            toast.success('Xóa chuyên khoa thành công');
+            queryClient.invalidateQueries({ queryKey: ['admin-specialties'] });
+            queryClient.invalidateQueries({ queryKey: ['specialties'] });
             setDeleteErrorMessage(null);
             setDeleteId(null);
         },
         onError: (error: any) => {
             const message =
                 error?.response?.data?.message ||
-                'Không thể xóa bác sĩ này vì có dữ liệu liên quan đến bảng khác. Vui lòng xử lý dữ liệu liên quan trước khi thử lại.';
+                'Không thể xóa chuyên khoa này vì đã có dữ liệu liên quan ở nơi khác. Vui lòng xóa hoặc cập nhật dữ liệu liên quan trước khi thử lại.';
             const normalizedMessage = Array.isArray(message) ? message.join(', ') : message;
             setDeleteErrorMessage(normalizedMessage);
             toast.error(normalizedMessage);
         },
     });
 
-    const selectedDoctor = useMemo(
-        () => doctors.find((doctor) => doctor.BS_MA === deleteId),
-        [doctors, deleteId],
+    const selectedSpecialty = useMemo(
+        () => specialties.find((specialty) => specialty.CK_MA === deleteId),
+        [specialties, deleteId],
     );
 
     const buildPageList = (page: number, totalPages: number) => {
@@ -145,15 +130,15 @@ export default function DoctorListPage() {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Quản lý thông tin bác sĩ</h1>
+                    <h1 className="text-2xl font-bold text-gray-900">Quản lý chuyên khoa</h1>
                     <p className="text-sm text-gray-500 mt-1">
-                        Quản lý danh sách bác sĩ trong hệ thống
+                        Quản trị danh sách chuyên khoa trong hệ thống
                     </p>
                 </div>
-                <Link to="/admin/doctors/create">
+                <Link to="/admin/specialties/create">
                     <Button className="bg-blue-600 hover:bg-blue-700">
                         <Plus className="w-4 h-4 mr-2" />
-                        Thêm bác s?
+                        Thêm chuyên khoa
                     </Button>
                 </Link>
             </div>
@@ -163,63 +148,28 @@ export default function DoctorListPage() {
                     <div className="relative w-full md:max-w-md">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                         <Input
-                            placeholder="Tìm theo tên hoặc số điện thoại bác sĩ..."
+                            placeholder="Tìm kiếm theo tên chuyên khoa..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="pl-9"
                         />
                     </div>
 
-                    <div className="flex w-full flex-col gap-3 sm:flex-row md:w-auto">
-                        <div className="w-full sm:w-[220px]">
-                            <AdminSelect value={specialtyFilter} onValueChange={setSpecialtyFilter}>
-                                <AdminSelectTrigger>
-                                    <div className="flex items-center gap-2">
-                                        <Filter className="w-4 h-4 text-gray-400" />
-                                        <AdminSelectValue placeholder="Lọc chuyên khoa" />
-                                    </div>
-                                </AdminSelectTrigger>
-                                <AdminSelectContent>
-                                    <AdminSelectItem value="all">Tất cả khoa</AdminSelectItem>
-                                    {specialties.map((specialty) => (
-                                        <AdminSelectItem key={specialty.CK_MA} value={specialty.CK_MA.toString()}>
-                                            {specialty.CK_TEN}
-                                        </AdminSelectItem>
-                                    ))}
-                                </AdminSelectContent>
-                            </AdminSelect>
-                        </div>
-
-                        <div className="w-full sm:w-[220px]">
-                            <AdminSelect value={academicTitleFilter} onValueChange={setAcademicTitleFilter}>
-                                <AdminSelectTrigger>
-                                    <AdminSelectValue placeholder="Lọc học hàm" />
-                                </AdminSelectTrigger>
-                                <AdminSelectContent>
-                                    <AdminSelectItem value="all">Tất cả học hàm</AdminSelectItem>
-                                    {academicTitles.map((title) => (
-                                        <AdminSelectItem key={title} value={title}>
-                                            {title}
-                                        </AdminSelectItem>
-                                    ))}
-                                </AdminSelectContent>
-                            </AdminSelect>
-                        </div>
-
-                        <div className="w-full sm:w-[220px]">
-                            <AdminSelect value={sortOption} onValueChange={(val) => setSortOption(val as SortOption)}>
-                                <AdminSelectTrigger>
-                                    <div className="flex items-center gap-2">
-                                        <ArrowUpDown className="w-4 h-4 text-gray-400" />
-                                        <AdminSelectValue placeholder="Sắp xếp" />
-                                    </div>
-                                </AdminSelectTrigger>
-                                <AdminSelectContent>
-                                    <AdminSelectItem value="code_asc">Mã: tăng dần</AdminSelectItem>
-                                    <AdminSelectItem value="code_desc">Mã: giảm dần</AdminSelectItem>
-                                </AdminSelectContent>
-                            </AdminSelect>
-                        </div>
+                    <div className="w-full sm:w-[220px] md:w-[220px]">
+                        <AdminSelect value={sortOption} onValueChange={(val) => setSortOption(val as SortOption)}>
+                            <AdminSelectTrigger>
+                                <div className="flex items-center gap-2">
+                                    <ArrowUpDown className="w-4 h-4 text-gray-400" />
+                                    <AdminSelectValue placeholder="Sắp xếp" />
+                                </div>
+                            </AdminSelectTrigger>
+                            <AdminSelectContent>
+                                <AdminSelectItem value="name_asc">Tên: A → Z</AdminSelectItem>
+                                <AdminSelectItem value="name_desc">Tên: Z → A</AdminSelectItem>
+                                <AdminSelectItem value="code_asc">Mã: thấp → cao</AdminSelectItem>
+                                <AdminSelectItem value="code_desc">Mã: cao → thấp</AdminSelectItem>
+                            </AdminSelectContent>
+                        </AdminSelect>
                     </div>
                 </div>
             </div>
@@ -229,59 +179,53 @@ export default function DoctorListPage() {
                     <TableHeader>
                         <TableRow className="bg-gray-50/50 hover:bg-gray-50/50">
                             <TableHead className="w-[90px]">Mã</TableHead>
-                            <TableHead className="min-w-[260px]">Bác sĩ</TableHead>
-                            <TableHead>Số điện thoại</TableHead>
-                            <TableHead>Chuyên khoa</TableHead>
-                            <TableHead>Học hàm</TableHead>
+                            <TableHead>Tên chuyên khoa</TableHead>
+                            <TableHead>Đối tượng khám</TableHead>
+                            <TableHead>Mô tả</TableHead>
                             <TableHead className="text-right w-[120px]">Thao tác</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {isLoading ? (
                             <TableRow>
-                                <TableCell colSpan={6} className="text-center py-10 text-gray-500">
-                                    Đang tải dữ liệu bác sĩ...
+                                <TableCell colSpan={5} className="text-center py-10 text-gray-500">
+                                    Đang tải dữ liệu...
                                 </TableCell>
                             </TableRow>
                         ) : isError ? (
                             <TableRow>
-                                <TableCell colSpan={6} className="text-center py-10 text-red-600">
-                                    Không thể tải danh sách bác sĩ. Vui lòng thử lại.
+                                <TableCell colSpan={5} className="text-center py-10 text-red-600">
+                                    Không thể tải danh sách chuyên khoa. Vui lòng thử lại.
                                 </TableCell>
                             </TableRow>
-                        ) : doctors.length === 0 ? (
+                        ) : specialties.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={6} className="text-center py-14 text-gray-500">
-                                    {debouncedSearch || specialtyFilter !== 'all' || academicTitleFilter !== 'all'
-                                        ? 'Không tìm thấy bác sĩ phù hợp'
-                                        : 'Chưa có bác sĩ nào'}
+                                <TableCell colSpan={5} className="text-center py-14">
+                                    <div className="flex flex-col items-center gap-2 text-gray-500">
+                                        <BookOpen className="w-9 h-9 text-gray-300" />
+                                        <p className="text-sm font-medium text-gray-700">
+                                            {debouncedSearch ? 'Không tìm thấy chuyên khoa phù hợp' : 'Chưa có chuyên khoa nào'}
+                                        </p>
+                                        <p className="text-xs">
+                                            {debouncedSearch
+                                                ? 'Hãy thử thay đổi từ khóa tìm kiếm.'
+                                                : 'Hãy thêm chuyên khoa đầu tiên để bắt đầu quản lý.'}
+                                        </p>
+                                    </div>
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            doctors.map((doctor: AdminDoctor) => (
-                                <TableRow key={doctor.BS_MA}>
-                                    <TableCell className="font-medium text-gray-700">{doctor.BS_MA}</TableCell>
-                                    <TableCell>
-                                        <div className="flex items-center gap-3">
-                                            <Avatar className="h-10 w-10 border border-gray-100">
-                                                <AvatarImage src={doctor.BS_ANH || ''} alt={doctor.BS_HO_TEN} className="object-cover" />
-                                                <AvatarFallback className="bg-blue-50 text-blue-600">
-                                                    <UserRound className="w-5 h-5" />
-                                                </AvatarFallback>
-                                            </Avatar>
-                                            <p className="font-medium text-gray-900">{doctor.BS_HO_TEN}</p>
-                                        </div>
+                            specialties.map((specialty) => (
+                                <TableRow key={specialty.CK_MA}>
+                                    <TableCell className="font-medium text-gray-700">{specialty.CK_MA}</TableCell>
+                                    <TableCell className="font-medium text-gray-900">{specialty.CK_TEN}</TableCell>
+                                    <TableCell className="text-gray-700">{specialty.CK_DOI_TUONG_KHAM || '-'}</TableCell>
+                                    <TableCell className="text-gray-600">
+                                        <p className="line-clamp-2">{specialty.CK_MO_TA || '-'}</p>
                                     </TableCell>
-                                    <TableCell className="text-gray-700">{doctor.BS_SDT || '-'}</TableCell>
-                                    <TableCell>
-                                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700">
-                                            {doctor.CHUYEN_KHOA?.CK_TEN || '-'}
-                                        </span>
-                                    </TableCell>
-                                    <TableCell className="text-gray-600">{doctor.BS_HOC_HAM || '-'}</TableCell>
                                     <TableCell>
                                         <div className="flex justify-end gap-2">
-                                            <Link to={`/admin/doctors/edit/${doctor.BS_MA}`}>
+                                            <Link to={`/admin/specialties/edit/${specialty.CK_MA}`}>
                                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-blue-50">
                                                     <Edit className="w-4 h-4" />
                                                 </Button>
@@ -292,7 +236,7 @@ export default function DoctorListPage() {
                                                 className="h-8 w-8 text-slate-500 hover:text-red-600 hover:bg-red-50"
                                                 onClick={() => {
                                                     setDeleteErrorMessage(null);
-                                                    setDeleteId(doctor.BS_MA);
+                                                    setDeleteId(specialty.CK_MA);
                                                 }}
                                             >
                                                 <Trash2 className="w-4 h-4" />
@@ -309,7 +253,7 @@ export default function DoctorListPage() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
                 <p className="text-sm text-gray-600">
                     {meta
-                        ? `Hiển thị ${(meta.page - 1) * meta.limit + (doctors.length ? 1 : 0)}-${(meta.page - 1) * meta.limit + doctors.length} / ${meta.total} bác sĩ`
+                        ? `Hiển thị ${(meta.page - 1) * meta.limit + (specialties.length ? 1 : 0)}-${(meta.page - 1) * meta.limit + specialties.length} / ${meta.total} chuyên khoa`
                         : 'Đang tải dữ liệu...'}
                     {isFetching && !isLoading ? ' • Đang cập nhật...' : ''}
                 </p>
@@ -358,14 +302,14 @@ export default function DoctorListPage() {
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 text-red-600">
                             <AlertTriangle className="h-5 w-5" />
-                            Xác nhận xóa bác sĩ
+                            Xác nhận xóa chuyên khoa
                         </DialogTitle>
                         <DialogDescription>
-                            Bạn có chắc chắn muốn xóa bác sĩ này không?
+                            Bạn có chắc chắn muốn xóa chuyên khoa này không?
                         </DialogDescription>
                         <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                             <p className="font-medium text-red-800">
-                                {selectedDoctor?.BS_HO_TEN || `Bác sĩ #${deleteId}`}
+                                {selectedSpecialty?.CK_TEN || `Chuyên khoa #${deleteId}`}
                             </p>
                             <p>Hành động này không thể hoàn tác.</p>
                         </div>
@@ -384,7 +328,7 @@ export default function DoctorListPage() {
                                 setDeleteErrorMessage(null);
                             }}
                         >
-                            {deleteErrorMessage ? 'Đóng' : 'H?y'}
+                            {deleteErrorMessage ? 'Đóng' : 'Hủy'}
                         </Button>
                         {!deleteErrorMessage ? (
                             <Button

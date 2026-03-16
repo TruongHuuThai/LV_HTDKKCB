@@ -44,4 +44,18 @@ export class SchedulesRepository {
             ],
         });
     }
+
+    findDoctorById(BS_MA: number) {
+        return this.prisma.bAC_SI.findUnique({
+            where: { BS_MA },
+            select: { BS_MA: true, CK_MA: true, BS_DA_XOA: true },
+        });
+    }
+
+    findRoomById(P_MA: number) {
+        return this.prisma.pHONG.findUnique({
+            where: { P_MA },
+            select: { P_MA: true, CK_MA: true },
+        });
+    }
 }
