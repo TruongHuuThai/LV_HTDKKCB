@@ -253,6 +253,14 @@ export interface ScheduleCycleOverview {
         rejected: number;
         official: number;
     };
+    missingShifts?: {
+        totalMissing: number;
+        items: Array<{
+            date: string;
+            weekday: number;
+            session: string;
+        }>;
+    };
 }
 
 export interface ScheduleRegistrationItem {
@@ -275,6 +283,8 @@ export interface ScheduleRegistrationItem {
         CHUYEN_KHOA: { CK_TEN: string };
     };
     submittedAt: string | null;
+    reviewedBy?: string | null;
+    reviewedAt?: string | null;
 }
 
 export interface ScheduleOfficialShiftItem extends ScheduleRegistrationItem {
@@ -297,6 +307,44 @@ export interface ScheduleRegistrationsResponse {
 export interface ScheduleOfficialShiftsResponse {
     items: ScheduleOfficialShiftItem[];
     meta: ScheduleListMeta;
+}
+
+export interface OfficialShiftFormContextSession {
+    session: string;
+    room: {
+        status: 'empty' | 'pending' | 'approved' | 'official' | 'rejected';
+        occupied: boolean;
+        doctor: { BS_MA: number; BS_HO_TEN: string } | null;
+        note: string | null;
+    };
+    doctor: {
+        status: 'empty' | 'pending' | 'approved' | 'official' | 'rejected';
+        occupied: boolean;
+        room: { P_MA: number; P_TEN: string } | null;
+        note: string | null;
+    };
+    canSelect: boolean;
+    reasons: string[];
+}
+
+export interface OfficialShiftFormContextResponse {
+    date: string;
+    room: {
+        P_MA: number;
+        P_TEN: string;
+        CK_MA: number;
+        CHUYEN_KHOA: { CK_TEN: string };
+    } | null;
+    doctor: {
+        BS_MA: number;
+        BS_HO_TEN: string;
+        CK_MA: number;
+        CHUYEN_KHOA: { CK_TEN: string };
+    } | null;
+    doctorSpecialtyMatchesRoom: boolean | null;
+    sessionContext: OfficialShiftFormContextSession[];
+    availableSessions: string[];
+    hasAnyAvailableSession: boolean;
 }
 
 // ─── DASHBOARD INTERFACES ─────────────────────────────────────
@@ -508,10 +556,23 @@ export const adminApi = {
         roomId?: number;
         status?: string;
         session?: string;
+        weekday?: number;
         date?: string;
         search?: string;
     }): Promise<ScheduleOfficialShiftsResponse> => {
         const res = await axiosClient.get<ScheduleOfficialShiftsResponse>('/admin/schedule-management/official-shifts', { params });
+        return res.data;
+    },
+
+    getOfficialShiftFormContext: async (params: {
+        date: string;
+        roomId?: number;
+        doctorId?: number;
+        excludeBsMa?: number;
+        excludeDate?: string;
+        excludeSession?: string;
+    }): Promise<OfficialShiftFormContextResponse> => {
+        const res = await axiosClient.get<OfficialShiftFormContextResponse>('/admin/schedule-management/form-context', { params });
         return res.data;
     },
 
@@ -521,7 +582,7 @@ export const adminApi = {
         N_NGAY: string;
         B_TEN: string;
         note?: string;
-        status?: ScheduleWorkflowStatus;
+        status?: 'approved' | 'official';
     }) => {
         const res = await axiosClient.post('/admin/schedule-management/official-shifts', data);
         return res.data;
@@ -537,7 +598,7 @@ export const adminApi = {
             N_NGAY?: string;
             B_TEN?: string;
             note?: string;
-            status?: ScheduleWorkflowStatus;
+            status?: 'approved' | 'official';
         },
     ) => {
         const res = await axiosClient.put(

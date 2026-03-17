@@ -1,3 +1,10 @@
+Chay nhanh (tu root `umc`):
+
+npm run kill:3000
+npm run backend:restart
+
+Hoac chay thu cong:
+
 cd backend
 npm run start:dev
 

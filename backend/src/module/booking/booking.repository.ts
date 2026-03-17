@@ -1,7 +1,6 @@
 // src/modules/booking/booking.repository.ts
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { parseScheduleStatus } from '../schedules/schedule-status.util';
 
 @Injectable()
 export class BookingRepository {
@@ -26,8 +25,7 @@ export class BookingRepository {
       include: { PHONG: true, BAC_SI: true, BUOI: true },
     }).then((schedule) => {
       if (!schedule) return schedule;
-      const { status } = parseScheduleStatus(schedule.LBSK_GHI_CHU);
-      if (status === 'pending' || status === 'rejected') return null;
+      if (schedule.LBSK_TRANGTHAI_DUYET !== 'approved') return null;
       return schedule;
     });
   }
@@ -139,7 +137,7 @@ export class BookingRepository {
           ? {
               LICH_BSK: {
                 where: { N_NGAY: date },
-                select: { LBSK_GHI_CHU: true },
+                select: { LBSK_TRANGTHAI_DUYET: true },
               },
             }
           : {}),
@@ -148,8 +146,7 @@ export class BookingRepository {
       if (!date) return doctors;
       return doctors.filter((doctor) =>
         (doctor.LICH_BSK || []).some((schedule: any) => {
-          const { status } = parseScheduleStatus(schedule.LBSK_GHI_CHU);
-          return status !== 'pending' && status !== 'rejected';
+          return schedule.LBSK_TRANGTHAI_DUYET === 'approved';
         }),
       );
     });
@@ -161,8 +158,7 @@ export class BookingRepository {
       include: { BUOI: { include: { KHUNG_GIO: { orderBy: { KG_BAT_DAU: 'asc' } } } }, PHONG: true }
     }).then((schedules) =>
       schedules.filter((schedule) => {
-        const { status } = parseScheduleStatus(schedule.LBSK_GHI_CHU);
-        return status !== 'pending' && status !== 'rejected';
+        return schedule.LBSK_TRANGTHAI_DUYET === 'approved';
       }),
     );
   }

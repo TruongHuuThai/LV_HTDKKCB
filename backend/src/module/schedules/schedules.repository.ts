@@ -10,6 +10,7 @@ export class SchedulesRepository {
         P_MA: number;
         N_NGAY: Date;
         B_TEN: string;
+        LBSK_TRANGTHAI_DUYET: 'pending' | 'approved' | 'rejected';
         LBSK_GHI_CHU?: string;
     }) {
         return this.prisma.lICH_BSK.create({
@@ -18,6 +19,7 @@ export class SchedulesRepository {
                 P_MA: data.P_MA,
                 N_NGAY: data.N_NGAY,
                 B_TEN: data.B_TEN,
+                LBSK_TRANGTHAI_DUYET: data.LBSK_TRANGTHAI_DUYET,
                 LBSK_GHI_CHU: data.LBSK_GHI_CHU,
             },
         });

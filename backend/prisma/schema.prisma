@@ -216,7 +216,10 @@ model LICH_BSK {
   P_MA         Int
   N_NGAY       DateTime  @db.Date
   B_TEN        String
+  LBSK_TRANGTHAI_DUYET String    @default("pending")
   LBSK_GHI_CHU String?
+  LBSK_DUYET_BOI       String?
+  LBSK_DUYET_LUC       DateTime? @db.Timestamp(6)
   DANG_KY      DANG_KY[]
   BAC_SI       BAC_SI    @relation(fields: [BS_MA], references: [BS_MA], onDelete: NoAction, onUpdate: NoAction)
   BUOI         BUOI      @relation(fields: [B_TEN], references: [B_TEN], onDelete: NoAction, onUpdate: NoAction)

@@ -1,0 +1,138 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+
+actor "Bệnh nhân" as Patient
+actor "Bác sĩ" as Doctor
+actor "Quản trị viên" as Admin
+
+
+
+  package "Bệnh nhân" {
+    usecase "Đăng ký tài khoản" as UC_P1
+    usecase "Đăng nhập" as UC_P2
+    usecase "Quản lý hồ sơ bệnh nhân" as UC_P3
+    usecase "Xem chuyên khoa" as UC_P4
+    usecase "Xem bác sĩ" as UC_P5
+    usecase "Xem dịch vụ" as UC_P6
+    usecase "Đặt lịch khám" as UC_P8
+    usecase "Thanh toán lịch khám" as UC_P9
+    usecase "Xem lịch khám" as UC_P10
+    usecase "Hủy lịch khám" as UC_P11
+    usecase "Đổi lịch khám" as UC_P12
+    usecase "Nhận thông báo" as UC_P13
+
+    usecase "Chọn hồ sơ bệnh nhân" as UC_P8_1
+    usecase "Chọn chuyên khoa" as UC_P8_2
+    usecase "Chọn bác sĩ" as UC_P8_3
+    usecase "Chọn dịch vụ" as UC_P8_4
+    usecase "Chọn ngày khám" as UC_P8_5
+    usecase "Chọn slot khám" as UC_P8_6
+    usecase "Xác nhận đặt lịch" as UC_P8_7
+  }
+
+  package "Bác sĩ" {
+    usecase "Đăng nhập bác sĩ" as UC_D1
+    usecase "Đăng ký lịch trực" as UC_D2
+    usecase "Cập nhật đăng ký trực\ntrước hạn khóa" as UC_D3
+    usecase "Hủy đăng ký trực\ntrước hạn khóa" as UC_D4
+    usecase "Xem trạng thái duyệt" as UC_D5
+    usecase "Xem lịch trực chính thức" as UC_D6
+    usecase "Xem lịch khám bệnh nhân" as UC_D7
+    usecase "Cập nhật kết quả khám" as UC_D8
+
+    usecase "Chọn ngày trực" as UC_D2_1
+    usecase "Chọn buổi trực" as UC_D2_2
+    usecase "Chọn phòng trực" as UC_D2_3
+  }
+
+  package "Quản trị viên" {
+    usecase "Đăng nhập admin" as UC_A1
+    usecase "Quản lý tài khoản\nvà phân quyền" as UC_A2
+    usecase "Quản lý chuyên khoa" as UC_A3
+    usecase "Quản lý bác sĩ" as UC_A4
+    usecase "Quản lý dịch vụ" as UC_A5
+    usecase "Quản lý phòng khám" as UC_A6
+    usecase "Quản lý bệnh nhân" as UC_A7
+
+    usecase "Quản lý lịch trực bác sĩ" as UC_A8
+    usecase "Mở kỳ đăng ký trực" as UC_A8_1
+    usecase "Xem đăng ký trực" as UC_A8_2
+    usecase "Duyệt đăng ký trực" as UC_A8_3
+    usecase "Từ chối đăng ký trực" as UC_A8_4
+    usecase "Thêm lịch trực chính thức" as UC_A8_5
+    usecase "Cập nhật lịch trực chính thức" as UC_A8_6
+    usecase "Xóa lịch trực chính thức" as UC_A8_7
+    usecase "Chốt lịch trực tuần" as UC_A8_8
+    usecase "Sinh slot lịch khám" as UC_A8_9
+
+    usecase "Quản lý lịch khám" as UC_A9
+    usecase "Quản lý thanh toán" as UC_A10
+    usecase "Quản trị chatbot" as UC_A11
+    usecase "Báo cáo thống kê" as UC_A12
+  }
+
+Patient --> UC_P1
+Patient --> UC_P2
+Patient --> UC_P3
+Patient --> UC_P4
+Patient --> UC_P5
+Patient --> UC_P6
+
+Patient --> UC_P8
+Patient --> UC_P9
+
+Patient --> UC_P11
+Patient --> UC_P12
+Patient --> UC_P13
+
+Doctor --> UC_D1
+Doctor --> UC_D2
+Doctor --> UC_D3
+Doctor --> UC_D4
+Doctor --> UC_D5
+Doctor --> UC_D6
+Doctor --> UC_D7
+Doctor --> UC_D8
+
+Admin --> UC_A1
+Admin --> UC_A2
+Admin --> UC_A3
+Admin --> UC_A4
+Admin --> UC_A5
+Admin --> UC_A6
+Admin --> UC_A7
+Admin --> UC_A8
+Admin --> UC_A9
+Admin --> UC_A10
+Admin --> UC_A11
+Admin --> UC_A12
+
+UC_P8 --> UC_P8_1 : <<include>>
+UC_P8 --> UC_P8_2 : <<include>>
+UC_P8 --> UC_P8_3 : <<include>>
+UC_P8 --> UC_P8_4 : <<include>>
+UC_P8 --> UC_P8_5 : <<include>>
+UC_P8 --> UC_P8_6 : <<include>>
+UC_P8 --> UC_P8_7 : <<include>>
+
+
+UC_P11 ..> UC_P10 : <<extend>>
+UC_P12 ..> UC_P10 : <<extend>>
+
+UC_D2 --> UC_D2_1 : <<include>>
+UC_D2 --> UC_D2_2 : <<include>>
+UC_D2 --> UC_D2_3 : <<include>>
+
+UC_A8 --> UC_A8_1 : <<include>>
+UC_A8 --> UC_A8_2 : <<include>>
+UC_A8 --> UC_A8_3 : <<include>>
+UC_A8 --> UC_A8_5 : <<include>>
+UC_A8 --> UC_A8_6 : <<include>>
+UC_A8 --> UC_A8_7 : <<include>>
+UC_A8 --> UC_A8_8 : <<include>>
+
+UC_A8_4 ..> UC_A8_3 : <<extend>>
+UC_A8_9 ..> UC_A8_8 : <<extend>>
+
+@enduml

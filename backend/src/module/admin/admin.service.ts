@@ -1,6 +1,7 @@
-import {
+﻿import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -21,11 +22,15 @@ import { UpdatePatientDto } from './dto/update-patient.dto';
 import { CreateAccountDto } from './dto/create-account.dto';
 import { UpdateAccountDto } from './dto/update-account.dto';
 import { SERVICE_TYPE_SET } from './constants/service-type.constants';
-import {
-  buildScheduleNote,
-  parseScheduleStatus,
-  type ScheduleWorkflowStatus,
-} from '../schedules/schedule-status.util';
+
+type ScheduleApprovalStatus = 'pending' | 'approved' | 'rejected';
+type OfficialShiftDisplayStatus = 'approved' | 'official';
+type ScheduleDisplayStatus =
+  | 'empty'
+  | 'pending'
+  | 'approved'
+  | 'official'
+  | 'rejected';
 
 @Injectable()
 export class AdminService {
@@ -45,7 +50,7 @@ export class AdminService {
       thirtyDaysFromNow.setDate(today.getDate() + 30);
 
       this.logger.debug("Executing chunk 1 (Daily)...");
-      // 1. Daily Operations (Vận hành khám bệnh hôm nay)
+      // 1. Daily Operations (Váº­n hĂ nh khĂ¡m bá»‡nh hĂ´m nay)
       const [
         totalPatientsToday,
         pendingVisitsToday,
@@ -59,7 +64,7 @@ export class AdminService {
       ]);
 
       this.logger.debug("Executing chunk 2 (Financials)...");
-      // 2. Financials & Staff (Tài chính & Nhân sự)
+      // 2. Financials & Staff (TĂ i chĂ­nh & NhĂ¢n sá»±)
       const [todayRevenueRaw, doctorsOnDutyToday] = await Promise.all([
         this.prisma.tHANH_TOAN.aggregate({
           _sum: { TT_TONG_TIEN: true },
@@ -75,7 +80,7 @@ export class AdminService {
       const todayRevenue = Number(todayRevenueRaw._sum.TT_TONG_TIEN || 0);
 
       this.logger.debug("Executing chunk 3 (Top Doctors)...");
-      // 3. Top Doctors (Bác sĩ nổi bật trong tháng)
+      // 3. Top Doctors (BĂ¡c sÄ© ná»•i báº­t trong thĂ¡ng)
       const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
       const topDoctorsRaw = await this.prisma.dANG_KY.groupBy({
         by: ['BS_MA'],
@@ -98,7 +103,7 @@ export class AdminService {
         const docInfo = doctorsInfo.find(d => d.BS_MA === td.BS_MA);
         return {
           id: td.BS_MA,
-          name: docInfo?.BS_HO_TEN || 'BS Không xác định',
+          name: docInfo?.BS_HO_TEN || 'BS KhĂ´ng xĂ¡c Ä‘á»‹nh',
           specialty: docInfo?.CHUYEN_KHOA?.CK_TEN || '',
           avatar: docInfo?.BS_ANH,
           visits: td._count.BS_MA,
@@ -106,7 +111,7 @@ export class AdminService {
       });
 
       this.logger.debug("Executing chunk 4 (Inventory)...");
-      // 4. Inventory (Cảnh báo thuốc sắp hết hạn <= 30 ngày)
+      // 4. Inventory (Cáº£nh bĂ¡o thuá»‘c sáº¯p háº¿t háº¡n <= 30 ngĂ y)
       const expiringMedicines = await this.prisma.tHUOC.findMany({
         where: { T_HAN_SU_DUNG: { gte: today, lte: thirtyDaysFromNow }, T_DA_XOA: false },
         select: { T_MA: true, T_TEN_THUOC: true, T_HAN_SU_DUNG: true },
@@ -115,7 +120,7 @@ export class AdminService {
       });
 
       this.logger.debug("Executing chunk 5 (Recent Activities)...");
-      // 2. Recent Activities (Hoạt động gần đây - 5 đăng ký mới nhất)
+      // 2. Recent Activities (Hoáº¡t Ä‘á»™ng gáº§n Ä‘Ă¢y - 5 Ä‘Äƒng kĂ½ má»›i nháº¥t)
       const recentActivitiesRaw = await this.prisma.dANG_KY.findMany({
         take: 5,
         orderBy: { DK_THOI_GIAN_TAO: 'desc' },
@@ -123,10 +128,10 @@ export class AdminService {
       });
 
       const recentActivities = recentActivitiesRaw.map((activity) => {
-        const patientName = `${activity.BENH_NHAN?.BN_HO_CHU_LOT || ''} ${activity.BENH_NHAN?.BN_TEN || ''}`.trim() || 'Bệnh nhân ẩn danh';
-        let actionStr = 'đã đăng ký lịch khám';
-        if (activity.DK_TRANG_THAI === 'DA_KHAM') actionStr = 'đã hoàn thành khám';
-        if (activity.DK_TRANG_THAI === 'HUY') actionStr = 'đã hủy lịch khám';
+        const patientName = `${activity.BENH_NHAN?.BN_HO_CHU_LOT || ''} ${activity.BENH_NHAN?.BN_TEN || ''}`.trim() || 'Bá»‡nh nhĂ¢n áº©n danh';
+        let actionStr = 'Ä‘Ă£ Ä‘Äƒng kĂ½ lá»‹ch khĂ¡m';
+        if (activity.DK_TRANG_THAI === 'DA_KHAM') actionStr = 'Ä‘Ă£ hoĂ n thĂ nh khĂ¡m';
+        if (activity.DK_TRANG_THAI === 'HUY') actionStr = 'Ä‘Ă£ há»§y lá»‹ch khĂ¡m';
 
         return {
           id: activity.DK_MA,
@@ -137,7 +142,7 @@ export class AdminService {
       });
 
       this.logger.debug("Executing chunk 6 (Chart Data)...");
-      // 3. Chart Data (Dữ liệu biểu đồ lượt khám - 7 ngày gần nhất)
+      // 3. Chart Data (Dá»¯ liá»‡u biá»ƒu Ä‘á»“ lÆ°á»£t khĂ¡m - 7 ngĂ y gáº§n nháº¥t)
       const chartData: { name: string; visits: number }[] = [];
       const chartToday = new Date();
       chartToday.setHours(0, 0, 0, 0); // Normalize to start of day
@@ -204,7 +209,7 @@ export class AdminService {
         });
 
         chartData.push({
-          name: `Tháng ${month + 1}`,
+          name: `ThĂ¡ng ${month + 1}`,
           total: visits,
         });
       }
@@ -262,7 +267,7 @@ export class AdminService {
         }
 
         chartData.push({
-          date: `Tháng ${month + 1}`,
+          date: `ThĂ¡ng ${month + 1}`,
           totalVisits,
           specialtyVisits,
         });
@@ -326,9 +331,9 @@ export class AdminService {
     const appointments = await this.prisma.dANG_KY.findMany({
       where: {
         DK_THOI_GIAN_TAO: { gte: startDate, lt: endDate },
-        // Lấy KHUNG_GIO để biết giờ khám
+        // Láº¥y KHUNG_GIO Ä‘á»ƒ biáº¿t giá» khĂ¡m
         KHUNG_GIO: {
-          // Có thể thêm điều kiện KHUNG_GIO nếu cần
+          // CĂ³ thá»ƒ thĂªm Ä‘iá»u kiá»‡n KHUNG_GIO náº¿u cáº§n
         }
       },
       include: {
@@ -363,7 +368,7 @@ export class AdminService {
         const payments = await this.prisma.tHANH_TOAN.findMany({
           where: {
             TT_THOI_GIAN: { gte: startDate, lt: endDate },
-            TT_TRANG_THAI: 'DA_THANH_TOAN', // Giả sử trạng thái này
+            TT_TRANG_THAI: 'DA_THANH_TOAN', // Giáº£ sá»­ tráº¡ng thĂ¡i nĂ y
           },
           select: { TT_TONG_TIEN: true }
         });
@@ -371,7 +376,7 @@ export class AdminService {
         const revenue = payments.reduce((sum, p) => sum + Number(p.TT_TONG_TIEN || 0), 0);
 
         chartData.push({
-          date: `Tháng ${month + 1}`,
+          date: `ThĂ¡ng ${month + 1}`,
           revenue,
         });
       }
@@ -688,7 +693,7 @@ export class AdminService {
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2003') {
         throw new ConflictException(
-          'Không thể xóa dịch vụ vì dịch vụ này đã phát sinh chỉ định hoặc kết quả cận lâm sàng trong hồ sơ khám. Vui lòng ngừng sử dụng hoặc cập nhật dịch vụ thay vì xóa.',
+          'KhĂ´ng thá»ƒ xĂ³a dá»‹ch vá»¥ vĂ¬ dá»‹ch vá»¥ nĂ y Ä‘Ă£ phĂ¡t sinh chá»‰ Ä‘á»‹nh hoáº·c káº¿t quáº£ cáº­n lĂ¢m sĂ ng trong há»“ sÆ¡ khĂ¡m. Vui lĂ²ng ngá»«ng sá»­ dá»¥ng hoáº·c cáº­p nháº­t dá»‹ch vá»¥ thay vĂ¬ xĂ³a.',
         );
       }
       mapPrismaError(e);
@@ -1394,30 +1399,52 @@ export class AdminService {
 
   async getScheduleCycleOverview(weekStartRaw?: string) {
     try {
-      const { mondayStart, saturdayEnd, sundayEnd, weekStartIso, weekEndIso } =
+      const { mondayStart, saturdayEnd, weekStartIso, weekEndIso } =
         this.resolveWeekRange(weekStartRaw);
       const now = new Date();
+      const registrationOpenAt = new Date(mondayStart);
+      registrationOpenAt.setUTCDate(mondayStart.getUTCDate() - 7);
+      registrationOpenAt.setUTCHours(0, 0, 0, 0);
+      const registrationCloseAt = new Date(mondayStart);
+      registrationCloseAt.setUTCDate(mondayStart.getUTCDate() - 2);
+      registrationCloseAt.setUTCHours(23, 59, 59, 999);
+      const adminReviewWindowEndAt = new Date(mondayStart);
+      adminReviewWindowEndAt.setUTCDate(mondayStart.getUTCDate() - 1);
+      adminReviewWindowEndAt.setUTCHours(23, 59, 59, 999);
 
-      const schedules = await this.prisma.lICH_BSK.findMany({
-        where: {
-          N_NGAY: {
-            gte: mondayStart,
-            lte: saturdayEnd,
+      const [schedules, sessions] = await this.prisma.$transaction([
+        this.prisma.lICH_BSK.findMany({
+          where: {
+            N_NGAY: {
+              gte: mondayStart,
+              lte: saturdayEnd,
+            },
           },
-        },
-        select: { LBSK_GHI_CHU: true },
-      });
+          select: {
+            N_NGAY: true,
+            B_TEN: true,
+            LBSK_TRANGTHAI_DUYET: true,
+          },
+        }),
+        this.prisma.bUOI.findMany({
+          select: { B_TEN: true },
+          orderBy: { B_GIO_BAT_DAU: 'asc' },
+        }),
+      ]);
 
       let pending = 0;
       let approved = 0;
       let rejected = 0;
-      let official = 0;
+      let officialCandidateCount = 0;
       for (const schedule of schedules) {
-        const { status } = parseScheduleStatus(schedule.LBSK_GHI_CHU);
+        const status = this.normalizeApprovalStatus(schedule.LBSK_TRANGTHAI_DUYET);
         if (status === 'pending') pending += 1;
-        else if (status === 'approved') approved += 1;
-        else if (status === 'rejected') rejected += 1;
-        else official += 1;
+        else if (status === 'approved') {
+          approved += 1;
+          officialCandidateCount += 1;
+        } else {
+          rejected += 1;
+        }
       }
 
       const [finalizedLog, generatedLog] = await this.prisma.$transaction([
@@ -1444,14 +1471,23 @@ export class AdminService {
       ]);
 
       const cycleStatus =
-        finalizedLog != null ? 'finalized' : now <= saturdayEnd ? 'open' : 'locked';
+        finalizedLog != null ? 'finalized' : now <= registrationCloseAt ? 'open' : 'locked';
+      const official = finalizedLog != null ? officialCandidateCount : 0;
+      const missingShifts = this.buildMissingShiftSummary({
+        mondayStart,
+        saturdayEnd,
+        sessions: sessions.map((session) => session.B_TEN),
+        approvedSchedules: schedules.filter(
+          (row) => this.normalizeApprovalStatus(row.LBSK_TRANGTHAI_DUYET) === 'approved',
+        ),
+      });
 
       return {
         weekStartDate: weekStartIso,
         weekEndDate: weekEndIso,
-        registrationOpenAt: mondayStart.toISOString(),
-        registrationCloseAt: saturdayEnd.toISOString(),
-        adminReviewWindowEndAt: sundayEnd.toISOString(),
+        registrationOpenAt: registrationOpenAt.toISOString(),
+        registrationCloseAt: registrationCloseAt.toISOString(),
+        adminReviewWindowEndAt: adminReviewWindowEndAt.toISOString(),
         status: cycleStatus,
         finalizedAt: finalizedLog?.AL_CHANGED_AT || null,
         slotGeneratedAt: generatedLog?.AL_CHANGED_AT || null,
@@ -1462,8 +1498,15 @@ export class AdminService {
           rejected,
           official,
         },
+        missingShifts,
       };
     } catch (e) {
+      if (this.isMissingScheduleApprovalColumnsError(e)) {
+        this.logger.warn(
+          'Missing schedule approval columns; using legacy schedule cycle overview fallback.',
+        );
+        return this.getScheduleCycleOverviewLegacy(weekStartRaw);
+      }
       mapPrismaError(e);
     }
   }
@@ -1508,6 +1551,10 @@ export class AdminService {
         ...(session ? { B_TEN: session } : {}),
         ...(specialtyId ? { BAC_SI: { CK_MA: specialtyId } } : {}),
         ...(dateFilter ? { N_NGAY: new Date(dateFilter) } : {}),
+        NOT: { LBSK_DUYET_BOI: 'ADMIN_MANUAL' },
+        ...(status === 'pending' || status === 'approved' || status === 'rejected'
+          ? { LBSK_TRANGTHAI_DUYET: status }
+          : {}),
       };
 
       const allRows = await this.prisma.lICH_BSK.findMany({
@@ -1535,21 +1582,20 @@ export class AdminService {
 
       const mapped = allRows
         .map((row) => {
-          const parsed = parseScheduleStatus(row.LBSK_GHI_CHU);
           return {
             BS_MA: row.BS_MA,
             N_NGAY: row.N_NGAY,
             B_TEN: row.B_TEN,
             P_MA: row.P_MA,
-            status: parsed.status,
-            note: parsed.note,
+            status: this.normalizeApprovalStatus(row.LBSK_TRANGTHAI_DUYET),
+            note: row.LBSK_GHI_CHU,
             doctor: row.BAC_SI,
             room: row.PHONG,
             submittedAt: null as string | null,
+            reviewedBy: row.LBSK_DUYET_BOI,
+            reviewedAt: row.LBSK_DUYET_LUC?.toISOString() || null,
           };
         })
-        .filter((row) => row.status === 'pending' || row.status === 'approved' || row.status === 'rejected')
-        .filter((row) => (status === 'all' ? true : row.status === status))
         .filter((row) =>
           search.length === 0
             ? true
@@ -1573,11 +1619,17 @@ export class AdminService {
         },
       };
     } catch (e) {
+      if (this.isMissingScheduleApprovalColumnsError(e)) {
+        this.logger.warn(
+          'Missing schedule approval columns; using legacy registrations fallback.',
+        );
+        return this.getScheduleRegistrationsLegacy(params);
+      }
       mapPrismaError(e);
     }
   }
 
-  async updateScheduleRegistrationStatus(
+    async updateScheduleRegistrationStatus(
     BS_MA: number,
     N_NGAY: string,
     B_TEN: string,
@@ -1585,33 +1637,72 @@ export class AdminService {
   ) {
     try {
       const targetDate = this.parseDateOnlyOrThrow(N_NGAY);
+      const targetWeekStart = this.getWeekMondayFromDate(targetDate);
+      const targetWeekStartIso = this.toDateOnlyIso(targetWeekStart);
+      this.assertAdminSundayActionForWeek(
+        targetWeekStart,
+        'duyệt hoặc từ chối đăng ký lịch trực',
+      );
+      await this.ensureWeekNotFinalized(targetWeekStartIso);
+
       const existing = await this.prisma.lICH_BSK.findUnique({
         where: { BS_MA_N_NGAY_B_TEN: { BS_MA, N_NGAY: targetDate, B_TEN } },
       });
       if (!existing) {
         throw new NotFoundException('Không tìm thấy ca đăng ký cần cập nhật');
       }
-
-      const parsed = parseScheduleStatus(existing.LBSK_GHI_CHU);
-      if (parsed.status !== 'pending' && parsed.status !== 'approved' && parsed.status !== 'rejected') {
+      if (existing.LBSK_DUYET_BOI === 'ADMIN_MANUAL') {
         throw new ConflictException(
-          'Ca trực này không thuộc nhóm đăng ký chờ duyệt nên không thể cập nhật theo luồng duyệt.',
+          'Ca trực này là ca chính thức do admin tạo thủ công, không thuộc luồng duyệt đăng ký.',
         );
       }
 
-      const mergedNote = this.mergeAdminNote(parsed.note, payload.adminNote);
+      const currentStatus = this.normalizeApprovalStatus(existing.LBSK_TRANGTHAI_DUYET);
+      if (currentStatus !== 'pending') {
+        throw new ConflictException(
+          'Chỉ có thể duyệt hoặc từ chối khi đăng ký đang ở trạng thái chờ duyệt.',
+        );
+      }
+
+      const nextStatus = this.normalizeApprovalStatus(payload.status);
+      if (nextStatus === 'approved') {
+        await this.validateDoctorRoomSpecialty(existing.BS_MA, existing.P_MA);
+        await this.assertNoApprovalConflicts({
+          BS_MA: existing.BS_MA,
+          P_MA: existing.P_MA,
+          N_NGAY: targetDate,
+          B_TEN,
+          currentKey: { BS_MA: existing.BS_MA, N_NGAY: targetDate, B_TEN },
+        });
+      }
+
+      const mergedNote = this.mergeAdminNote(existing.LBSK_GHI_CHU, payload.adminNote);
+      const reviewedAt = new Date();
 
       return await this.prisma.lICH_BSK.update({
         where: { BS_MA_N_NGAY_B_TEN: { BS_MA, N_NGAY: targetDate, B_TEN } },
         data: {
-          LBSK_GHI_CHU: buildScheduleNote(payload.status, mergedNote),
+          LBSK_TRANGTHAI_DUYET: nextStatus,
+          LBSK_GHI_CHU: mergedNote,
+          LBSK_DUYET_BOI: 'ADMIN',
+          LBSK_DUYET_LUC: reviewedAt,
         },
       });
     } catch (e) {
+      if (this.isMissingScheduleApprovalColumnsError(e)) {
+        this.logger.warn(
+          'Missing schedule approval columns; using legacy registration status update fallback.',
+        );
+        return this.updateScheduleRegistrationStatusLegacy(
+          BS_MA,
+          N_NGAY,
+          B_TEN,
+          payload,
+        );
+      }
       mapPrismaError(e);
     }
   }
-
   async getOfficialSchedules(params?: {
     weekStart?: string;
     page?: string;
@@ -1621,6 +1712,7 @@ export class AdminService {
     roomId?: string;
     status?: string;
     session?: string;
+    weekday?: string;
     date?: string;
     search?: string;
   }) {
@@ -1634,11 +1726,14 @@ export class AdminService {
       const parsedSpecialtyId = Number.parseInt(params?.specialtyId || '', 10);
       const doctorId = Number.isNaN(parsedDoctorId) ? undefined : parsedDoctorId;
       const roomId = Number.isNaN(parsedRoomId) ? undefined : parsedRoomId;
-      const specialtyId = Number.isNaN(parsedSpecialtyId)
-        ? undefined
-        : parsedSpecialtyId;
+      const specialtyId = Number.isNaN(parsedSpecialtyId) ? undefined : parsedSpecialtyId;
       const status = (params?.status || 'all').trim().toLowerCase();
       const session = params?.session?.trim() || undefined;
+      const parsedWeekday = Number.parseInt(params?.weekday || '', 10);
+      const weekday =
+        Number.isNaN(parsedWeekday) || parsedWeekday < 0 || parsedWeekday > 6
+          ? undefined
+          : parsedWeekday;
       const search = params?.search?.trim().toLowerCase() || '';
       const dateFilter = params?.date?.trim() || undefined;
       const { mondayStart, saturdayEnd, weekStartIso } = this.resolveWeekRange(
@@ -1647,6 +1742,7 @@ export class AdminService {
 
       const where: Prisma.LICH_BSKWhereInput = {
         N_NGAY: { gte: mondayStart, lte: saturdayEnd },
+        LBSK_TRANGTHAI_DUYET: 'approved',
         ...(doctorId ? { BS_MA: doctorId } : {}),
         ...(roomId ? { P_MA: roomId } : {}),
         ...(session ? { B_TEN: session } : {}),
@@ -1654,9 +1750,566 @@ export class AdminService {
         ...(dateFilter ? { N_NGAY: new Date(dateFilter) } : {}),
       };
 
-      const allRows = await this.prisma.lICH_BSK.findMany({
+      const [allRows, finalizedLog] = await this.prisma.$transaction([
+        this.prisma.lICH_BSK.findMany({
+          where,
+          include: {
+            BAC_SI: {
+              select: {
+                BS_MA: true,
+                BS_HO_TEN: true,
+                CK_MA: true,
+                CHUYEN_KHOA: { select: { CK_TEN: true } },
+              },
+            },
+            PHONG: {
+              select: {
+                P_MA: true,
+                P_TEN: true,
+                CK_MA: true,
+                CHUYEN_KHOA: { select: { CK_TEN: true } },
+              },
+            },
+            BUOI: {
+              select: {
+                B_TEN: true,
+                KHUNG_GIO: {
+                  select: { KG_MA: true },
+                },
+              },
+            },
+          },
+          orderBy: [{ N_NGAY: 'asc' }, { B_TEN: 'asc' }, { BS_MA: 'asc' }],
+        }),
+        this.prisma.aUDIT_LOG.findFirst({
+          where: {
+            AL_TABLE: 'SCHEDULE_CYCLE',
+            AL_ACTION: 'FINALIZED',
+            AL_PK: { equals: { weekStart: weekStartIso } },
+          },
+          orderBy: { AL_CHANGED_AT: 'desc' },
+        }),
+      ]);
+
+      const displayStatus = this.resolveOfficialShiftDisplayStatus(Boolean(finalizedLog));
+      const mapped = allRows
+        .map((row) => ({
+          BS_MA: row.BS_MA,
+          N_NGAY: row.N_NGAY,
+          B_TEN: row.B_TEN,
+          P_MA: row.P_MA,
+          status: displayStatus,
+          note: row.LBSK_GHI_CHU,
+          doctor: row.BAC_SI,
+          room: row.PHONG,
+          slotCount: row.BUOI?.KHUNG_GIO?.length ?? 0,
+        }))
+        .filter((row) => (status === 'all' ? true : row.status === status))
+        .filter((row) =>
+          weekday === undefined ? true : this.getWeekdayFromDate(row.N_NGAY) === weekday,
+        )
+        .filter((row) =>
+          search.length === 0
+            ? true
+            : row.doctor.BS_HO_TEN.toLowerCase().includes(search) ||
+              row.doctor.BS_MA.toString().includes(search),
+        );
+
+      const total = mapped.length;
+      const totalPages = Math.max(1, Math.ceil(total / limit));
+      const offset = (page - 1) * limit;
+      const items = mapped.slice(offset, offset + limit);
+
+      return {
+        items,
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages,
+          weekStart: weekStartIso,
+        },
+      };
+    } catch (e) {
+      if (this.isMissingScheduleApprovalColumnsError(e)) {
+        this.logger.warn(
+          'Missing schedule approval columns; using legacy official shifts fallback.',
+        );
+        return this.getOfficialSchedulesLegacy(params);
+      }
+      mapPrismaError(e);
+    }
+  }
+
+  async getOfficialShiftFormContext(params?: {
+    date?: string;
+    roomId?: string;
+    doctorId?: string;
+    excludeBsMa?: string;
+    excludeDate?: string;
+    excludeSession?: string;
+  }) {
+    try {
+      if (!params?.date?.trim()) {
+        throw new BadRequestException('Vui lòng chọn ngày làm việc.');
+      }
+
+      const targetDate = this.parseDateOnlyOrThrow(params.date.trim());
+      const dateIso = this.toDateOnlyIso(targetDate);
+      const parsedRoomId = Number.parseInt(params.roomId || '', 10);
+      const parsedDoctorId = Number.parseInt(params.doctorId || '', 10);
+      const roomId = Number.isNaN(parsedRoomId) ? undefined : parsedRoomId;
+      const doctorId = Number.isNaN(parsedDoctorId) ? undefined : parsedDoctorId;
+      const parsedExcludeBsMa = Number.parseInt(params.excludeBsMa || '', 10);
+      const excludeBsMa = Number.isNaN(parsedExcludeBsMa)
+        ? undefined
+        : parsedExcludeBsMa;
+      const excludeDate = params.excludeDate?.trim() || undefined;
+      const excludeSession = params.excludeSession?.trim() || undefined;
+
+      const [sessions, room, doctor, finalizedLog] = await Promise.all([
+        this.prisma.bUOI.findMany({
+          select: { B_TEN: true },
+          orderBy: { B_GIO_BAT_DAU: 'asc' },
+        }),
+        roomId
+          ? this.prisma.pHONG.findUnique({
+              where: { P_MA: roomId },
+              select: {
+                P_MA: true,
+                P_TEN: true,
+                CK_MA: true,
+                CHUYEN_KHOA: { select: { CK_TEN: true } },
+              },
+            })
+          : Promise.resolve(null),
+        doctorId
+          ? this.prisma.bAC_SI.findUnique({
+              where: { BS_MA: doctorId },
+              select: {
+                BS_MA: true,
+                BS_HO_TEN: true,
+                CK_MA: true,
+                BS_DA_XOA: true,
+                CHUYEN_KHOA: { select: { CK_TEN: true } },
+              },
+            })
+          : Promise.resolve(null),
+        this.prisma.aUDIT_LOG.findFirst({
+          where: {
+            AL_TABLE: 'SCHEDULE_CYCLE',
+            AL_ACTION: 'FINALIZED',
+            AL_PK: {
+              equals: {
+                weekStart: this.toDateOnlyIso(this.getWeekMondayFromDate(targetDate)),
+              },
+            },
+          },
+          orderBy: { AL_CHANGED_AT: 'desc' },
+        }),
+      ]);
+
+      if (roomId && !room) {
+        throw new NotFoundException('Không tìm thấy phòng đã chọn.');
+      }
+      if (doctorId && (!doctor || doctor.BS_DA_XOA)) {
+        throw new NotFoundException('Không tìm thấy bác sĩ hợp lệ đã chọn.');
+      }
+
+      const doctorSpecialtyMatchesRoom =
+        room && doctor ? doctor.CK_MA === room.CK_MA : null;
+
+      const rows = await this.getDailyScheduleContextRows(
+        targetDate,
+        Boolean(finalizedLog),
+      );
+      const excludedRows = rows.filter((row) => {
+        if (!excludeBsMa || !excludeDate || !excludeSession) return true;
+        return !(
+          row.BS_MA === excludeBsMa &&
+          this.toDateOnlyIso(row.N_NGAY) === excludeDate &&
+          row.B_TEN === excludeSession
+        );
+      });
+
+      const sessionNames = (sessions ?? []).map((s) => s.B_TEN);
+      const roomSessionMap = new Map<string, (typeof excludedRows)[number]>();
+      const doctorSessionMap = new Map<string, (typeof excludedRows)[number]>();
+
+      for (const row of excludedRows) {
+        if (roomId && row.P_MA === roomId) {
+          const current = roomSessionMap.get(row.B_TEN);
+          if (!current || this.getDisplayStatusPriority(row.status) > this.getDisplayStatusPriority(current.status)) {
+            roomSessionMap.set(row.B_TEN, row);
+          }
+        }
+        if (doctorId && row.BS_MA === doctorId) {
+          const current = doctorSessionMap.get(row.B_TEN);
+          if (!current || this.getDisplayStatusPriority(row.status) > this.getDisplayStatusPriority(current.status)) {
+            doctorSessionMap.set(row.B_TEN, row);
+          }
+        }
+      }
+
+      const sessionContext = sessionNames.map((session) => {
+        const roomRow = roomSessionMap.get(session);
+        const doctorRow = doctorSessionMap.get(session);
+        const roomOccupied = this.isOccupiedScheduleStatus(roomRow?.status);
+        const doctorOccupied = this.isOccupiedScheduleStatus(doctorRow?.status);
+        const reasons: string[] = [];
+
+        if (roomOccupied) {
+          reasons.push('Buổi này của phòng đã có bác sĩ được phân công.');
+        }
+        if (doctorOccupied) {
+          reasons.push('Bác sĩ này đã có ca trực khác trong cùng buổi.');
+        }
+        if (doctorSpecialtyMatchesRoom === false) {
+          reasons.push('Bác sĩ không thuộc chuyên khoa của phòng đã chọn.');
+        }
+
+        const canSelect =
+          Boolean(roomId) &&
+          !roomOccupied &&
+          (!doctorId || !doctorOccupied) &&
+          doctorSpecialtyMatchesRoom !== false;
+
+        return {
+          session,
+          room: {
+            status: roomRow?.status ?? ('empty' as ScheduleDisplayStatus),
+            occupied: roomOccupied,
+            doctor: roomRow
+              ? { BS_MA: roomRow.BS_MA, BS_HO_TEN: roomRow.doctorName }
+              : null,
+            note: roomRow?.note || null,
+          },
+          doctor: {
+            status: doctorRow?.status ?? ('empty' as ScheduleDisplayStatus),
+            occupied: doctorOccupied,
+            room: doctorRow
+              ? { P_MA: doctorRow.P_MA, P_TEN: doctorRow.roomName }
+              : null,
+            note: doctorRow?.note || null,
+          },
+          canSelect,
+          reasons,
+        };
+      });
+
+      const availableSessions = sessionContext
+        .filter((item) => item.canSelect)
+        .map((item) => item.session);
+
+      return {
+        date: dateIso,
+        room:
+          room == null
+            ? null
+            : {
+                P_MA: room.P_MA,
+                P_TEN: room.P_TEN,
+                CK_MA: room.CK_MA,
+                CHUYEN_KHOA: room.CHUYEN_KHOA,
+              },
+        doctor:
+          doctor == null
+            ? null
+            : {
+                BS_MA: doctor.BS_MA,
+                BS_HO_TEN: doctor.BS_HO_TEN,
+                CK_MA: doctor.CK_MA,
+                CHUYEN_KHOA: doctor.CHUYEN_KHOA,
+              },
+        doctorSpecialtyMatchesRoom,
+        sessionContext,
+        availableSessions,
+        hasAnyAvailableSession: availableSessions.length > 0,
+      };
+    } catch (e) {
+      mapPrismaError(e);
+    }
+  }
+
+  private async getScheduleCycleOverviewLegacy(weekStartRaw?: string) {
+    const { mondayStart, saturdayEnd, weekStartIso, weekEndIso } =
+      this.resolveWeekRange(weekStartRaw);
+    const now = new Date();
+    const registrationOpenAt = new Date(mondayStart);
+    registrationOpenAt.setUTCDate(mondayStart.getUTCDate() - 7);
+    registrationOpenAt.setUTCHours(0, 0, 0, 0);
+    const registrationCloseAt = new Date(mondayStart);
+    registrationCloseAt.setUTCDate(mondayStart.getUTCDate() - 2);
+    registrationCloseAt.setUTCHours(23, 59, 59, 999);
+    const adminReviewWindowEndAt = new Date(mondayStart);
+    adminReviewWindowEndAt.setUTCDate(mondayStart.getUTCDate() - 1);
+    adminReviewWindowEndAt.setUTCHours(23, 59, 59, 999);
+
+    const [schedules, sessions] = await this.prisma.$transaction([
+      this.prisma.lICH_BSK.findMany({
+        where: {
+          N_NGAY: {
+            gte: mondayStart,
+            lte: saturdayEnd,
+          },
+        },
+        select: {
+          N_NGAY: true,
+          B_TEN: true,
+          LBSK_GHI_CHU: true,
+        },
+      }),
+      this.prisma.bUOI.findMany({
+        select: { B_TEN: true },
+        orderBy: { B_GIO_BAT_DAU: 'asc' },
+      }),
+    ]);
+
+    let pending = 0;
+    let approved = 0;
+    let rejected = 0;
+    let officialCandidateCount = 0;
+    const approvedSchedules: Array<{ N_NGAY: Date; B_TEN: string }> = [];
+    for (const schedule of schedules) {
+      const parsed = this.parseLegacyScheduleStatus(schedule.LBSK_GHI_CHU);
+      if (parsed.status === 'pending') {
+        pending += 1;
+      } else if (parsed.status === 'rejected') {
+        rejected += 1;
+      } else {
+        approved += 1;
+        officialCandidateCount += 1;
+        approvedSchedules.push({ N_NGAY: schedule.N_NGAY, B_TEN: schedule.B_TEN });
+      }
+    }
+
+    const [finalizedLog, generatedLog] = await this.prisma.$transaction([
+      this.prisma.aUDIT_LOG.findFirst({
+        where: {
+          AL_TABLE: 'SCHEDULE_CYCLE',
+          AL_ACTION: 'FINALIZED',
+          AL_PK: {
+            equals: { weekStart: weekStartIso },
+          },
+        },
+        orderBy: { AL_CHANGED_AT: 'desc' },
+      }),
+      this.prisma.aUDIT_LOG.findFirst({
+        where: {
+          AL_TABLE: 'SCHEDULE_CYCLE',
+          AL_ACTION: 'SLOTS_GENERATED',
+          AL_PK: {
+            equals: { weekStart: weekStartIso },
+          },
+        },
+        orderBy: { AL_CHANGED_AT: 'desc' },
+      }),
+    ]);
+
+    const cycleStatus =
+      finalizedLog != null ? 'finalized' : now <= registrationCloseAt ? 'open' : 'locked';
+    const official = finalizedLog != null ? officialCandidateCount : 0;
+    const missingShifts = this.buildMissingShiftSummary({
+      mondayStart,
+      saturdayEnd,
+      sessions: sessions.map((session) => session.B_TEN),
+      approvedSchedules,
+    });
+
+    return {
+      weekStartDate: weekStartIso,
+      weekEndDate: weekEndIso,
+      registrationOpenAt: registrationOpenAt.toISOString(),
+      registrationCloseAt: registrationCloseAt.toISOString(),
+      adminReviewWindowEndAt: adminReviewWindowEndAt.toISOString(),
+      status: cycleStatus,
+      finalizedAt: finalizedLog?.AL_CHANGED_AT || null,
+      slotGeneratedAt: generatedLog?.AL_CHANGED_AT || null,
+      summary: {
+        total: schedules.length,
+        pending,
+        approved,
+        rejected,
+        official,
+      },
+      missingShifts,
+    };
+  }
+
+  private async getScheduleRegistrationsLegacy(
+    params?: {
+      weekStart?: string;
+      page?: string;
+      limit?: string;
+      specialtyId?: string;
+      doctorId?: string;
+      roomId?: string;
+      status?: string;
+      session?: string;
+      date?: string;
+      search?: string;
+    },
+  ) {
+    const rawPage = Number.parseInt(params?.page || '1', 10);
+    const rawLimit = Number.parseInt(params?.limit || '10', 10);
+    const page = Number.isNaN(rawPage) ? 1 : Math.max(rawPage, 1);
+    const limit = Number.isNaN(rawLimit) ? 10 : Math.min(Math.max(rawLimit, 1), 100);
+    const parsedDoctorId = Number.parseInt(params?.doctorId || '', 10);
+    const parsedRoomId = Number.parseInt(params?.roomId || '', 10);
+    const parsedSpecialtyId = Number.parseInt(params?.specialtyId || '', 10);
+    const doctorId = Number.isNaN(parsedDoctorId) ? undefined : parsedDoctorId;
+    const roomId = Number.isNaN(parsedRoomId) ? undefined : parsedRoomId;
+    const specialtyId = Number.isNaN(parsedSpecialtyId)
+      ? undefined
+      : parsedSpecialtyId;
+    const status = (params?.status || 'all').trim().toLowerCase();
+    const session = params?.session?.trim() || undefined;
+    const search = params?.search?.trim().toLowerCase() || '';
+    const dateFilter = params?.date?.trim() || undefined;
+    const { mondayStart, saturdayEnd, weekStartIso } = this.resolveWeekRange(
+      params?.weekStart,
+    );
+
+    const where: Prisma.LICH_BSKWhereInput = {
+      N_NGAY: { gte: mondayStart, lte: saturdayEnd },
+      ...(doctorId ? { BS_MA: doctorId } : {}),
+      ...(roomId ? { P_MA: roomId } : {}),
+      ...(session ? { B_TEN: session } : {}),
+      ...(specialtyId ? { BAC_SI: { CK_MA: specialtyId } } : {}),
+      ...(dateFilter ? { N_NGAY: new Date(dateFilter) } : {}),
+    };
+
+    const allRows = await this.prisma.lICH_BSK.findMany({
+      where,
+      select: {
+        BS_MA: true,
+        N_NGAY: true,
+        B_TEN: true,
+        P_MA: true,
+        LBSK_GHI_CHU: true,
+        BAC_SI: {
+          select: {
+            BS_MA: true,
+            BS_HO_TEN: true,
+            CK_MA: true,
+            CHUYEN_KHOA: { select: { CK_TEN: true } },
+          },
+        },
+        PHONG: {
+          select: {
+            P_MA: true,
+            P_TEN: true,
+            CK_MA: true,
+            CHUYEN_KHOA: { select: { CK_TEN: true } },
+          },
+        },
+      },
+      orderBy: [{ N_NGAY: 'asc' }, { B_TEN: 'asc' }, { BS_MA: 'asc' }],
+    });
+
+    const mapped = allRows
+      .flatMap((row) => {
+        const parsed = this.parseLegacyScheduleStatus(row.LBSK_GHI_CHU);
+        if (parsed.status === 'official') {
+          return [];
+        }
+        return [
+          {
+            BS_MA: row.BS_MA,
+            N_NGAY: row.N_NGAY,
+            B_TEN: row.B_TEN,
+            P_MA: row.P_MA,
+            status: parsed.status,
+            note: parsed.note,
+            doctor: row.BAC_SI,
+            room: row.PHONG,
+            submittedAt: null as string | null,
+            reviewedBy: null as string | null,
+            reviewedAt: null as string | null,
+          },
+        ];
+      })
+      .filter((row) => (status === 'all' ? true : row.status === status))
+      .filter((row) =>
+        search.length === 0
+          ? true
+          : row.doctor.BS_HO_TEN.toLowerCase().includes(search) ||
+            row.doctor.BS_MA.toString().includes(search),
+      );
+
+    const total = mapped.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const offset = (page - 1) * limit;
+    const items = mapped.slice(offset, offset + limit);
+
+    return {
+      items,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages,
+        weekStart: weekStartIso,
+      },
+    };
+  }
+
+  private async getOfficialSchedulesLegacy(
+    params?: {
+      weekStart?: string;
+      page?: string;
+      limit?: string;
+      specialtyId?: string;
+      doctorId?: string;
+      roomId?: string;
+      status?: string;
+      session?: string;
+      weekday?: string;
+      date?: string;
+      search?: string;
+    },
+  ) {
+    const rawPage = Number.parseInt(params?.page || '1', 10);
+    const rawLimit = Number.parseInt(params?.limit || '10', 10);
+    const page = Number.isNaN(rawPage) ? 1 : Math.max(rawPage, 1);
+    const limit = Number.isNaN(rawLimit) ? 10 : Math.min(Math.max(rawLimit, 1), 100);
+    const parsedDoctorId = Number.parseInt(params?.doctorId || '', 10);
+    const parsedRoomId = Number.parseInt(params?.roomId || '', 10);
+    const parsedSpecialtyId = Number.parseInt(params?.specialtyId || '', 10);
+    const doctorId = Number.isNaN(parsedDoctorId) ? undefined : parsedDoctorId;
+    const roomId = Number.isNaN(parsedRoomId) ? undefined : parsedRoomId;
+    const specialtyId = Number.isNaN(parsedSpecialtyId) ? undefined : parsedSpecialtyId;
+    const status = (params?.status || 'all').trim().toLowerCase();
+    const session = params?.session?.trim() || undefined;
+    const parsedWeekday = Number.parseInt(params?.weekday || '', 10);
+    const weekday =
+      Number.isNaN(parsedWeekday) || parsedWeekday < 0 || parsedWeekday > 6
+        ? undefined
+        : parsedWeekday;
+    const search = params?.search?.trim().toLowerCase() || '';
+    const dateFilter = params?.date?.trim() || undefined;
+    const { mondayStart, saturdayEnd, weekStartIso } = this.resolveWeekRange(
+      params?.weekStart,
+    );
+
+    const where: Prisma.LICH_BSKWhereInput = {
+      N_NGAY: { gte: mondayStart, lte: saturdayEnd },
+      ...(doctorId ? { BS_MA: doctorId } : {}),
+      ...(roomId ? { P_MA: roomId } : {}),
+      ...(session ? { B_TEN: session } : {}),
+      ...(specialtyId ? { BAC_SI: { CK_MA: specialtyId } } : {}),
+      ...(dateFilter ? { N_NGAY: new Date(dateFilter) } : {}),
+    };
+
+    const [allRows, finalizedLog] = await this.prisma.$transaction([
+      this.prisma.lICH_BSK.findMany({
         where,
-        include: {
+        select: {
+          BS_MA: true,
+          N_NGAY: true,
+          B_TEN: true,
+          P_MA: true,
+          LBSK_GHI_CHU: true,
           BAC_SI: {
             select: {
               BS_MA: true,
@@ -1683,64 +2336,304 @@ export class AdminService {
           },
         },
         orderBy: [{ N_NGAY: 'asc' }, { B_TEN: 'asc' }, { BS_MA: 'asc' }],
-      });
+      }),
+      this.prisma.aUDIT_LOG.findFirst({
+        where: {
+          AL_TABLE: 'SCHEDULE_CYCLE',
+          AL_ACTION: 'FINALIZED',
+          AL_PK: { equals: { weekStart: weekStartIso } },
+        },
+        orderBy: { AL_CHANGED_AT: 'desc' },
+      }),
+    ]);
 
-      const mapped = allRows
-        .map((row) => {
-          const parsed = parseScheduleStatus(row.LBSK_GHI_CHU);
-          return {
+    const displayStatus = this.resolveOfficialShiftDisplayStatus(Boolean(finalizedLog));
+    const mapped = allRows
+      .flatMap((row) => {
+        const parsed = this.parseLegacyScheduleStatus(row.LBSK_GHI_CHU);
+        if (parsed.status === 'pending' || parsed.status === 'rejected') {
+          return [];
+        }
+        const rowStatus: OfficialShiftDisplayStatus =
+          parsed.status === 'official' ? 'official' : displayStatus;
+        return [
+          {
             BS_MA: row.BS_MA,
             N_NGAY: row.N_NGAY,
             B_TEN: row.B_TEN,
             P_MA: row.P_MA,
-            status: parsed.status,
+            status: rowStatus,
             note: parsed.note,
             doctor: row.BAC_SI,
             room: row.PHONG,
             slotCount: row.BUOI?.KHUNG_GIO?.length ?? 0,
-          };
-        })
-        .filter((row) => row.status === 'official' || row.status === 'approved')
-        .filter((row) => (status === 'all' ? true : row.status === status))
-        .filter((row) =>
-          search.length === 0
-            ? true
-            : row.doctor.BS_HO_TEN.toLowerCase().includes(search) ||
-              row.doctor.BS_MA.toString().includes(search),
-        );
+          },
+        ];
+      })
+      .filter((row) => (status === 'all' ? true : row.status === status))
+      .filter((row) =>
+        weekday === undefined ? true : this.getWeekdayFromDate(row.N_NGAY) === weekday,
+      )
+      .filter((row) =>
+        search.length === 0
+          ? true
+          : row.doctor.BS_HO_TEN.toLowerCase().includes(search) ||
+            row.doctor.BS_MA.toString().includes(search),
+      );
 
-      const total = mapped.length;
-      const totalPages = Math.max(1, Math.ceil(total / limit));
-      const offset = (page - 1) * limit;
-      const items = mapped.slice(offset, offset + limit);
+    const total = mapped.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const offset = (page - 1) * limit;
+    const items = mapped.slice(offset, offset + limit);
 
-      return {
-        items,
-        meta: {
-          total,
-          page,
-          limit,
-          totalPages,
-          weekStart: weekStartIso,
-        },
-      };
+    return {
+      items,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages,
+        weekStart: weekStartIso,
+      },
+    };
+  }
+
+  private async updateScheduleRegistrationStatusLegacy(
+    BS_MA: number,
+    N_NGAY: string,
+    B_TEN: string,
+    payload: { status: 'approved' | 'rejected'; adminNote?: string },
+  ) {
+    const targetDate = this.parseDateOnlyOrThrow(N_NGAY);
+    const targetWeekStart = this.getWeekMondayFromDate(targetDate);
+    const targetWeekStartIso = this.toDateOnlyIso(targetWeekStart);
+    this.assertAdminSundayActionForWeek(
+      targetWeekStart,
+      'duyệt hoặc từ chối đăng ký lịch trực',
+    );
+    await this.ensureWeekNotFinalized(targetWeekStartIso);
+
+    const existing = await this.prisma.lICH_BSK.findUnique({
+      where: { BS_MA_N_NGAY_B_TEN: { BS_MA, N_NGAY: targetDate, B_TEN } },
+      select: {
+        BS_MA: true,
+        P_MA: true,
+        N_NGAY: true,
+        B_TEN: true,
+        LBSK_GHI_CHU: true,
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Không tìm thấy ca đăng ký cần cập nhật');
+    }
+
+    const currentParsed = this.parseLegacyScheduleStatus(existing.LBSK_GHI_CHU);
+    if (currentParsed.status === 'official') {
+      throw new ConflictException(
+        'Ca trực này là ca chính thức do admin tạo thủ công, không thuộc luồng duyệt đăng ký.',
+      );
+    }
+    if (currentParsed.status !== 'pending') {
+      throw new ConflictException(
+        'Chỉ có thể duyệt hoặc từ chối khi đăng ký đang ở trạng thái chờ duyệt.',
+      );
+    }
+
+    const nextStatus = this.normalizeApprovalStatus(payload.status);
+    if (nextStatus === 'approved') {
+      await this.validateDoctorRoomSpecialty(existing.BS_MA, existing.P_MA);
+      await this.assertNoApprovalConflictsLegacy({
+        BS_MA: existing.BS_MA,
+        P_MA: existing.P_MA,
+        N_NGAY: targetDate,
+        B_TEN,
+        currentKey: { BS_MA: existing.BS_MA, N_NGAY: targetDate, B_TEN },
+      });
+    }
+
+    const mergedNote = this.mergeAdminNote(currentParsed.note, payload.adminNote);
+
+    return await this.prisma.lICH_BSK.update({
+      where: { BS_MA_N_NGAY_B_TEN: { BS_MA, N_NGAY: targetDate, B_TEN } },
+      data: {
+        LBSK_GHI_CHU: this.buildLegacyScheduleStatusNote(nextStatus, mergedNote),
+      },
+    });
+  }
+
+  private async createOfficialScheduleLegacy(payload: {
+    BS_MA: number;
+    P_MA: number;
+    N_NGAY: string;
+    B_TEN: string;
+    note?: string;
+    status?: OfficialShiftDisplayStatus;
+  }) {
+    const targetDate = this.parseDateOnlyOrThrow(payload.N_NGAY);
+    this.validateScheduleDateForAdmin(targetDate);
+    await this.ensureScheduleDateExists(targetDate);
+    const targetWeekStart = this.getWeekMondayFromDate(targetDate);
+    this.assertAdminSundayActionForWeek(targetWeekStart, 'điều chỉnh lịch trực tuần');
+    await this.ensureWeekNotFinalized(this.toDateOnlyIso(targetWeekStart));
+    await this.validateDoctorRoomSpecialty(payload.BS_MA, payload.P_MA);
+    await this.assertNoOfficialShiftOccupancyConflicts({
+      BS_MA: payload.BS_MA,
+      P_MA: payload.P_MA,
+      N_NGAY: targetDate,
+      B_TEN: payload.B_TEN,
+    });
+
+    const status: ScheduleApprovalStatus | 'official' =
+      payload.status === 'official' ? 'official' : 'approved';
+
+    const note = this.buildLegacyScheduleStatusNote(status, payload.note);
+    const client = this.prisma.getClient();
+    const dateOnly = this.toDateOnlyIso(targetDate);
+
+    try {
+      const createdWithStatus = await client.$queryRaw<
+        Array<{
+          BS_MA: number;
+          P_MA: number;
+          N_NGAY: Date;
+          B_TEN: string;
+          LBSK_GHI_CHU: string | null;
+        }>
+      >(Prisma.sql`
+        INSERT INTO "LICH_BSK"
+          ("BS_MA", "P_MA", "N_NGAY", "B_TEN", "LBSK_TRANGTHAI_DUYET", "LBSK_GHI_CHU")
+        VALUES
+          (${payload.BS_MA}, ${payload.P_MA}, ${dateOnly}, ${payload.B_TEN}, ${null}, ${note})
+        RETURNING "BS_MA", "P_MA", "N_NGAY", "B_TEN", "LBSK_GHI_CHU"
+      `);
+      return createdWithStatus[0];
     } catch (e) {
-      mapPrismaError(e);
+      const haystack = `${(e as any)?.message || ''} ${JSON.stringify((e as any)?.meta || {})}`.toLowerCase();
+      const missingStatusColumn =
+        haystack.includes('lbsk_trangthai_duyet') &&
+        (haystack.includes('does not exist') || haystack.includes('columnnotfound'));
+      if (!missingStatusColumn) {
+        this.rethrowOfficialShiftLegacyWriteError(e);
+      }
+    }
+
+    try {
+      const createdWithoutStatus = await client.$queryRaw<
+        Array<{
+          BS_MA: number;
+          P_MA: number;
+          N_NGAY: Date;
+          B_TEN: string;
+          LBSK_GHI_CHU: string | null;
+        }>
+      >(Prisma.sql`
+        INSERT INTO "LICH_BSK"
+          ("BS_MA", "P_MA", "N_NGAY", "B_TEN", "LBSK_GHI_CHU")
+        VALUES
+          (${payload.BS_MA}, ${payload.P_MA}, ${dateOnly}, ${payload.B_TEN}, ${note})
+        RETURNING "BS_MA", "P_MA", "N_NGAY", "B_TEN", "LBSK_GHI_CHU"
+      `);
+      return createdWithoutStatus[0];
+    } catch (e) {
+      this.rethrowOfficialShiftLegacyWriteError(e);
     }
   }
 
+  private async updateOfficialScheduleLegacy(
+    BS_MA: number,
+    N_NGAY: string,
+    B_TEN: string,
+    payload: {
+      BS_MA?: number;
+      P_MA?: number;
+      N_NGAY?: string;
+      B_TEN?: string;
+      note?: string;
+      status?: OfficialShiftDisplayStatus;
+    },
+  ) {
+    const oldDate = this.parseDateOnlyOrThrow(N_NGAY);
+    const existing = await this.prisma.lICH_BSK.findUnique({
+      where: { BS_MA_N_NGAY_B_TEN: { BS_MA, N_NGAY: oldDate, B_TEN } },
+      select: {
+        BS_MA: true,
+        P_MA: true,
+        N_NGAY: true,
+        B_TEN: true,
+        LBSK_GHI_CHU: true,
+      },
+    });
+    if (!existing) {
+      throw new NotFoundException('Không tìm thấy ca trực cần cập nhật');
+    }
+
+    const nextDoctorId = payload.BS_MA ?? BS_MA;
+    const nextRoomId = payload.P_MA ?? existing.P_MA;
+    const nextDate = payload.N_NGAY
+      ? this.parseDateOnlyOrThrow(payload.N_NGAY)
+      : oldDate;
+    const nextSession = payload.B_TEN ?? B_TEN;
+    const currentParsed = this.parseLegacyScheduleStatus(existing.LBSK_GHI_CHU);
+    const noteFromCurrent = currentParsed.note || '';
+    const nextNote = payload.note ?? noteFromCurrent;
+    const nextStatus: ScheduleApprovalStatus | 'official' =
+      payload.status === 'official' ? 'official' : 'approved';
+
+    this.validateScheduleDateForAdmin(nextDate);
+    await this.ensureScheduleDateExists(nextDate);
+    const nextWeekStart = this.getWeekMondayFromDate(nextDate);
+    this.assertAdminSundayActionForWeek(nextWeekStart, 'điều chỉnh lịch trực tuần');
+    await this.ensureWeekNotFinalized(this.toDateOnlyIso(nextWeekStart));
+    await this.validateDoctorRoomSpecialty(nextDoctorId, nextRoomId);
+    await this.assertNoOfficialShiftOccupancyConflicts({
+      BS_MA: nextDoctorId,
+      P_MA: nextRoomId,
+      N_NGAY: nextDate,
+      B_TEN: nextSession,
+      currentKey: { BS_MA, N_NGAY: oldDate, B_TEN },
+    });
+
+    return await this.prisma.lICH_BSK.update({
+      where: { BS_MA_N_NGAY_B_TEN: { BS_MA, N_NGAY: oldDate, B_TEN } },
+      data: {
+        BS_MA: nextDoctorId,
+        P_MA: nextRoomId,
+        N_NGAY: nextDate,
+        B_TEN: nextSession,
+        LBSK_GHI_CHU: this.buildLegacyScheduleStatusNote(nextStatus, nextNote),
+      },
+      select: {
+        BS_MA: true,
+        P_MA: true,
+        N_NGAY: true,
+        B_TEN: true,
+        LBSK_GHI_CHU: true,
+      },
+    });
+  }
   async createOfficialSchedule(payload: {
     BS_MA: number;
     P_MA: number;
     N_NGAY: string;
     B_TEN: string;
     note?: string;
-    status?: ScheduleWorkflowStatus;
+    status?: OfficialShiftDisplayStatus;
   }) {
     try {
       const targetDate = this.parseDateOnlyOrThrow(payload.N_NGAY);
       this.validateScheduleDateForAdmin(targetDate);
+      await this.ensureScheduleDateExists(targetDate);
+      const targetWeekStart = this.getWeekMondayFromDate(targetDate);
+      this.assertAdminSundayActionForWeek(targetWeekStart, 'điều chỉnh lịch trực tuần');
+      await this.ensureWeekNotFinalized(this.toDateOnlyIso(targetWeekStart));
       await this.validateDoctorRoomSpecialty(payload.BS_MA, payload.P_MA);
+      await this.assertNoOfficialShiftOccupancyConflicts({
+        BS_MA: payload.BS_MA,
+        P_MA: payload.P_MA,
+        N_NGAY: targetDate,
+        B_TEN: payload.B_TEN,
+      });
 
       return await this.prisma.lICH_BSK.create({
         data: {
@@ -1748,10 +2641,19 @@ export class AdminService {
           P_MA: payload.P_MA,
           N_NGAY: targetDate,
           B_TEN: payload.B_TEN,
-          LBSK_GHI_CHU: buildScheduleNote(payload.status || 'official', payload.note),
+          LBSK_TRANGTHAI_DUYET: 'approved',
+          LBSK_GHI_CHU: payload.note?.trim() || null,
+          LBSK_DUYET_BOI: 'ADMIN_MANUAL',
+          LBSK_DUYET_LUC: new Date(),
         },
       });
     } catch (e) {
+      if (this.isMissingScheduleApprovalColumnsError(e)) {
+        this.logger.warn(
+          'Missing schedule approval columns; using legacy official shift create fallback.',
+        );
+        return this.createOfficialScheduleLegacy(payload);
+      }
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
         throw new ConflictException(
           'Trùng lịch trực: bác sĩ hoặc phòng đã có lịch trong cùng ngày và buổi.',
@@ -1760,7 +2662,6 @@ export class AdminService {
       mapPrismaError(e);
     }
   }
-
   async updateOfficialSchedule(
     BS_MA: number,
     N_NGAY: string,
@@ -1771,7 +2672,7 @@ export class AdminService {
       N_NGAY?: string;
       B_TEN?: string;
       note?: string;
-      status?: ScheduleWorkflowStatus;
+      status?: OfficialShiftDisplayStatus;
     },
   ) {
     try {
@@ -1789,11 +2690,21 @@ export class AdminService {
         ? this.parseDateOnlyOrThrow(payload.N_NGAY)
         : oldDate;
       const nextSession = payload.B_TEN ?? B_TEN;
-      const currentParsed = parseScheduleStatus(existing.LBSK_GHI_CHU);
-      const nextStatus = payload.status ?? currentParsed.status;
-      const nextNote = payload.note ?? currentParsed.note ?? undefined;
+      const nextNote = payload.note ?? existing.LBSK_GHI_CHU ?? undefined;
+
       this.validateScheduleDateForAdmin(nextDate);
+      await this.ensureScheduleDateExists(nextDate);
+      const nextWeekStart = this.getWeekMondayFromDate(nextDate);
+      this.assertAdminSundayActionForWeek(nextWeekStart, 'điều chỉnh lịch trực tuần');
+      await this.ensureWeekNotFinalized(this.toDateOnlyIso(nextWeekStart));
       await this.validateDoctorRoomSpecialty(nextDoctorId, nextRoomId);
+      await this.assertNoOfficialShiftOccupancyConflicts({
+        BS_MA: nextDoctorId,
+        P_MA: nextRoomId,
+        N_NGAY: nextDate,
+        B_TEN: nextSession,
+        currentKey: { BS_MA, N_NGAY: oldDate, B_TEN },
+      });
 
       return await this.prisma.lICH_BSK.update({
         where: { BS_MA_N_NGAY_B_TEN: { BS_MA, N_NGAY: oldDate, B_TEN } },
@@ -1802,10 +2713,19 @@ export class AdminService {
           P_MA: nextRoomId,
           N_NGAY: nextDate,
           B_TEN: nextSession,
-          LBSK_GHI_CHU: buildScheduleNote(nextStatus, nextNote),
+          LBSK_TRANGTHAI_DUYET: 'approved',
+          LBSK_GHI_CHU: nextNote,
+          LBSK_DUYET_BOI: existing.LBSK_DUYET_BOI || 'ADMIN_MANUAL',
+          LBSK_DUYET_LUC: new Date(),
         },
       });
     } catch (e) {
+      if (this.isMissingScheduleApprovalColumnsError(e)) {
+        this.logger.warn(
+          'Missing schedule approval columns; using legacy official shift update fallback.',
+        );
+        return this.updateOfficialScheduleLegacy(BS_MA, N_NGAY, B_TEN, payload);
+      }
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
         throw new ConflictException(
           'Trùng lịch trực: bác sĩ hoặc phòng đã có lịch trong cùng ngày và buổi.',
@@ -1819,15 +2739,24 @@ export class AdminService {
       mapPrismaError(e);
     }
   }
-
   async deleteOfficialSchedule(BS_MA: number, N_NGAY: string, B_TEN: string) {
     try {
       const targetDate = this.parseDateOnlyOrThrow(N_NGAY);
+      const targetWeekStart = this.getWeekMondayFromDate(targetDate);
+      this.assertAdminSundayActionForWeek(targetWeekStart, 'điều chỉnh lịch trực tuần');
+      await this.ensureWeekNotFinalized(this.toDateOnlyIso(targetWeekStart));
       await this.prisma.lICH_BSK.delete({
         where: { BS_MA_N_NGAY_B_TEN: { BS_MA, N_NGAY: targetDate, B_TEN } },
       });
       return { message: 'Xóa ca trực thành công' };
     } catch (e) {
+      if (this.isMissingScheduleApprovalColumnsError(e)) {
+        this.logger.warn(
+          'Missing schedule approval columns; using legacy official shift delete fallback.',
+        );
+        const targetDate = this.parseDateOnlyOrThrow(N_NGAY);
+        return this.deleteOfficialScheduleLegacy(BS_MA, targetDate, B_TEN);
+      }
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2003') {
         throw new ConflictException(
           'Không thể xóa ca trực này vì đã có lịch hẹn bệnh nhân liên quan.',
@@ -1837,7 +2766,42 @@ export class AdminService {
     }
   }
 
-  async finalizeScheduleWeek(
+  private async deleteOfficialScheduleLegacy(
+    BS_MA: number,
+    targetDate: Date,
+    B_TEN: string,
+  ) {
+    const client = this.prisma.getClient();
+    const dateOnly = this.toDateOnlyIso(targetDate);
+
+    try {
+      const deleted = await client.$queryRaw<
+        Array<{ BS_MA: number }>
+      >(Prisma.sql`
+        DELETE FROM "LICH_BSK"
+        WHERE "BS_MA" = ${BS_MA}
+          AND "N_NGAY" = ${dateOnly}
+          AND "B_TEN" = ${B_TEN}
+        RETURNING "BS_MA"
+      `);
+      if (deleted.length === 0) {
+        throw new NotFoundException('Không tìm thấy ca trực cần xóa');
+      }
+      return { message: 'Xóa ca trực thành công' };
+    } catch (e) {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        this.isRawForeignKeyViolation(e)
+      ) {
+        throw new ConflictException(
+          'Không thể xóa ca trực này vì đã có lịch hẹn bệnh nhân liên quan.',
+        );
+      }
+      mapPrismaError(e);
+    }
+  }
+
+    async finalizeScheduleWeek(
     weekStartRaw: string,
     options?: { forceRefinalize?: boolean; generateSlots?: boolean; forceRegenerate?: boolean },
   ) {
@@ -1845,6 +2809,7 @@ export class AdminService {
       const { mondayStart, saturdayEnd, weekStartIso } = this.resolveWeekRange(
         weekStartRaw,
       );
+      this.assertAdminSundayActionForWeek(mondayStart, 'chốt lịch trực tuần');
       const existingFinalizeLog = await this.prisma.aUDIT_LOG.findFirst({
         where: {
           AL_TABLE: 'SCHEDULE_CYCLE',
@@ -1854,7 +2819,7 @@ export class AdminService {
         orderBy: { AL_CHANGED_AT: 'desc' },
       });
 
-      if (existingFinalizeLog && !options?.forceRefinalize) {
+      if (existingFinalizeLog) {
         throw new ConflictException(
           'Tuần này đã được chốt lịch. Nếu cần chốt lại, hãy bật chế độ chốt lại có chủ đích.',
         );
@@ -1862,11 +2827,11 @@ export class AdminService {
 
       const rows = await this.prisma.lICH_BSK.findMany({
         where: { N_NGAY: { gte: mondayStart, lte: saturdayEnd } },
-        select: { BS_MA: true, N_NGAY: true, B_TEN: true, LBSK_GHI_CHU: true },
+        select: { LBSK_TRANGTHAI_DUYET: true },
       });
 
       const pendingCount = rows.filter(
-        (row) => parseScheduleStatus(row.LBSK_GHI_CHU).status === 'pending',
+        (row) => this.normalizeApprovalStatus(row.LBSK_TRANGTHAI_DUYET) === 'pending',
       ).length;
       if (pendingCount > 0) {
         throw new ConflictException(
@@ -1874,36 +2839,22 @@ export class AdminService {
         );
       }
 
-      await this.prisma.$transaction(async (tx) => {
-        for (const row of rows) {
-          const parsed = parseScheduleStatus(row.LBSK_GHI_CHU);
-          if (parsed.status === 'approved') {
-            await tx.lICH_BSK.update({
-              where: {
-                BS_MA_N_NGAY_B_TEN: {
-                  BS_MA: row.BS_MA,
-                  N_NGAY: row.N_NGAY,
-                  B_TEN: row.B_TEN,
-                },
-              },
-              data: {
-                LBSK_GHI_CHU: buildScheduleNote('official', parsed.note),
-              },
-            });
-          }
-        }
+      const approvedCount = rows.filter(
+        (row) => this.normalizeApprovalStatus(row.LBSK_TRANGTHAI_DUYET) === 'approved',
+      ).length;
 
-        await tx.aUDIT_LOG.create({
-          data: {
-            AL_TABLE: 'SCHEDULE_CYCLE',
-            AL_ACTION: 'FINALIZED',
-            AL_PK: { weekStart: weekStartIso },
-            AL_NEW: {
-              finalizedAt: new Date().toISOString(),
-            },
-            AL_CHANGED_AT: new Date(),
+      const finalizedAt = new Date();
+      await this.prisma.aUDIT_LOG.create({
+        data: {
+          AL_TABLE: 'SCHEDULE_CYCLE',
+          AL_ACTION: 'FINALIZED',
+          AL_PK: { weekStart: weekStartIso },
+          AL_NEW: {
+            finalizedAt: finalizedAt.toISOString(),
+            approvedShiftCount: approvedCount,
           },
-        });
+          AL_CHANGED_AT: finalizedAt,
+        },
       });
 
       const generated =
@@ -1916,14 +2867,14 @@ export class AdminService {
       return {
         message: 'Chốt lịch trực tuần thành công',
         weekStart: weekStartIso,
+        approvedShiftCount: approvedCount,
         generated,
       };
     } catch (e) {
       mapPrismaError(e);
     }
   }
-
-  async generateSlotsFromOfficialSchedule(
+    async generateSlotsFromOfficialSchedule(
     weekStartRaw: string,
     options?: { forceRegenerate?: boolean },
   ) {
@@ -1931,15 +2882,35 @@ export class AdminService {
       const { mondayStart, saturdayEnd, weekStartIso } = this.resolveWeekRange(
         weekStartRaw,
       );
+      this.assertAdminSundayActionForWeek(
+        mondayStart,
+        'sinh slot cho lịch trực tuần',
+      );
 
-      const existingGeneratedLog = await this.prisma.aUDIT_LOG.findFirst({
-        where: {
-          AL_TABLE: 'SCHEDULE_CYCLE',
-          AL_ACTION: 'SLOTS_GENERATED',
-          AL_PK: { equals: { weekStart: weekStartIso } },
-        },
-        orderBy: { AL_CHANGED_AT: 'desc' },
-      });
+      const [finalizedLog, existingGeneratedLog] = await this.prisma.$transaction([
+        this.prisma.aUDIT_LOG.findFirst({
+          where: {
+            AL_TABLE: 'SCHEDULE_CYCLE',
+            AL_ACTION: 'FINALIZED',
+            AL_PK: { equals: { weekStart: weekStartIso } },
+          },
+          orderBy: { AL_CHANGED_AT: 'desc' },
+        }),
+        this.prisma.aUDIT_LOG.findFirst({
+          where: {
+            AL_TABLE: 'SCHEDULE_CYCLE',
+            AL_ACTION: 'SLOTS_GENERATED',
+            AL_PK: { equals: { weekStart: weekStartIso } },
+          },
+          orderBy: { AL_CHANGED_AT: 'desc' },
+        }),
+      ]);
+
+      if (!finalizedLog) {
+        throw new ConflictException(
+          'Chỉ có thể sinh slot sau khi tuần đã được chốt lịch chính thức.',
+        );
+      }
 
       if (existingGeneratedLog && !options?.forceRegenerate) {
         throw new ConflictException(
@@ -1948,7 +2919,10 @@ export class AdminService {
       }
 
       const schedules = await this.prisma.lICH_BSK.findMany({
-        where: { N_NGAY: { gte: mondayStart, lte: saturdayEnd } },
+        where: {
+          N_NGAY: { gte: mondayStart, lte: saturdayEnd },
+          LBSK_TRANGTHAI_DUYET: 'approved',
+        },
         include: {
           BUOI: {
             include: {
@@ -1960,12 +2934,11 @@ export class AdminService {
         },
       });
 
-      const officialSchedules = schedules.filter((schedule) => {
-        const { status } = parseScheduleStatus(schedule.LBSK_GHI_CHU);
-        return status === 'official' || status === 'approved';
-      });
+      if (schedules.length === 0) {
+        throw new ConflictException('Không có ca trực chính thức để sinh slot cho tuần này.');
+      }
 
-      const totalSlots = officialSchedules.reduce(
+      const totalSlots = schedules.reduce(
         (sum, schedule) => sum + (schedule.BUOI?.KHUNG_GIO?.length ?? 0),
         0,
       );
@@ -1978,7 +2951,7 @@ export class AdminService {
             AL_ACTION: 'GENERATED',
             AL_PK: { weekStart: weekStartIso },
             AL_NEW: {
-              shiftCount: officialSchedules.length,
+              shiftCount: schedules.length,
               totalSlots,
               generatedAt: generatedAt.toISOString(),
             },
@@ -1991,7 +2964,7 @@ export class AdminService {
             AL_ACTION: 'SLOTS_GENERATED',
             AL_PK: { weekStart: weekStartIso },
             AL_NEW: {
-              shiftCount: officialSchedules.length,
+              shiftCount: schedules.length,
               totalSlots,
               generatedAt: generatedAt.toISOString(),
             },
@@ -2003,33 +2976,35 @@ export class AdminService {
       return {
         weekStart: weekStartIso,
         generatedAt: generatedAt.toISOString(),
-        shiftCount: officialSchedules.length,
+        shiftCount: schedules.length,
         totalSlots,
       };
     } catch (e) {
       mapPrismaError(e);
     }
   }
-
   private resolveWeekRange(weekStartRaw?: string) {
     let mondayStart: Date;
     if (weekStartRaw) {
       mondayStart = this.parseDateOnlyOrThrow(weekStartRaw);
     } else {
       const now = new Date();
-      mondayStart = new Date(now);
-      mondayStart.setHours(0, 0, 0, 0);
-      mondayStart.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+      mondayStart = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+      );
+      mondayStart.setUTCDate(
+        mondayStart.getUTCDate() - ((mondayStart.getUTCDay() + 6) % 7),
+      );
     }
 
-    mondayStart.setHours(0, 0, 0, 0);
+    mondayStart.setUTCHours(0, 0, 0, 0);
     const saturdayEnd = new Date(mondayStart);
-    saturdayEnd.setDate(mondayStart.getDate() + 5);
-    saturdayEnd.setHours(23, 59, 59, 999);
+    saturdayEnd.setUTCDate(mondayStart.getUTCDate() + 5);
+    saturdayEnd.setUTCHours(23, 59, 59, 999);
 
     const sundayEnd = new Date(mondayStart);
-    sundayEnd.setDate(mondayStart.getDate() + 6);
-    sundayEnd.setHours(23, 59, 59, 999);
+    sundayEnd.setUTCDate(mondayStart.getUTCDate() + 6);
+    sundayEnd.setUTCHours(23, 59, 59, 999);
 
     return {
       mondayStart,
@@ -2041,16 +3016,571 @@ export class AdminService {
   }
 
   private parseDateOnlyOrThrow(dateRaw: string) {
-    const date = new Date(dateRaw);
+    const normalized = dateRaw.trim();
+    const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(normalized);
+    if (dateOnlyMatch) {
+      const year = Number(dateOnlyMatch[1]);
+      const month = Number(dateOnlyMatch[2]);
+      const day = Number(dateOnlyMatch[3]);
+      const dateOnly = new Date(Date.UTC(year, month - 1, day));
+      if (
+        dateOnly.getUTCFullYear() !== year ||
+        dateOnly.getUTCMonth() !== month - 1 ||
+        dateOnly.getUTCDate() !== day
+      ) {
+        throw new BadRequestException('Ngày không hợp lệ');
+      }
+      dateOnly.setUTCHours(0, 0, 0, 0);
+      return dateOnly;
+    }
+
+    const date = new Date(normalized);
     if (Number.isNaN(date.getTime())) {
       throw new BadRequestException('Ngày không hợp lệ');
     }
-    date.setHours(0, 0, 0, 0);
-    return date;
+    const utcDate = new Date(
+      Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+    );
+    utcDate.setUTCHours(0, 0, 0, 0);
+    return utcDate;
   }
 
   private toDateOnlyIso(date: Date) {
-    return date.toISOString().slice(0, 10);
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  private getWeekdayFromDate(date: Date) {
+    return date.getUTCDay();
+  }
+
+  private getWeekMondayFromDate(date: Date) {
+    const monday = new Date(
+      Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+    );
+    monday.setUTCHours(0, 0, 0, 0);
+    monday.setUTCDate(date.getUTCDate() - ((date.getUTCDay() + 6) % 7));
+    return monday;
+  }
+
+  private getNextWeekMondayFromNow() {
+    const now = new Date();
+    const utcToday = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    );
+    const currentWeekMonday = this.getWeekMondayFromDate(utcToday);
+    const nextWeekMonday = new Date(currentWeekMonday);
+    nextWeekMonday.setUTCDate(currentWeekMonday.getUTCDate() + 7);
+    return nextWeekMonday;
+  }
+
+  private assertAdminSundayActionForWeek(weekStart: Date, action: string) {
+    if (!this.isSundayScheduleRestrictionEnabled()) {
+      return;
+    }
+
+    const now = new Date();
+    if (now.getDay() !== 0) {
+      throw new ForbiddenException(
+        `Chỉ được ${action} vào Chủ nhật trong khung duyệt lịch.`,
+      );
+    }
+
+    const nextWeekMonday = this.getNextWeekMondayFromNow();
+    if (this.toDateOnlyIso(weekStart) !== this.toDateOnlyIso(nextWeekMonday)) {
+      throw new ForbiddenException(
+        `Chỉ được ${action} cho tuần kế tiếp bắt đầu từ ${this.toDateOnlyIso(nextWeekMonday)}.`,
+      );
+    }
+  }
+
+  private isSundayScheduleRestrictionEnabled() {
+    const raw = (process.env.ENFORCE_SUNDAY_SCHEDULE_ACTIONS || '')
+      .trim()
+      .toLowerCase();
+    if (raw === '1' || raw === 'true' || raw === 'yes') {
+      return true;
+    }
+    if (raw === '0' || raw === 'false' || raw === 'no') {
+      return false;
+    }
+    return process.env.NODE_ENV === 'production';
+  }
+
+  private async ensureWeekNotFinalized(weekStartIso: string) {
+    const finalizedLog = await this.prisma.aUDIT_LOG.findFirst({
+      where: {
+        AL_TABLE: 'SCHEDULE_CYCLE',
+        AL_ACTION: 'FINALIZED',
+        AL_PK: { equals: { weekStart: weekStartIso } },
+      },
+      orderBy: { AL_CHANGED_AT: 'desc' },
+    });
+
+    if (finalizedLog) {
+      throw new ConflictException(
+        'Tuần này đã được chốt lịch. Không thể chỉnh sửa thêm.',
+      );
+    }
+  }
+
+  private normalizeApprovalStatus(
+    value: string | number | null | undefined,
+  ): ScheduleApprovalStatus {
+    const normalized = String(value ?? '')
+      .trim()
+      .toLowerCase();
+    if (normalized === 'approved') return 'approved';
+    if (normalized === 'rejected') return 'rejected';
+    if (normalized === '1') return 'approved';
+    if (normalized === '-1') return 'rejected';
+    return 'pending';
+  }
+
+  private resolveOfficialShiftDisplayStatus(
+    isFinalized: boolean,
+  ): OfficialShiftDisplayStatus {
+    return isFinalized ? 'official' : 'approved';
+  }
+
+  private isMissingScheduleApprovalColumnsError(e: unknown) {
+    if (!(e instanceof Prisma.PrismaClientKnownRequestError)) {
+      return false;
+    }
+
+    if (e.code === 'P2022') {
+      return true;
+    }
+
+    if (e.code !== 'P2007') {
+      return false;
+    }
+
+    const haystack = `${e.message} ${JSON.stringify(e.meta ?? {})}`.toLowerCase();
+    const isScheduleModel =
+      haystack.includes('"modelname":"lich_bsk"') || haystack.includes('lich_bsk');
+    if (!isScheduleModel) {
+      return false;
+    }
+
+    if (haystack.includes('lbsk_trangthai_duyet')) {
+      return true;
+    }
+
+    const isNumericStatusMismatch =
+      haystack.includes('invalid input syntax for type numeric') &&
+      (haystack.includes('"pending"') ||
+        haystack.includes('"approved"') ||
+        haystack.includes('"rejected"'));
+    return isNumericStatusMismatch;
+  }
+
+  private parseLegacyScheduleStatus(rawNote?: string | null): {
+    status: ScheduleApprovalStatus | 'official';
+    note: string | null;
+  } {
+    if (!rawNote) {
+      return { status: 'approved', note: null };
+    }
+
+    const trimmed = rawNote.trim();
+    const markerMatch = /^\[#SCHEDULE_STATUS:(pending|approved|rejected|official)\]/i.exec(
+      trimmed,
+    );
+
+    if (markerMatch) {
+      const marker = markerMatch[1].toLowerCase() as
+        | ScheduleApprovalStatus
+        | 'official';
+      const note = trimmed.slice(markerMatch[0].length).trim();
+      return {
+        status: marker,
+        note: note.length > 0 ? note : null,
+      };
+    }
+
+    return {
+      status: 'approved',
+      note: trimmed.length > 0 ? trimmed : null,
+    };
+  }
+
+  private async getDailyScheduleContextRows(
+    targetDate: Date,
+    isWeekFinalized: boolean,
+  ) {
+    try {
+      const rows = await this.prisma.lICH_BSK.findMany({
+        where: { N_NGAY: targetDate },
+        select: {
+          BS_MA: true,
+          P_MA: true,
+          N_NGAY: true,
+          B_TEN: true,
+          LBSK_GHI_CHU: true,
+          LBSK_TRANGTHAI_DUYET: true,
+          BAC_SI: {
+            select: { BS_HO_TEN: true },
+          },
+          PHONG: {
+            select: { P_TEN: true },
+          },
+        },
+      });
+
+      return rows.map((row) => {
+        const normalized = this.normalizeApprovalStatus(row.LBSK_TRANGTHAI_DUYET);
+        const status = this.resolveDisplayStatusFromApproval(
+          normalized,
+          isWeekFinalized,
+        );
+        return {
+          BS_MA: row.BS_MA,
+          P_MA: row.P_MA,
+          N_NGAY: row.N_NGAY,
+          B_TEN: row.B_TEN,
+          status,
+          note: row.LBSK_GHI_CHU,
+          doctorName: row.BAC_SI?.BS_HO_TEN || `BS #${row.BS_MA}`,
+          roomName: row.PHONG?.P_TEN || `Phòng #${row.P_MA}`,
+        };
+      });
+    } catch (e) {
+      if (!this.isMissingScheduleApprovalColumnsError(e)) {
+        throw e;
+      }
+    }
+
+    const legacyRows = await this.prisma.lICH_BSK.findMany({
+      where: { N_NGAY: targetDate },
+      select: {
+        BS_MA: true,
+        P_MA: true,
+        N_NGAY: true,
+        B_TEN: true,
+        LBSK_GHI_CHU: true,
+        BAC_SI: {
+          select: { BS_HO_TEN: true },
+        },
+        PHONG: {
+          select: { P_TEN: true },
+        },
+      },
+    });
+
+    return legacyRows.map((row) => {
+      const parsed = this.parseLegacyScheduleStatus(row.LBSK_GHI_CHU);
+      const baseStatus: ScheduleDisplayStatus =
+        parsed.status === 'official'
+          ? 'official'
+          : this.resolveDisplayStatusFromApproval(parsed.status, isWeekFinalized);
+      return {
+        BS_MA: row.BS_MA,
+        P_MA: row.P_MA,
+        N_NGAY: row.N_NGAY,
+        B_TEN: row.B_TEN,
+        status: baseStatus,
+        note: parsed.note,
+        doctorName: row.BAC_SI?.BS_HO_TEN || `BS #${row.BS_MA}`,
+        roomName: row.PHONG?.P_TEN || `Phòng #${row.P_MA}`,
+      };
+    });
+  }
+
+  private resolveDisplayStatusFromApproval(
+    status: ScheduleApprovalStatus,
+    isWeekFinalized: boolean,
+  ): ScheduleDisplayStatus {
+    if (status === 'pending') return 'pending';
+    if (status === 'rejected') return 'rejected';
+    return isWeekFinalized ? 'official' : 'approved';
+  }
+
+  private isOccupiedScheduleStatus(status?: ScheduleDisplayStatus) {
+    return status === 'pending' || status === 'approved' || status === 'official';
+  }
+
+  private getDisplayStatusPriority(status: ScheduleDisplayStatus) {
+    if (status === 'official') return 4;
+    if (status === 'approved') return 3;
+    if (status === 'pending') return 2;
+    if (status === 'rejected') return 1;
+    return 0;
+  }
+
+  private buildMissingShiftSummary(params: {
+    mondayStart: Date;
+    saturdayEnd: Date;
+    sessions: string[];
+    approvedSchedules: Array<{ N_NGAY: Date; B_TEN: string }>;
+  }) {
+    const coverageSet = new Set<string>();
+    for (const row of params.approvedSchedules) {
+      const dateIso = this.toDateOnlyIso(row.N_NGAY);
+      coverageSet.add(`${dateIso}::${row.B_TEN}`);
+    }
+
+    const days: string[] = [];
+    const cursor = new Date(params.mondayStart);
+    cursor.setUTCHours(0, 0, 0, 0);
+    while (cursor <= params.saturdayEnd) {
+      days.push(this.toDateOnlyIso(cursor));
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+
+    const missingItems: Array<{ date: string; weekday: number; session: string }> =
+      [];
+    for (const dateIso of days) {
+      const dateObj = this.parseDateOnlyOrThrow(dateIso);
+      const weekday = this.getWeekdayFromDate(dateObj);
+      for (const session of params.sessions) {
+        if (!coverageSet.has(`${dateIso}::${session}`)) {
+          missingItems.push({ date: dateIso, weekday, session });
+        }
+      }
+    }
+
+    return {
+      totalMissing: missingItems.length,
+      items: missingItems,
+    };
+  }
+
+  private async assertNoApprovalConflicts(params: {
+    BS_MA: number;
+    P_MA: number;
+    N_NGAY: Date;
+    B_TEN: string;
+    currentKey?: {
+      BS_MA: number;
+      N_NGAY: Date;
+      B_TEN: string;
+    };
+  }) {
+    const [doctorConflict, roomConflict] = await this.prisma.$transaction([
+      this.prisma.lICH_BSK.findFirst({
+        where: {
+          BS_MA: params.BS_MA,
+          N_NGAY: params.N_NGAY,
+          B_TEN: params.B_TEN,
+          LBSK_TRANGTHAI_DUYET: 'approved',
+          ...(params.currentKey
+            ? {
+                NOT: {
+                  BS_MA: params.currentKey.BS_MA,
+                  N_NGAY: params.currentKey.N_NGAY,
+                  B_TEN: params.currentKey.B_TEN,
+                },
+              }
+            : {}),
+        },
+        select: { BS_MA: true },
+      }),
+      this.prisma.lICH_BSK.findFirst({
+        where: {
+          P_MA: params.P_MA,
+          N_NGAY: params.N_NGAY,
+          B_TEN: params.B_TEN,
+          LBSK_TRANGTHAI_DUYET: 'approved',
+          ...(params.currentKey
+            ? {
+                NOT: {
+                  BS_MA: params.currentKey.BS_MA,
+                  N_NGAY: params.currentKey.N_NGAY,
+                  B_TEN: params.currentKey.B_TEN,
+                },
+              }
+            : {}),
+        },
+        select: { P_MA: true },
+      }),
+    ]);
+
+    if (doctorConflict) {
+      throw new ConflictException(
+        'Bác sĩ đã có ca trực khác trong cùng ngày và buổi.',
+      );
+    }
+    if (roomConflict) {
+      throw new ConflictException(
+        'Phòng đã có bác sĩ khác được duyệt trong cùng ngày và buổi.',
+      );
+    }
+  }
+
+  private async assertNoOfficialShiftOccupancyConflicts(params: {
+    BS_MA: number;
+    P_MA: number;
+    N_NGAY: Date;
+    B_TEN: string;
+    currentKey?: {
+      BS_MA: number;
+      N_NGAY: Date;
+      B_TEN: string;
+    };
+  }) {
+    try {
+      const [doctorConflict, roomConflict] = await this.prisma.$transaction([
+        this.prisma.lICH_BSK.findFirst({
+          where: {
+            BS_MA: params.BS_MA,
+            N_NGAY: params.N_NGAY,
+            B_TEN: params.B_TEN,
+            LBSK_TRANGTHAI_DUYET: { in: ['pending', 'approved'] },
+            ...(params.currentKey
+              ? {
+                  NOT: {
+                    BS_MA: params.currentKey.BS_MA,
+                    N_NGAY: params.currentKey.N_NGAY,
+                    B_TEN: params.currentKey.B_TEN,
+                  },
+                }
+              : {}),
+          },
+          select: { BS_MA: true },
+        }),
+        this.prisma.lICH_BSK.findFirst({
+          where: {
+            P_MA: params.P_MA,
+            N_NGAY: params.N_NGAY,
+            B_TEN: params.B_TEN,
+            LBSK_TRANGTHAI_DUYET: { in: ['pending', 'approved'] },
+            ...(params.currentKey
+              ? {
+                  NOT: {
+                    BS_MA: params.currentKey.BS_MA,
+                    N_NGAY: params.currentKey.N_NGAY,
+                    B_TEN: params.currentKey.B_TEN,
+                  },
+                }
+              : {}),
+          },
+          select: { P_MA: true },
+        }),
+      ]);
+
+      if (roomConflict) {
+        throw new ConflictException(
+          'Buổi này của phòng đã có bác sĩ được phân công.',
+        );
+      }
+      if (doctorConflict) {
+        throw new ConflictException(
+          'Bác sĩ này đã có ca trực khác trong cùng buổi.',
+        );
+      }
+      return;
+    } catch (e) {
+      if (!this.isMissingScheduleApprovalColumnsError(e)) {
+        throw e;
+      }
+    }
+
+    await this.assertNoOfficialShiftOccupancyConflictsLegacy(params);
+  }
+
+  private async assertNoApprovalConflictsLegacy(params: {
+    BS_MA: number;
+    P_MA: number;
+    N_NGAY: Date;
+    B_TEN: string;
+    currentKey?: {
+      BS_MA: number;
+      N_NGAY: Date;
+      B_TEN: string;
+    };
+  }) {
+    const candidates = await this.prisma.lICH_BSK.findMany({
+      where: {
+        N_NGAY: params.N_NGAY,
+        B_TEN: params.B_TEN,
+        OR: [{ BS_MA: params.BS_MA }, { P_MA: params.P_MA }],
+      },
+      select: {
+        BS_MA: true,
+        P_MA: true,
+        N_NGAY: true,
+        B_TEN: true,
+        LBSK_GHI_CHU: true,
+      },
+    });
+
+    const activeRows = candidates.filter((row) => {
+      const isCurrent =
+        params.currentKey &&
+        row.BS_MA === params.currentKey.BS_MA &&
+        this.toDateOnlyIso(row.N_NGAY) === this.toDateOnlyIso(params.currentKey.N_NGAY) &&
+        row.B_TEN === params.currentKey.B_TEN;
+      if (isCurrent) return false;
+      const parsed = this.parseLegacyScheduleStatus(row.LBSK_GHI_CHU);
+      return parsed.status === 'approved' || parsed.status === 'official';
+    });
+
+    if (activeRows.some((row) => row.BS_MA === params.BS_MA)) {
+      throw new ConflictException(
+        'Bác sĩ đã có ca trực khác trong cùng ngày và buổi.',
+      );
+    }
+    if (activeRows.some((row) => row.P_MA === params.P_MA)) {
+      throw new ConflictException(
+        'Phòng đã có bác sĩ khác được duyệt trong cùng ngày và buổi.',
+      );
+    }
+  }
+
+  private async assertNoOfficialShiftOccupancyConflictsLegacy(params: {
+    BS_MA: number;
+    P_MA: number;
+    N_NGAY: Date;
+    B_TEN: string;
+    currentKey?: {
+      BS_MA: number;
+      N_NGAY: Date;
+      B_TEN: string;
+    };
+  }) {
+    const candidates = await this.prisma.lICH_BSK.findMany({
+      where: {
+        N_NGAY: params.N_NGAY,
+        B_TEN: params.B_TEN,
+        OR: [{ BS_MA: params.BS_MA }, { P_MA: params.P_MA }],
+      },
+      select: {
+        BS_MA: true,
+        P_MA: true,
+        N_NGAY: true,
+        B_TEN: true,
+        LBSK_GHI_CHU: true,
+      },
+    });
+
+    const activeRows = candidates.filter((row) => {
+      const isCurrent =
+        params.currentKey &&
+        row.BS_MA === params.currentKey.BS_MA &&
+        this.toDateOnlyIso(row.N_NGAY) === this.toDateOnlyIso(params.currentKey.N_NGAY) &&
+        row.B_TEN === params.currentKey.B_TEN;
+      if (isCurrent) return false;
+      const parsed = this.parseLegacyScheduleStatus(row.LBSK_GHI_CHU);
+      return (
+        parsed.status === 'pending' ||
+        parsed.status === 'approved' ||
+        parsed.status === 'official'
+      );
+    });
+
+    if (activeRows.some((row) => row.P_MA === params.P_MA)) {
+      throw new ConflictException(
+        'Buổi này của phòng đã có bác sĩ được phân công.',
+      );
+    }
+    if (activeRows.some((row) => row.BS_MA === params.BS_MA)) {
+      throw new ConflictException(
+        'Bác sĩ này đã có ca trực khác trong cùng buổi.',
+      );
+    }
   }
 
   private mergeAdminNote(currentNote?: string | null, adminNote?: string) {
@@ -2059,6 +3589,63 @@ export class AdminService {
     if (!incoming) return current || null;
     if (!current) return incoming;
     return `${current}\n[ADMIN] ${incoming}`;
+  }
+
+  private buildLegacyScheduleStatusNote(
+    status: ScheduleApprovalStatus | 'official',
+    note?: string | null,
+  ) {
+    const marker = `[#SCHEDULE_STATUS:${status}]`;
+    const normalizedNote = note?.trim() || '';
+    return normalizedNote.length > 0 ? `${marker}\n${normalizedNote}` : marker;
+  }
+
+  private rethrowOfficialShiftLegacyWriteError(e: unknown): never {
+    if (
+      e instanceof Prisma.PrismaClientKnownRequestError &&
+      (e.code === 'P2002' || this.isRawUniqueViolation(e))
+    ) {
+      throw new ConflictException(
+        'Trùng lịch trực: bác sĩ hoặc phòng đã có lịch trong cùng ngày và buổi.',
+      );
+    }
+    if (
+      e instanceof Prisma.PrismaClientKnownRequestError &&
+      (e.code === 'P2003' || this.isRawForeignKeyViolation(e))
+    ) {
+      throw new BadRequestException('Dữ liệu ca trực không hợp lệ.');
+    }
+    mapPrismaError(e);
+  }
+
+  private async ensureScheduleDateExists(targetDate: Date) {
+    const client = this.prisma.getClient();
+    const dateOnly = this.toDateOnlyIso(targetDate);
+    await client.$executeRaw(Prisma.sql`
+      INSERT INTO "NGAY" ("N_NGAY")
+      VALUES (${dateOnly})
+      ON CONFLICT ("N_NGAY") DO NOTHING
+    `);
+  }
+
+  private isRawUniqueViolation(e: Prisma.PrismaClientKnownRequestError) {
+    if (e.code !== 'P2010') return false;
+    const haystack = `${e.message} ${JSON.stringify(e.meta ?? {})}`.toLowerCase();
+    return (
+      haystack.includes('23505') ||
+      haystack.includes('duplicate key value') ||
+      haystack.includes('uniqueconstraintviolation')
+    );
+  }
+
+  private isRawForeignKeyViolation(e: Prisma.PrismaClientKnownRequestError) {
+    if (e.code !== 'P2010') return false;
+    const haystack = `${e.message} ${JSON.stringify(e.meta ?? {})}`.toLowerCase();
+    return (
+      haystack.includes('23503') ||
+      haystack.includes('foreign key constraint') ||
+      haystack.includes('foreignkeyconstraintviolation')
+    );
   }
 
   private async validateDoctorRoomSpecialty(BS_MA: number, P_MA: number) {
@@ -2087,14 +3674,17 @@ export class AdminService {
   }
 
   private validateScheduleDateForAdmin(targetDate: Date) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const now = new Date();
+    const today = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    );
+    today.setUTCHours(0, 0, 0, 0);
     if (targetDate < today) {
       throw new BadRequestException(
         'Không thể tạo/cập nhật lịch trực cho ngày đã qua.',
       );
     }
-    const day = targetDate.getDay();
+    const day = targetDate.getUTCDay();
     if (day < 1 || day > 6) {
       throw new BadRequestException(
         'Lịch trực chỉ được lập từ thứ 2 đến thứ 7.',
@@ -2102,3 +3692,9 @@ export class AdminService {
     }
   }
 }
+
+
+
+
+
+

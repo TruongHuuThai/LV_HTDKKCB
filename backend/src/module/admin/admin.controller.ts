@@ -396,6 +396,7 @@ export class AdminController {
     @Query('roomId') roomId?: string,
     @Query('status') status?: string,
     @Query('session') session?: string,
+    @Query('weekday') weekday?: string,
     @Query('date') date?: string,
     @Query('search') search?: string,
   ) {
@@ -408,8 +409,29 @@ export class AdminController {
       roomId,
       status,
       session,
+      weekday,
       date,
       search,
+    });
+  }
+
+  @Get('schedule-management/form-context')
+  @HttpCode(HttpStatus.OK)
+  async getOfficialShiftFormContext(
+    @Query('date') date?: string,
+    @Query('roomId') roomId?: string,
+    @Query('doctorId') doctorId?: string,
+    @Query('excludeBsMa') excludeBsMa?: string,
+    @Query('excludeDate') excludeDate?: string,
+    @Query('excludeSession') excludeSession?: string,
+  ) {
+    return this.adminService.getOfficialShiftFormContext({
+      date,
+      roomId,
+      doctorId,
+      excludeBsMa,
+      excludeDate,
+      excludeSession,
     });
   }
 
@@ -423,7 +445,7 @@ export class AdminController {
       N_NGAY: string;
       B_TEN: string;
       note?: string;
-      status?: 'pending' | 'approved' | 'rejected' | 'official';
+      status?: 'approved' | 'official';
     },
   ) {
     return this.adminService.createOfficialSchedule(body);
@@ -442,7 +464,7 @@ export class AdminController {
       N_NGAY?: string;
       B_TEN?: string;
       note?: string;
-      status?: 'pending' | 'approved' | 'rejected' | 'official';
+      status?: 'approved' | 'official';
     },
   ) {
     return this.adminService.updateOfficialSchedule(bsMa, date, session, body);

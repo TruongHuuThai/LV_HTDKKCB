@@ -1,9 +1,23 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Filter, Plus, Search, ShieldCheck, Trash2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { adminApi, type ScheduleWorkflowStatus } from '@/services/api/adminApi';
+import { adminApi, type OfficialShiftFormContextSession } from '@/services/api/adminApi';
+import {
+  formatDateDdMmYyyy,
+  formatDateDdMmYyyySlash,
+  getCycleStatusLabel,
+  getScheduleStatusBadgeClass,
+  getScheduleWorkflowStatusLabel,
+  getSessionLabel,
+  getWeekdayLabel,
+  getWeekdayLabelFromDate,
+  OFFICIAL_FORM_STATUS_OPTIONS,
+  toDateOnlyIso,
+  WEEKDAY_FILTER_OPTIONS,
+  type WeekdayFilterValue,
+} from '@/lib/scheduleDisplay';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -19,6 +33,7 @@ import {
 
 type ReviewStatusFilter = 'all' | 'pending' | 'approved' | 'rejected';
 type OfficialStatusFilter = 'all' | 'official' | 'approved';
+type OfficialFormStatus = 'approved' | 'official';
 
 const PAGE_SIZE = 10;
 
@@ -30,19 +45,28 @@ function getCurrentWeekStartIso() {
   return monday.toISOString().slice(0, 10);
 }
 
-function toDateOnlyIso(raw: string) {
-  return new Date(raw).toISOString().slice(0, 10);
+function getContextStatusLabel(status: OfficialShiftFormContextSession['room']['status']) {
+  if (status === 'empty') return 'Trống';
+  if (status === 'pending') return 'Chờ duyệt';
+  if (status === 'approved') return 'Đã duyệt';
+  if (status === 'official') return 'Chính thức';
+  if (status === 'rejected') return 'Đã hủy/Từ chối';
+  return status;
 }
 
-function statusBadgeClass(status: string) {
-  if (status === 'pending') return 'bg-amber-50 text-amber-700';
-  if (status === 'approved' || status === 'official') return 'bg-emerald-50 text-emerald-700';
-  if (status === 'rejected') return 'bg-red-50 text-red-700';
-  return 'bg-slate-100 text-slate-700';
+function getContextStatusClass(status: OfficialShiftFormContextSession['room']['status']) {
+  if (status === 'empty') return 'border-slate-200 bg-slate-50 text-slate-700';
+  if (status === 'pending') return 'border-amber-200 bg-amber-50 text-amber-700';
+  if (status === 'approved') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+  if (status === 'official') return 'border-blue-200 bg-blue-50 text-blue-700';
+  return 'border-rose-200 bg-rose-50 text-rose-700';
 }
 
 export default function DoctorShiftManagementPage() {
   const queryClient = useQueryClient();
+  const weekStartPickerRef = useRef<HTMLInputElement>(null);
+  const officialDatePickerRef = useRef<HTMLInputElement>(null);
+
   const [weekStart, setWeekStart] = useState(getCurrentWeekStartIso());
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -50,8 +74,9 @@ export default function DoctorShiftManagementPage() {
   const [doctorFilter, setDoctorFilter] = useState('all');
   const [roomFilter, setRoomFilter] = useState('all');
   const [sessionFilter, setSessionFilter] = useState('all');
-  const [reviewStatusFilter, setReviewStatusFilter] = useState<ReviewStatusFilter>('all');
+  const [reviewStatusFilter, setReviewStatusFilter] = useState<ReviewStatusFilter>('pending');
   const [officialStatusFilter, setOfficialStatusFilter] = useState<OfficialStatusFilter>('all');
+  const [officialWeekdayFilter, setOfficialWeekdayFilter] = useState<WeekdayFilterValue>('all');
   const [reviewPage, setReviewPage] = useState(1);
   const [officialPage, setOfficialPage] = useState(1);
 
@@ -71,7 +96,7 @@ export default function DoctorShiftManagementPage() {
     P_MA: '',
     N_NGAY: '',
     B_TEN: '',
-    status: 'official' as ScheduleWorkflowStatus,
+    status: 'approved' as OfficialFormStatus,
     note: '',
   });
 
@@ -89,10 +114,17 @@ export default function DoctorShiftManagementPage() {
   useEffect(() => {
     setReviewPage(1);
     setOfficialPage(1);
-  }, [weekStart, specialtyFilter, doctorFilter, roomFilter, sessionFilter, reviewStatusFilter, officialStatusFilter]);
+  }, [weekStart, specialtyFilter, doctorFilter, roomFilter, sessionFilter, reviewStatusFilter, officialStatusFilter, officialWeekdayFilter]);
 
-  const { data: options } = useQuery({ queryKey: ['admin-schedule-options'], queryFn: () => adminApi.getScheduleManagementOptions() });
-  const { data: cycle } = useQuery({ queryKey: ['admin-schedule-cycle-overview', weekStart], queryFn: () => adminApi.getScheduleCycleOverview(weekStart) });
+  const { data: options } = useQuery({
+    queryKey: ['admin-schedule-options'],
+    queryFn: () => adminApi.getScheduleManagementOptions(),
+  });
+
+  const { data: cycle } = useQuery({
+    queryKey: ['admin-schedule-cycle-overview', weekStart],
+    queryFn: () => adminApi.getScheduleCycleOverview(weekStart),
+  });
 
   const commonParams = {
     weekStart,
@@ -110,10 +142,18 @@ export default function DoctorShiftManagementPage() {
   });
 
   const { data: official, isLoading: officialLoading } = useQuery({
-    queryKey: ['admin-schedule-official', commonParams, officialStatusFilter, officialPage],
-    queryFn: () => adminApi.getOfficialSchedules({ ...commonParams, status: officialStatusFilter, page: officialPage, limit: PAGE_SIZE }),
+    queryKey: ['admin-schedule-official', commonParams, officialStatusFilter, officialWeekdayFilter, officialPage],
+    queryFn: () =>
+      adminApi.getOfficialSchedules({
+        ...commonParams,
+        status: officialStatusFilter,
+        weekday: officialWeekdayFilter === 'all' ? undefined : Number(officialWeekdayFilter),
+        page: officialPage,
+        limit: PAGE_SIZE,
+      }),
     placeholderData: (prev) => prev,
   });
+
   const registrationMutation = useMutation({
     mutationFn: (payload: { bsMa: number; date: string; session: string; status: 'approved' | 'rejected'; adminNote?: string }) =>
       adminApi.updateScheduleRegistrationStatus(payload.bsMa, payload.date, payload.session, {
@@ -135,6 +175,10 @@ export default function DoctorShiftManagementPage() {
 
   const saveOfficialMutation = useMutation({
     mutationFn: async () => {
+      if (saveBlockReason) {
+        throw new Error(saveBlockReason);
+      }
+
       const payload = {
         BS_MA: Number(officialForm.BS_MA),
         P_MA: Number(officialForm.P_MA),
@@ -215,15 +259,154 @@ export default function DoctorShiftManagementPage() {
     },
   });
 
-  const selectedDoctor = useMemo(
-    () => options?.doctors.find((doctor) => doctor.BS_MA === Number(officialForm.BS_MA)),
-    [options?.doctors, officialForm.BS_MA],
+  const selectedRoom = useMemo(
+    () => options?.rooms.find((room) => room.P_MA === Number(officialForm.P_MA)),
+    [options?.rooms, officialForm.P_MA],
   );
 
-  const filteredRoomOptions = useMemo(() => {
-    if (!selectedDoctor) return options?.rooms ?? [];
-    return (options?.rooms ?? []).filter((room) => room.CK_MA === selectedDoctor.CK_MA);
-  }, [options?.rooms, selectedDoctor]);
+  const filteredDoctorOptions = useMemo(() => {
+    if (!selectedRoom) return options?.doctors ?? [];
+    return (options?.doctors ?? []).filter((doctor) => doctor.CK_MA === selectedRoom.CK_MA);
+  }, [options?.doctors, selectedRoom]);
+
+  const officialContextParams = useMemo(() => ({
+    date: officialForm.N_NGAY,
+    roomId: officialForm.P_MA ? Number(officialForm.P_MA) : undefined,
+    doctorId: officialForm.BS_MA ? Number(officialForm.BS_MA) : undefined,
+    excludeBsMa: officialForm.originalKey?.bsMa,
+    excludeDate: officialForm.originalKey?.date,
+    excludeSession: officialForm.originalKey?.session,
+  }), [officialForm.N_NGAY, officialForm.P_MA, officialForm.BS_MA, officialForm.originalKey]);
+
+  const { data: officialFormContext, isLoading: officialFormContextLoading } = useQuery({
+    queryKey: ['admin-official-form-context', officialContextParams],
+    queryFn: () => adminApi.getOfficialShiftFormContext(officialContextParams),
+    enabled: officialDialogOpen && Boolean(officialContextParams.date),
+    staleTime: 15_000,
+  });
+
+  const sessionContextMap = useMemo(() => {
+    const map = new Map<string, OfficialShiftFormContextSession>();
+    (officialFormContext?.sessionContext ?? []).forEach((item) => {
+      map.set(item.session, item);
+    });
+    return map;
+  }, [officialFormContext?.sessionContext]);
+
+  const selectedSessionContext = useMemo(
+    () => sessionContextMap.get(officialForm.B_TEN),
+    [officialForm.B_TEN, sessionContextMap],
+  );
+
+  const specialtyConflict = officialFormContext?.doctorSpecialtyMatchesRoom === false;
+  const noAvailableSession =
+    Boolean(officialForm.P_MA) &&
+    Boolean(officialForm.N_NGAY) &&
+    Boolean(officialFormContext) &&
+    !officialFormContext?.hasAnyAvailableSession;
+
+  const selectedScheduleWeekday = useMemo(() => {
+    if (!officialForm.N_NGAY) return null;
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(officialForm.N_NGAY.trim());
+    if (!match) return null;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (
+      date.getUTCFullYear() !== year ||
+      date.getUTCMonth() !== month - 1 ||
+      date.getUTCDate() !== day
+    ) {
+      return null;
+    }
+    return date.getUTCDay();
+  }, [officialForm.N_NGAY]);
+
+  const utcTodayIso = useMemo(() => {
+    const now = new Date();
+    return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(
+      now.getUTCDate(),
+    ).padStart(2, '0')}`;
+  }, []);
+
+  const saveBlockReason = useMemo(() => {
+    if (!officialForm.BS_MA || !officialForm.P_MA || !officialForm.N_NGAY || !officialForm.B_TEN) {
+      return 'Vui lòng nhập đầy đủ bác sĩ, phòng, ngày và buổi.';
+    }
+    if (officialForm.N_NGAY < utcTodayIso) {
+      return 'Không thể tạo/cập nhật lịch trực cho ngày đã qua.';
+    }
+    if (selectedScheduleWeekday === 0) {
+      return 'Lịch trực chỉ được lập từ thứ 2 đến thứ 7.';
+    }
+    if (specialtyConflict) {
+      return 'Bác sĩ không thuộc chuyên khoa của phòng đã chọn.';
+    }
+    if (selectedSessionContext && !selectedSessionContext.canSelect) {
+      return selectedSessionContext.reasons[0] || 'Buổi trực đã bận, vui lòng chọn buổi khác.';
+    }
+    if (noAvailableSession) {
+      return 'Không còn buổi trống cho phòng này trong ngày đã chọn.';
+    }
+    return null;
+  }, [
+    officialForm.BS_MA,
+    officialForm.P_MA,
+    officialForm.N_NGAY,
+    officialForm.B_TEN,
+    selectedScheduleWeekday,
+    utcTodayIso,
+    specialtyConflict,
+    selectedSessionContext,
+    noAvailableSession,
+  ]);
+
+  useEffect(() => {
+    if (!officialDialogOpen) return;
+    if (!officialForm.BS_MA || !selectedRoom) return;
+    const selected = options?.doctors.find((doctor) => doctor.BS_MA === Number(officialForm.BS_MA));
+    if (!selected) return;
+    if (selected.CK_MA !== selectedRoom.CK_MA) {
+      setOfficialForm((prev) => ({ ...prev, BS_MA: '' }));
+    }
+  }, [officialDialogOpen, officialForm.BS_MA, options?.doctors, selectedRoom]);
+
+  useEffect(() => {
+    if (!officialDialogOpen) return;
+    if (!officialForm.B_TEN) return;
+    const ctx = sessionContextMap.get(officialForm.B_TEN);
+    if (!ctx) return;
+    if (!ctx.canSelect) {
+      setOfficialForm((prev) => ({ ...prev, B_TEN: '' }));
+    }
+  }, [officialDialogOpen, officialForm.B_TEN, sessionContextMap]);
+
+  const missingShiftPreview = useMemo(() => {
+    const all = cycle?.missingShifts?.items ?? [];
+    return all.slice(0, 8);
+  }, [cycle?.missingShifts?.items]);
+
+  const openWeekStartPicker = () => {
+    const input = weekStartPickerRef.current;
+    if (!input) return;
+    if (typeof input.showPicker === 'function') {
+      input.showPicker();
+      return;
+    }
+    input.focus();
+  };
+
+  const openOfficialDatePicker = () => {
+    const input = officialDatePickerRef.current;
+    if (!input) return;
+    if (typeof input.showPicker === 'function') {
+      input.showPicker();
+      return;
+    }
+    input.focus();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -240,20 +423,35 @@ export default function DoctorShiftManagementPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-        <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm"><p className="text-xs uppercase tracking-wide text-gray-500">Trạng thái chu kỳ</p><p className="mt-1 text-lg font-semibold text-gray-900 capitalize">{cycle?.status || '-'}</p><p className="text-xs text-gray-500">{cycle?.weekStartDate} → {cycle?.weekEndDate}</p></div>
+        <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm"><p className="text-xs uppercase tracking-wide text-gray-500">Trạng thái chu kỳ</p><p className="mt-1 text-lg font-semibold text-gray-900">{getCycleStatusLabel(cycle?.status)}</p><p className="text-xs text-gray-500">{formatDateDdMmYyyy(cycle?.weekStartDate)} → {formatDateDdMmYyyy(cycle?.weekEndDate)}</p></div>
         <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm"><p className="text-xs uppercase tracking-wide text-gray-500">Đăng ký chờ duyệt</p><p className="mt-1 text-lg font-semibold text-amber-700">{cycle?.summary.pending ?? 0}</p></div>
         <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm"><p className="text-xs uppercase tracking-wide text-gray-500">Đăng ký đã duyệt</p><p className="mt-1 text-lg font-semibold text-emerald-700">{cycle?.summary.approved ?? 0}</p></div>
         <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm"><p className="text-xs uppercase tracking-wide text-gray-500">Ca trực chính thức</p><p className="mt-1 text-lg font-semibold text-blue-700">{cycle?.summary.official ?? 0}</p></div>
       </div>
 
+      <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm space-y-2">
+        <p className="text-sm font-medium text-gray-800">Thiếu ca trực theo ngày/buổi: <span className="font-semibold text-rose-600">{cycle?.missingShifts?.totalMissing ?? 0}</span></p>
+        {missingShiftPreview.length > 0 ? (
+          <div className="flex flex-wrap gap-2 text-xs text-gray-700">
+            {missingShiftPreview.map((item) => (
+              <span key={`${item.date}-${item.session}`} className="inline-flex items-center rounded-md border border-rose-200 bg-rose-50 px-2 py-1">
+                {formatDateDdMmYyyy(item.date)} - {getWeekdayLabel(item.weekday)} - {getSessionLabel(item.session)}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-emerald-700">Tuần này không còn ca trực trống theo khung ngày/buổi.</p>
+        )}
+      </div>
+
       <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm space-y-3">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-7">
-          <Input type="date" value={weekStart} onChange={(e) => setWeekStart(e.target.value)} />
+          <div className="relative"><Input type="text" readOnly value={formatDateDdMmYyyySlash(weekStart)} onClick={openWeekStartPicker} className="cursor-pointer" /><input ref={weekStartPickerRef} type="date" value={weekStart} onChange={(e) => setWeekStart(e.target.value)} tabIndex={-1} aria-hidden className="pointer-events-none absolute inset-0 opacity-0" /></div>
           <div className="relative sm:col-span-2"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" /><Input placeholder="Tìm theo tên/mã bác sĩ..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" /></div>
           <AdminSelect value={specialtyFilter} onValueChange={setSpecialtyFilter}><AdminSelectTrigger><AdminSelectValue placeholder="Chuyên khoa" /></AdminSelectTrigger><AdminSelectContent><AdminSelectItem value="all">Tất cả chuyên khoa</AdminSelectItem>{(options?.specialties ?? []).map((item) => (<AdminSelectItem key={item.CK_MA} value={String(item.CK_MA)}>{item.CK_TEN}</AdminSelectItem>))}</AdminSelectContent></AdminSelect>
           <AdminSelect value={doctorFilter} onValueChange={setDoctorFilter}><AdminSelectTrigger><AdminSelectValue placeholder="Bác sĩ" /></AdminSelectTrigger><AdminSelectContent><AdminSelectItem value="all">Tất cả bác sĩ</AdminSelectItem>{(options?.doctors ?? []).map((item) => (<AdminSelectItem key={item.BS_MA} value={String(item.BS_MA)}>{item.BS_HO_TEN}</AdminSelectItem>))}</AdminSelectContent></AdminSelect>
           <AdminSelect value={roomFilter} onValueChange={setRoomFilter}><AdminSelectTrigger><AdminSelectValue placeholder="Phòng" /></AdminSelectTrigger><AdminSelectContent><AdminSelectItem value="all">Tất cả phòng</AdminSelectItem>{(options?.rooms ?? []).map((item) => (<AdminSelectItem key={item.P_MA} value={String(item.P_MA)}>{item.P_TEN}</AdminSelectItem>))}</AdminSelectContent></AdminSelect>
-          <AdminSelect value={sessionFilter} onValueChange={setSessionFilter}><AdminSelectTrigger><div className="flex items-center gap-2"><Filter className="h-4 w-4 text-gray-400" /><AdminSelectValue placeholder="Buổi" /></div></AdminSelectTrigger><AdminSelectContent><AdminSelectItem value="all">Tất cả buổi</AdminSelectItem>{(options?.sessions ?? []).map((item) => (<AdminSelectItem key={item.B_TEN} value={item.B_TEN}>{item.B_TEN}</AdminSelectItem>))}</AdminSelectContent></AdminSelect>
+          <AdminSelect value={sessionFilter} onValueChange={setSessionFilter}><AdminSelectTrigger><div className="flex items-center gap-2"><Filter className="h-4 w-4 text-gray-400" /><AdminSelectValue placeholder="Buổi" /></div></AdminSelectTrigger><AdminSelectContent><AdminSelectItem value="all">Tất cả buổi</AdminSelectItem>{(options?.sessions ?? []).map((item) => (<AdminSelectItem key={item.B_TEN} value={item.B_TEN}>{getSessionLabel(item.B_TEN)}</AdminSelectItem>))}</AdminSelectContent></AdminSelect>
         </div>
       </div>
 
@@ -264,29 +462,286 @@ export default function DoctorShiftManagementPage() {
             <TableHeader><TableRow className="bg-gray-50/50 hover:bg-gray-50/50"><TableHead>Bác sĩ</TableHead><TableHead>Chuyên khoa</TableHead><TableHead>Phòng</TableHead><TableHead>Ngày</TableHead><TableHead>Buổi</TableHead><TableHead>Trạng thái</TableHead><TableHead>Ghi chú</TableHead><TableHead className="text-right">Thao tác</TableHead></TableRow></TableHeader>
             <TableBody>{reviewLoading ? (<TableRow><TableCell colSpan={8} className="py-10 text-center text-gray-500">Đang tải đăng ký...</TableCell></TableRow>) : (reviews?.items ?? []).length === 0 ? (<TableRow><TableCell colSpan={8} className="py-10 text-center text-gray-500">Không có đăng ký phù hợp</TableCell></TableRow>) : ((reviews?.items ?? []).map((item) => (
               <TableRow key={`${item.BS_MA}-${item.N_NGAY}-${item.B_TEN}`}>
-                <TableCell className="font-medium text-gray-900">{item.doctor.BS_HO_TEN}</TableCell><TableCell>{item.doctor.CHUYEN_KHOA.CK_TEN}</TableCell><TableCell>{item.room.P_TEN}</TableCell><TableCell>{toDateOnlyIso(item.N_NGAY)}</TableCell><TableCell>{item.B_TEN}</TableCell>
-                <TableCell><span className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium ${statusBadgeClass(item.status)}`}>{item.status}</span></TableCell>
+                <TableCell className="font-medium text-gray-900">{item.doctor.BS_HO_TEN}</TableCell><TableCell>{item.doctor.CHUYEN_KHOA.CK_TEN}</TableCell><TableCell>{item.room.P_TEN}</TableCell><TableCell>{formatDateDdMmYyyy(item.N_NGAY)}</TableCell><TableCell>{getSessionLabel(item.B_TEN)}</TableCell>
+                <TableCell><span className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium ${getScheduleStatusBadgeClass(item.status)}`}>{getScheduleWorkflowStatusLabel(item.status)}</span></TableCell>
                 <TableCell className="max-w-[240px] truncate text-sm text-gray-600">{item.note || '-'}</TableCell>
-                <TableCell><div className="flex justify-end gap-2"><Button size="sm" variant="outline" className="h-8 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={() => setReviewDialog({ open: true, bsMa: item.BS_MA, date: toDateOnlyIso(item.N_NGAY), session: item.B_TEN, targetStatus: 'approved', adminNote: '' })}><CheckCircle2 className="mr-1 h-4 w-4" /> Duyệt</Button><Button size="sm" variant="outline" className="h-8 border-red-200 text-red-700 hover:bg-red-50" onClick={() => setReviewDialog({ open: true, bsMa: item.BS_MA, date: toDateOnlyIso(item.N_NGAY), session: item.B_TEN, targetStatus: 'rejected', adminNote: '' })}><XCircle className="mr-1 h-4 w-4" /> Từ chối</Button></div></TableCell>
+                <TableCell>{item.status === 'pending' ? (<div className="flex justify-end gap-2"><Button size="sm" variant="outline" className="h-8 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={() => setReviewDialog({ open: true, bsMa: item.BS_MA, date: toDateOnlyIso(item.N_NGAY), session: item.B_TEN, targetStatus: 'approved', adminNote: '' })}><CheckCircle2 className="mr-1 h-4 w-4" /> Duyệt</Button><Button size="sm" variant="outline" className="h-8 border-red-200 text-red-700 hover:bg-red-50" onClick={() => setReviewDialog({ open: true, bsMa: item.BS_MA, date: toDateOnlyIso(item.N_NGAY), session: item.B_TEN, targetStatus: 'rejected', adminNote: '' })}><XCircle className="mr-1 h-4 w-4" /> Từ chối</Button></div>) : (<span className="text-xs text-gray-500">Đã xử lý</span>)}</TableCell>
               </TableRow>
             )))}</TableBody>
           </Table>
         </div>
       </div>
+
       <div className="space-y-3">
-        <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-semibold text-gray-900">Lịch trực chính thức</h2><div className="flex items-center gap-2"><AdminSelect value={officialStatusFilter} onValueChange={(value) => setOfficialStatusFilter(value as OfficialStatusFilter)}><AdminSelectTrigger className="w-[220px]"><AdminSelectValue placeholder="Trạng thái chính thức" /></AdminSelectTrigger><AdminSelectContent><AdminSelectItem value="all">Tất cả trạng thái</AdminSelectItem><AdminSelectItem value="official">Chính thức</AdminSelectItem><AdminSelectItem value="approved">Đã duyệt (chưa chốt)</AdminSelectItem></AdminSelectContent></AdminSelect><Button className="bg-blue-600 hover:bg-blue-700" onClick={() => { setOfficialForm({ originalKey: null, BS_MA: '', P_MA: '', N_NGAY: weekStart, B_TEN: options?.sessions?.[0]?.B_TEN || '', status: 'official', note: '' }); setOfficialDialogOpen(true); }}><Plus className="mr-2 h-4 w-4" /> Thêm ca trực</Button></div></div>
-        <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm"><Table><TableHeader><TableRow className="bg-gray-50/50 hover:bg-gray-50/50"><TableHead>Bác sĩ</TableHead><TableHead>Chuyên khoa</TableHead><TableHead>Phòng</TableHead><TableHead>Ngày</TableHead><TableHead>Buổi</TableHead><TableHead>Slot</TableHead><TableHead>Trạng thái</TableHead><TableHead>Ghi chú</TableHead><TableHead className="text-right">Thao tác</TableHead></TableRow></TableHeader><TableBody>{officialLoading ? (<TableRow><TableCell colSpan={9} className="py-10 text-center text-gray-500">Đang tải lịch chính thức...</TableCell></TableRow>) : (official?.items ?? []).length === 0 ? (<TableRow><TableCell colSpan={9} className="py-10 text-center text-gray-500">Chưa có ca trực chính thức</TableCell></TableRow>) : ((official?.items ?? []).map((item) => (<TableRow key={`${item.BS_MA}-${item.N_NGAY}-${item.B_TEN}`}><TableCell className="font-medium text-gray-900">{item.doctor.BS_HO_TEN}</TableCell><TableCell>{item.doctor.CHUYEN_KHOA.CK_TEN}</TableCell><TableCell>{item.room.P_TEN}</TableCell><TableCell>{toDateOnlyIso(item.N_NGAY)}</TableCell><TableCell>{item.B_TEN}</TableCell><TableCell>{item.slotCount}</TableCell><TableCell><span className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium ${statusBadgeClass(item.status)}`}>{item.status}</span></TableCell><TableCell className="max-w-[220px] truncate text-sm text-gray-600">{item.note || '-'}</TableCell><TableCell><div className="flex justify-end gap-2"><Button size="sm" variant="outline" onClick={() => { setOfficialForm({ originalKey: { bsMa: item.BS_MA, date: toDateOnlyIso(item.N_NGAY), session: item.B_TEN }, BS_MA: String(item.BS_MA), P_MA: String(item.P_MA), N_NGAY: toDateOnlyIso(item.N_NGAY), B_TEN: item.B_TEN, status: item.status, note: item.note || '' }); setOfficialDialogOpen(true); }}>Sửa</Button><Button size="sm" variant="outline" className="border-red-200 text-red-700 hover:bg-red-50" onClick={() => setDeleteDialog({ open: true, bsMa: item.BS_MA, date: toDateOnlyIso(item.N_NGAY), session: item.B_TEN })}><Trash2 className="mr-1 h-4 w-4" /> Xóa</Button></div></TableCell></TableRow>)))}</TableBody></Table></div>
+        <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-semibold text-gray-900">Lịch trực chính thức</h2><div className="flex items-center gap-2"><AdminSelect value={officialWeekdayFilter} onValueChange={(value) => setOfficialWeekdayFilter(value as WeekdayFilterValue)}><AdminSelectTrigger className="w-[190px]"><AdminSelectValue placeholder="Lọc theo thứ" /></AdminSelectTrigger><AdminSelectContent>{WEEKDAY_FILTER_OPTIONS.map((option) => (<AdminSelectItem key={option.value} value={option.value}>{option.label}</AdminSelectItem>))}</AdminSelectContent></AdminSelect><AdminSelect value={officialStatusFilter} onValueChange={(value) => setOfficialStatusFilter(value as OfficialStatusFilter)}><AdminSelectTrigger className="w-[220px]"><AdminSelectValue placeholder="Trạng thái chính thức" /></AdminSelectTrigger><AdminSelectContent><AdminSelectItem value="all">Tất cả trạng thái</AdminSelectItem><AdminSelectItem value="official">{getScheduleWorkflowStatusLabel('official')}</AdminSelectItem><AdminSelectItem value="approved">{getScheduleWorkflowStatusLabel('approved')} (chưa chốt)</AdminSelectItem></AdminSelectContent></AdminSelect><Button className="bg-blue-600 hover:bg-blue-700" onClick={() => { setOfficialForm({ originalKey: null, BS_MA: '', P_MA: '', N_NGAY: weekStart, B_TEN: '', status: 'approved', note: '' }); setOfficialDialogOpen(true); }}><Plus className="mr-2 h-4 w-4" /> Thêm ca trực</Button></div></div>
+        <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm"><Table><TableHeader><TableRow className="bg-gray-50/50 hover:bg-gray-50/50"><TableHead>Bác sĩ</TableHead><TableHead>Chuyên khoa</TableHead><TableHead>Phòng</TableHead><TableHead>Ngày</TableHead><TableHead>Thứ</TableHead><TableHead>Buổi</TableHead><TableHead>Slot</TableHead><TableHead>Trạng thái</TableHead><TableHead>Ghi chú</TableHead><TableHead className="text-right">Thao tác</TableHead></TableRow></TableHeader><TableBody>{officialLoading ? (<TableRow><TableCell colSpan={10} className="py-10 text-center text-gray-500">Đang tải lịch chính thức...</TableCell></TableRow>) : (official?.items ?? []).length === 0 ? (<TableRow><TableCell colSpan={10} className="py-10 text-center text-gray-500">Chưa có ca trực chính thức</TableCell></TableRow>) : ((official?.items ?? []).map((item) => (<TableRow key={`${item.BS_MA}-${item.N_NGAY}-${item.B_TEN}`}><TableCell className="font-medium text-gray-900">{item.doctor.BS_HO_TEN}</TableCell><TableCell>{item.doctor.CHUYEN_KHOA.CK_TEN}</TableCell><TableCell>{item.room.P_TEN}</TableCell><TableCell>{formatDateDdMmYyyy(item.N_NGAY)}</TableCell><TableCell>{getWeekdayLabelFromDate(item.N_NGAY)}</TableCell><TableCell>{getSessionLabel(item.B_TEN)}</TableCell><TableCell>{item.slotCount}</TableCell><TableCell><span className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium ${getScheduleStatusBadgeClass(item.status)}`}>{getScheduleWorkflowStatusLabel(item.status)}</span></TableCell><TableCell className="max-w-[220px] truncate text-sm text-gray-600">{item.note || '-'}</TableCell><TableCell><div className="flex justify-end gap-2"><Button size="sm" variant="outline" onClick={() => { setOfficialForm({ originalKey: { bsMa: item.BS_MA, date: toDateOnlyIso(item.N_NGAY), session: item.B_TEN }, BS_MA: String(item.BS_MA), P_MA: String(item.P_MA), N_NGAY: toDateOnlyIso(item.N_NGAY), B_TEN: item.B_TEN, status: item.status === 'official' ? 'official' : 'approved', note: item.note || '' }); setOfficialDialogOpen(true); }}>Sửa</Button><Button size="sm" variant="outline" className="border-red-200 text-red-700 hover:bg-red-50" onClick={() => setDeleteDialog({ open: true, bsMa: item.BS_MA, date: toDateOnlyIso(item.N_NGAY), session: item.B_TEN })}><Trash2 className="mr-1 h-4 w-4" /> Xóa</Button></div></TableCell></TableRow>)))}</TableBody></Table></div>
       </div>
 
-      <Dialog open={reviewDialog.open} onOpenChange={(open) => setReviewDialog((prev) => ({ ...prev, open }))}><DialogContent><DialogHeader><DialogTitle>{reviewDialog.targetStatus === 'approved' ? 'Duyệt đăng ký lịch trực' : 'Từ chối đăng ký lịch trực'}</DialogTitle><DialogDescription>{reviewDialog.bsMa} - {reviewDialog.date} - {reviewDialog.session}</DialogDescription></DialogHeader><div className="space-y-2"><label className="text-sm font-medium text-gray-700">Ghi chú admin (tuỳ chọn)</label><Textarea value={reviewDialog.adminNote} onChange={(e) => setReviewDialog((prev) => ({ ...prev, adminNote: e.target.value }))} /></div><DialogFooter><Button variant="outline" onClick={() => setReviewDialog((prev) => ({ ...prev, open: false }))}>Hủy</Button><Button onClick={() => registrationMutation.mutate({ bsMa: reviewDialog.bsMa, date: reviewDialog.date, session: reviewDialog.session, status: reviewDialog.targetStatus, adminNote: reviewDialog.adminNote || undefined })} disabled={registrationMutation.isPending}>{registrationMutation.isPending ? 'Đang xử lý...' : 'Xác nhận'}</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={reviewDialog.open} onOpenChange={(open) => setReviewDialog((prev) => ({ ...prev, open }))}><DialogContent><DialogHeader><DialogTitle>{reviewDialog.targetStatus === 'approved' ? 'Duyệt đăng ký lịch trực' : 'Từ chối đăng ký lịch trực'}</DialogTitle><DialogDescription>{reviewDialog.bsMa} - {formatDateDdMmYyyy(reviewDialog.date)} - {getSessionLabel(reviewDialog.session)}</DialogDescription></DialogHeader><div className="space-y-2"><label className="text-sm font-medium text-gray-700">Ghi chú admin (tuỳ chọn)</label><Textarea value={reviewDialog.adminNote} onChange={(e) => setReviewDialog((prev) => ({ ...prev, adminNote: e.target.value }))} /></div><DialogFooter><Button variant="outline" onClick={() => setReviewDialog((prev) => ({ ...prev, open: false }))}>Hủy</Button><Button onClick={() => registrationMutation.mutate({ bsMa: reviewDialog.bsMa, date: reviewDialog.date, session: reviewDialog.session, status: reviewDialog.targetStatus, adminNote: reviewDialog.adminNote || undefined })} disabled={registrationMutation.isPending}>{registrationMutation.isPending ? 'Đang xử lý...' : 'Xác nhận'}</Button></DialogFooter></DialogContent></Dialog>
 
-      <Dialog open={officialDialogOpen} onOpenChange={setOfficialDialogOpen}><DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>{officialForm.originalKey ? 'Cập nhật ca trực chính thức' : 'Thêm ca trực chính thức'}</DialogTitle><DialogDescription>Áp dụng ràng buộc 1 bác sĩ / 1 phòng / 1 buổi và cùng chuyên khoa.</DialogDescription></DialogHeader><div className="grid grid-cols-1 gap-3 md:grid-cols-2"><div><label className="mb-1 block text-sm font-medium text-gray-700">Bác sĩ</label><AdminSelect value={officialForm.BS_MA} onValueChange={(value) => setOfficialForm((prev) => ({ ...prev, BS_MA: value, P_MA: '' }))}><AdminSelectTrigger><AdminSelectValue placeholder="Chọn bác sĩ" /></AdminSelectTrigger><AdminSelectContent>{(options?.doctors ?? []).map((doctor) => (<AdminSelectItem key={doctor.BS_MA} value={String(doctor.BS_MA)}>{doctor.BS_HO_TEN}</AdminSelectItem>))}</AdminSelectContent></AdminSelect></div><div><label className="mb-1 block text-sm font-medium text-gray-700">Phòng</label><AdminSelect value={officialForm.P_MA} onValueChange={(value) => setOfficialForm((prev) => ({ ...prev, P_MA: value }))}><AdminSelectTrigger><AdminSelectValue placeholder="Chọn phòng" /></AdminSelectTrigger><AdminSelectContent>{filteredRoomOptions.map((room) => (<AdminSelectItem key={room.P_MA} value={String(room.P_MA)}>{room.P_TEN}</AdminSelectItem>))}</AdminSelectContent></AdminSelect></div><div><label className="mb-1 block text-sm font-medium text-gray-700">Ngày</label><Input type="date" value={officialForm.N_NGAY} onChange={(e) => setOfficialForm((prev) => ({ ...prev, N_NGAY: e.target.value }))} /></div><div><label className="mb-1 block text-sm font-medium text-gray-700">Buổi</label><AdminSelect value={officialForm.B_TEN} onValueChange={(value) => setOfficialForm((prev) => ({ ...prev, B_TEN: value }))}><AdminSelectTrigger><AdminSelectValue placeholder="Chọn buổi" /></AdminSelectTrigger><AdminSelectContent>{(options?.sessions ?? []).map((session) => (<AdminSelectItem key={session.B_TEN} value={session.B_TEN}>{session.B_TEN}</AdminSelectItem>))}</AdminSelectContent></AdminSelect></div><div><label className="mb-1 block text-sm font-medium text-gray-700">Trạng thái</label><AdminSelect value={officialForm.status} onValueChange={(value) => setOfficialForm((prev) => ({ ...prev, status: value as ScheduleWorkflowStatus }))}><AdminSelectTrigger><AdminSelectValue placeholder="Trạng thái" /></AdminSelectTrigger><AdminSelectContent><AdminSelectItem value="official">official</AdminSelectItem><AdminSelectItem value="approved">approved</AdminSelectItem><AdminSelectItem value="pending">pending</AdminSelectItem><AdminSelectItem value="rejected">rejected</AdminSelectItem></AdminSelectContent></AdminSelect></div><div className="md:col-span-2"><label className="mb-1 block text-sm font-medium text-gray-700">Ghi chú</label><Textarea value={officialForm.note} onChange={(e) => setOfficialForm((prev) => ({ ...prev, note: e.target.value }))} /></div></div><DialogFooter><Button variant="outline" onClick={() => setOfficialDialogOpen(false)}>Hủy</Button><Button onClick={() => saveOfficialMutation.mutate()} disabled={saveOfficialMutation.isPending}>{saveOfficialMutation.isPending ? 'Đang lưu...' : 'Lưu ca trực'}</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={officialDialogOpen} onOpenChange={setOfficialDialogOpen}>
+        <DialogContent className="grid-rows-[auto_minmax(0,1fr)_auto] !w-[calc(100vw-1rem)] !max-w-[calc(100vw-1rem)] sm:!w-[min(92vw,960px)] sm:!max-w-[min(92vw,960px)] lg:!w-[min(50vw,960px)] lg:!max-w-[min(50vw,960px)] h-[min(84vh,860px)] overflow-hidden gap-0 p-0">
+          <DialogHeader className="shrink-0 border-b border-gray-100 px-5 pb-2.5 pt-4">
+            <DialogTitle>
+              {officialForm.originalKey ? 'Cập nhật ca trực chính thức' : 'Thêm ca trực chính thức'}
+            </DialogTitle>
+            <DialogDescription>
+              Luồng đề xuất: Ngày → Phòng → xem lịch phòng → Buổi → Bác sĩ → xem lịch bác sĩ → Lưu.
+            </DialogDescription>
+          </DialogHeader>
 
-      <Dialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog((prev) => ({ ...prev, open }))}><DialogContent><DialogHeader><DialogTitle className="flex items-center gap-2 text-red-600"><Trash2 className="h-5 w-5" /> Xác nhận xóa ca trực</DialogTitle><DialogDescription>{deleteDialog.bsMa} - {deleteDialog.date} - {deleteDialog.session}</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" onClick={() => setDeleteDialog((prev) => ({ ...prev, open: false }))}>Hủy</Button><Button variant="destructive" onClick={() => deleteOfficialMutation.mutate()} disabled={deleteOfficialMutation.isPending}>{deleteOfficialMutation.isPending ? 'Đang xóa...' : 'Xác nhận xóa'}</Button></DialogFooter></DialogContent></Dialog>
+          <div className="min-h-0 overflow-y-auto px-5 py-3">
+            <div className="space-y-3">
+              <div className="rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
+                <p className="text-sm font-semibold text-gray-800">Thiết lập lịch trực</p>
+                <p className="mt-1 text-xs text-gray-500">
+                  Chọn ngày, phòng, buổi và bác sĩ trước khi kiểm tra xung đột.
+                </p>
+                <div className="mt-2.5 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-6">
+                  <div className="xl:col-span-1">
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Ngày</label>
+                    <div className="relative">
+                      <Input
+                        type="text"
+                        readOnly
+                        value={formatDateDdMmYyyySlash(officialForm.N_NGAY)}
+                        onClick={openOfficialDatePicker}
+                        className="cursor-pointer"
+                      />
+                      <input
+                        ref={officialDatePickerRef}
+                        type="date"
+                        value={officialForm.N_NGAY}
+                        onChange={(e) =>
+                          setOfficialForm((prev) => ({ ...prev, N_NGAY: e.target.value }))
+                        }
+                        tabIndex={-1}
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0 opacity-0"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="xl:col-span-2">
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Phòng</label>
+                    <AdminSelect
+                      value={officialForm.P_MA}
+                      onValueChange={(value) =>
+                        setOfficialForm((prev) => ({
+                          ...prev,
+                          P_MA: value,
+                          B_TEN: '',
+                        }))
+                      }
+                    >
+                      <AdminSelectTrigger>
+                        <AdminSelectValue placeholder="Chọn phòng" />
+                      </AdminSelectTrigger>
+                      <AdminSelectContent>
+                        {(options?.rooms ?? []).map((room) => (
+                          <AdminSelectItem key={room.P_MA} value={String(room.P_MA)}>
+                            {room.P_TEN}
+                          </AdminSelectItem>
+                        ))}
+                      </AdminSelectContent>
+                    </AdminSelect>
+                    {selectedRoom ? (
+                      <p className="mt-1 text-xs text-gray-500">
+                        Chuyên khoa: {selectedRoom.CHUYEN_KHOA.CK_TEN}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="xl:col-span-1">
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Buổi</label>
+                    <AdminSelect
+                      value={officialForm.B_TEN}
+                      onValueChange={(value) => setOfficialForm((prev) => ({ ...prev, B_TEN: value }))}
+                    >
+                      <AdminSelectTrigger>
+                        <AdminSelectValue placeholder="Chọn buổi còn trống" />
+                      </AdminSelectTrigger>
+                      <AdminSelectContent>
+                        {(options?.sessions ?? []).map((session) => {
+                          const ctx = sessionContextMap.get(session.B_TEN);
+                          const disabled =
+                            !officialForm.P_MA ||
+                            officialFormContextLoading ||
+                            Boolean(ctx && !ctx.canSelect);
+                          const reason = ctx?.canSelect ? '' : ctx?.reasons?.[0] || '';
+                          return (
+                            <AdminSelectItem
+                              key={session.B_TEN}
+                              value={session.B_TEN}
+                              disabled={disabled}
+                            >
+                              {getSessionLabel(session.B_TEN)}
+                              {disabled && reason ? ` - ${reason}` : ''}
+                            </AdminSelectItem>
+                          );
+                        })}
+                      </AdminSelectContent>
+                    </AdminSelect>
+                  </div>
+
+                  <div className="xl:col-span-2">
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Bác sĩ</label>
+                    <AdminSelect
+                      value={officialForm.BS_MA}
+                      onValueChange={(value) => setOfficialForm((prev) => ({ ...prev, BS_MA: value }))}
+                    >
+                      <AdminSelectTrigger>
+                        <AdminSelectValue placeholder="Chọn bác sĩ theo chuyên khoa phòng" />
+                      </AdminSelectTrigger>
+                      <AdminSelectContent>
+                        {filteredDoctorOptions.map((doctor) => (
+                          <AdminSelectItem key={doctor.BS_MA} value={String(doctor.BS_MA)}>
+                            {doctor.BS_HO_TEN}
+                          </AdminSelectItem>
+                        ))}
+                      </AdminSelectContent>
+                    </AdminSelect>
+                    {selectedRoom && filteredDoctorOptions.length === 0 ? (
+                      <p className="mt-1 text-xs text-rose-600">
+                        Không có bác sĩ thuộc chuyên khoa của phòng đã chọn.
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="xl:col-span-1">
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Trạng thái</label>
+                    <AdminSelect
+                      value={officialForm.status}
+                      onValueChange={(value) =>
+                        setOfficialForm((prev) => ({ ...prev, status: value as OfficialFormStatus }))
+                      }
+                    >
+                      <AdminSelectTrigger>
+                        <AdminSelectValue placeholder="Trạng thái" />
+                      </AdminSelectTrigger>
+                      <AdminSelectContent>
+                        {OFFICIAL_FORM_STATUS_OPTIONS.map((status) => (
+                          <AdminSelectItem key={status.value} value={status.value}>
+                            {status.label}
+                          </AdminSelectItem>
+                        ))}
+                      </AdminSelectContent>
+                    </AdminSelect>
+                  </div>
+
+                  <div className="xl:col-span-5">
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Ghi chú</label>
+                    <Textarea
+                      value={officialForm.note}
+                      onChange={(e) => setOfficialForm((prev) => ({ ...prev, note: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                <div className="rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
+                  <p className="text-sm font-semibold text-gray-800">Lịch phòng theo ngày đã chọn</p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {officialForm.P_MA
+                      ? 'Xem nhanh buổi nào còn trống trước khi chọn.'
+                      : 'Chọn phòng để xem lịch theo ngày.'}
+                  </p>
+                  <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {(options?.sessions ?? []).map((session) => {
+                      const ctx = sessionContextMap.get(session.B_TEN);
+                      const roomCtx = ctx?.room;
+                      const status = roomCtx?.status ?? 'empty';
+                      return (
+                        <div
+                          key={`room-context-${session.B_TEN}`}
+                          className={`rounded-lg border p-2.5 ${getContextStatusClass(status)}`}
+                        >
+                          <p className="text-sm font-semibold">{getSessionLabel(session.B_TEN)}</p>
+                          <p className="mt-1 text-xs">{getContextStatusLabel(status)}</p>
+                          <p className="mt-1 text-xs">
+                            {roomCtx?.doctor
+                              ? `${roomCtx.doctor.BS_HO_TEN} (BS #${roomCtx.doctor.BS_MA})`
+                              : 'Chưa phân công'}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {noAvailableSession ? (
+                    <p className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-2 text-xs font-medium text-rose-700">
+                      Không còn buổi trống cho phòng này trong ngày đã chọn.
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
+                  <p className="text-sm font-semibold text-gray-800">Lịch bác sĩ theo ngày đã chọn</p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {officialForm.BS_MA
+                      ? 'Kiểm tra bác sĩ đã bận ở buổi nào trước khi lưu.'
+                      : 'Chọn bác sĩ để xem lịch theo ngày.'}
+                  </p>
+                  <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {(options?.sessions ?? []).map((session) => {
+                      const ctx = sessionContextMap.get(session.B_TEN);
+                      const doctorCtx = ctx?.doctor;
+                      const status = doctorCtx?.status ?? 'empty';
+                      return (
+                        <div
+                          key={`doctor-context-${session.B_TEN}`}
+                          className={`rounded-lg border p-2.5 ${getContextStatusClass(status)}`}
+                        >
+                          <p className="text-sm font-semibold">{getSessionLabel(session.B_TEN)}</p>
+                          <p className="mt-1 text-xs">{getContextStatusLabel(status)}</p>
+                          <p className="mt-1 text-xs">
+                            {doctorCtx?.room
+                              ? `${doctorCtx.room.P_TEN} (P#${doctorCtx.room.P_MA})`
+                              : 'Bác sĩ đang trống'}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {specialtyConflict ? (
+                <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                  Bác sĩ không thuộc chuyên khoa của phòng đã chọn.
+                </p>
+              ) : null}
+
+              {selectedSessionContext && !selectedSessionContext.canSelect ? (
+                <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                  {selectedSessionContext.reasons[0] || 'Buổi trực đã bận, vui lòng chọn buổi khác.'}
+                </p>
+              ) : null}
+            </div>
+          </div>
+
+          <DialogFooter className="!mx-0 !mb-0 shrink-0 border-t border-gray-100 bg-white px-5 py-3">
+            <Button variant="outline" onClick={() => setOfficialDialogOpen(false)}>
+              Hủy
+            </Button>
+            <Button
+              onClick={() => saveOfficialMutation.mutate()}
+              disabled={saveOfficialMutation.isPending || officialFormContextLoading || Boolean(saveBlockReason)}
+            >
+              {saveOfficialMutation.isPending
+                ? 'Đang lưu...'
+                : officialForm.originalKey
+                ? 'Cập nhật ca trực'
+                : 'Lưu ca trực'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog((prev) => ({ ...prev, open }))}><DialogContent><DialogHeader><DialogTitle className="flex items-center gap-2 text-red-600"><Trash2 className="h-5 w-5" /> Xác nhận xóa ca trực</DialogTitle><DialogDescription>{deleteDialog.bsMa} - {formatDateDdMmYyyy(deleteDialog.date)} - {getSessionLabel(deleteDialog.session)}</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" onClick={() => setDeleteDialog((prev) => ({ ...prev, open: false }))}>Hủy</Button><Button variant="destructive" onClick={() => deleteOfficialMutation.mutate()} disabled={deleteOfficialMutation.isPending}>{deleteOfficialMutation.isPending ? 'Đang xóa...' : 'Xác nhận xóa'}</Button></DialogFooter></DialogContent></Dialog>
 
       <div className="flex items-center justify-between text-sm text-gray-600"><p>Đăng ký: trang {reviews?.meta.page || 1}/{reviews?.meta.totalPages || 1}</p><div className="flex items-center gap-2"><Button size="sm" variant="outline" onClick={() => setReviewPage((p) => Math.max(1, p - 1))} disabled={(reviews?.meta.page || 1) <= 1}>Trước</Button><Button size="sm" variant="outline" onClick={() => setReviewPage((p) => Math.min(reviews?.meta.totalPages || p, p + 1))} disabled={(reviews?.meta.page || 1) >= (reviews?.meta.totalPages || 1)}>Sau</Button></div></div>
       <div className="flex items-center justify-between text-sm text-gray-600"><p>Lịch chính thức: trang {official?.meta.page || 1}/{official?.meta.totalPages || 1}</p><div className="flex items-center gap-2"><Button size="sm" variant="outline" onClick={() => setOfficialPage((p) => Math.max(1, p - 1))} disabled={(official?.meta.page || 1) <= 1}>Trước</Button><Button size="sm" variant="outline" onClick={() => setOfficialPage((p) => Math.min(official?.meta.totalPages || p, p + 1))} disabled={(official?.meta.page || 1) >= (official?.meta.totalPages || 1)}>Sau</Button></div></div>
     </div>
   );
 }
-

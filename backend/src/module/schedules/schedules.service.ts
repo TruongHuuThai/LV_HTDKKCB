@@ -7,7 +7,6 @@
 import { SchedulesRepository } from './schedules.repository';
 import { RegisterScheduleDto } from './dto/register-schedule.dto';
 import { mapPrismaError } from '../../common/prisma/prisma-error.util';
-import { buildScheduleNote } from './schedule-status.util';
 
 @Injectable()
 export class SchedulesService {
@@ -25,7 +24,8 @@ export class SchedulesService {
         P_MA: dto.P_MA,
         N_NGAY: date,
         B_TEN: dto.B_TEN,
-        LBSK_GHI_CHU: buildScheduleNote('pending', dto.LBSK_GHI_CHU),
+        LBSK_TRANGTHAI_DUYET: 'pending',
+        LBSK_GHI_CHU: dto.LBSK_GHI_CHU?.trim() || undefined,
       });
     } catch (e: any) {
       if (e?.code === 'P2002') {
@@ -54,13 +54,20 @@ export class SchedulesService {
       );
     }
 
-    const monday = new Date(now);
-    monday.setHours(0, 0, 0, 0);
-    monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+    const currentWeekMonday = new Date(now);
+    currentWeekMonday.setHours(0, 0, 0, 0);
+    currentWeekMonday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
 
-    const saturdayEnd = new Date(monday);
-    saturdayEnd.setDate(monday.getDate() + 5);
-    saturdayEnd.setHours(23, 59, 59, 999);
+    const nextWeekMonday = new Date(currentWeekMonday);
+    nextWeekMonday.setDate(currentWeekMonday.getDate() + 7);
+
+    const nextWeekSaturdayEnd = new Date(nextWeekMonday);
+    nextWeekSaturdayEnd.setDate(nextWeekMonday.getDate() + 5);
+    nextWeekSaturdayEnd.setHours(23, 59, 59, 999);
+
+    const nextWeekSunday = new Date(nextWeekMonday);
+    nextWeekSunday.setDate(nextWeekMonday.getDate() + 6);
+    nextWeekSunday.setHours(23, 59, 59, 999);
 
     const targetDate = new Date(targetDateIso);
     if (Number.isNaN(targetDate.getTime())) {
@@ -72,9 +79,11 @@ export class SchedulesService {
       throw new BadRequestException('Bác sĩ chỉ được đăng ký lịch trực từ thứ 2 đến thứ 7.');
     }
 
-    if (targetDate < monday || targetDate > saturdayEnd) {
+    if (targetDate < nextWeekMonday || targetDate > nextWeekSaturdayEnd) {
       throw new ForbiddenException(
-        'Chỉ được đăng ký lịch trực trong chu kỳ tuần hiện tại (thứ 2 đến thứ 7).',
+        `Chỉ được đăng ký lịch trực cho tuần kế tiếp (${nextWeekMonday
+          .toISOString()
+          .slice(0, 10)} đến ${nextWeekSunday.toISOString().slice(0, 10)}).`,
       );
     }
   }
