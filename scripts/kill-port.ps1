@@ -11,13 +11,13 @@ if (-not $listeners) {
 
 $pids = $listeners | Select-Object -ExpandProperty OwningProcess -Unique
 
-foreach ($pid in $pids) {
+foreach ($processId in $pids) {
   try {
-    $process = Get-Process -Id $pid -ErrorAction Stop
-    Write-Host "Stopping PID $pid ($($process.ProcessName)) on port $Port..."
-    Stop-Process -Id $pid -Force -ErrorAction Stop
+    $process = Get-Process -Id $processId -ErrorAction Stop
+    Write-Host "Stopping PID $processId ($($process.ProcessName)) on port $Port..."
+    Stop-Process -Id $processId -Force -ErrorAction Stop
   } catch {
-    Write-Warning "Could not stop PID $pid. $($_.Exception.Message)"
+    Write-Warning "Could not stop PID $processId. $($_.Exception.Message)"
   }
 }
 

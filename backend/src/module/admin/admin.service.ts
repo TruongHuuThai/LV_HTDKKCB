@@ -21,6 +21,11 @@ import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 import { CreateAccountDto } from './dto/create-account.dto';
 import { UpdateAccountDto } from './dto/update-account.dto';
+import { CreateMedicineDto } from './dto/create-medicine.dto';
+import { UpdateMedicineDto } from './dto/update-medicine.dto';
+import { UpdateMedicineBrandInfoDto } from './dto/update-medicine-brand-info.dto';
+import { CreateRoomDto } from './dto/create-room.dto';
+import { UpdateRoomDto } from './dto/update-room.dto';
 import { SERVICE_TYPE_SET } from './constants/service-type.constants';
 
 type ScheduleApprovalStatus = 'pending' | 'approved' | 'rejected';
@@ -120,7 +125,7 @@ export class AdminService {
       });
 
       this.logger.debug("Executing chunk 5 (Recent Activities)...");
-      // 2. Recent Activities (Hoáº¡t Ä‘á»™ng gáº§n Ä‘Ă¢y - 5 Ä‘Äƒng kĂ½ má»›i nháº¥t)
+      // 2. Recent Activities (Hoạt động gần đây - 5 đăng ký mới nhất)
       const recentActivitiesRaw = await this.prisma.dANG_KY.findMany({
         take: 5,
         orderBy: { DK_THOI_GIAN_TAO: 'desc' },
@@ -128,10 +133,12 @@ export class AdminService {
       });
 
       const recentActivities = recentActivitiesRaw.map((activity) => {
-        const patientName = `${activity.BENH_NHAN?.BN_HO_CHU_LOT || ''} ${activity.BENH_NHAN?.BN_TEN || ''}`.trim() || 'Bá»‡nh nhĂ¢n áº©n danh';
-        let actionStr = 'Ä‘Ă£ Ä‘Äƒng kĂ½ lá»‹ch khĂ¡m';
-        if (activity.DK_TRANG_THAI === 'DA_KHAM') actionStr = 'Ä‘Ă£ hoĂ n thĂ nh khĂ¡m';
-        if (activity.DK_TRANG_THAI === 'HUY') actionStr = 'Ä‘Ă£ há»§y lá»‹ch khĂ¡m';
+        const patientName =
+          `${activity.BENH_NHAN?.BN_HO_CHU_LOT || ''} ${activity.BENH_NHAN?.BN_TEN || ''}`.trim() ||
+          'Bệnh nhân ẩn danh';
+        let actionStr = 'đã đăng ký lịch khám';
+        if (activity.DK_TRANG_THAI === 'DA_KHAM') actionStr = 'đã hoàn thành khám';
+        if (activity.DK_TRANG_THAI === 'HUY') actionStr = 'đã hủy lịch khám';
 
         return {
           id: activity.DK_MA,
@@ -550,6 +557,195 @@ export class AdminService {
     }
   }
 
+  async getRooms(params?: {
+    search?: string;
+    page?: string;
+    limit?: string;
+    sortBy?: string;
+    sortOrder?: string;
+    specialtyId?: string;
+  }) {
+    try {
+      const rawPage = Number.parseInt(params?.page || '1', 10);
+      const rawLimit = Number.parseInt(params?.limit || '10', 10);
+      const page = Number.isNaN(rawPage) ? 1 : Math.max(rawPage, 1);
+      const limit = Number.isNaN(rawLimit) ? 10 : Math.min(Math.max(rawLimit, 1), 100);
+      const search = params?.search?.trim();
+      const parsedSpecialtyId = Number.parseInt(params?.specialtyId || '', 10);
+      const specialtyId = Number.isNaN(parsedSpecialtyId) ? undefined : parsedSpecialtyId;
+      const sortBy: 'code' | 'name' = params?.sortBy === 'name' ? 'name' : 'code';
+      const sortOrder: 'asc' | 'desc' = params?.sortOrder === 'desc' ? 'desc' : 'asc';
+
+      const where: Prisma.PHONGWhereInput = {
+        ...(specialtyId ? { CK_MA: specialtyId } : {}),
+        ...(search
+          ? {
+              OR: [
+                {
+                  P_TEN: {
+                    contains: search,
+                    mode: 'insensitive',
+                  },
+                },
+                {
+                  P_VI_TRI: {
+                    contains: search,
+                    mode: 'insensitive',
+                  },
+                },
+                {
+                  CHUYEN_KHOA: {
+                    CK_TEN: {
+                      contains: search,
+                      mode: 'insensitive',
+                    },
+                  },
+                },
+              ],
+            }
+          : {}),
+      };
+
+      const orderBy =
+        sortBy === 'name'
+          ? { P_TEN: sortOrder }
+          : { P_MA: sortOrder };
+
+      const [total, items] = await this.prisma.$transaction([
+        this.prisma.pHONG.count({ where }),
+        this.prisma.pHONG.findMany({
+          where,
+          include: {
+            CHUYEN_KHOA: {
+              select: {
+                CK_MA: true,
+                CK_TEN: true,
+              },
+            },
+          },
+          orderBy,
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+      ]);
+
+      const totalPages = Math.max(1, Math.ceil(total / limit));
+
+      return {
+        items,
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages,
+          sortBy,
+          sortOrder,
+          search: search || '',
+          specialtyId: specialtyId ?? null,
+        },
+      };
+    } catch (e) {
+      mapPrismaError(e);
+    }
+  }
+
+  async getRoomById(id: number) {
+    try {
+      const room = await this.prisma.pHONG.findUnique({
+        where: { P_MA: id },
+        include: {
+          CHUYEN_KHOA: {
+            select: {
+              CK_MA: true,
+              CK_TEN: true,
+            },
+          },
+        },
+      });
+
+      if (!room) {
+        throw new NotFoundException('Khong tim thay phong');
+      }
+
+      return room;
+    } catch (e) {
+      mapPrismaError(e);
+    }
+  }
+
+  async createRoom(dto: CreateRoomDto) {
+    try {
+      await this.getSpecialtyById(dto.CK_MA);
+
+      return await this.prisma.pHONG.create({
+        data: {
+          CK_MA: dto.CK_MA,
+          P_TEN: dto.P_TEN.trim(),
+          P_VI_TRI: dto.P_VI_TRI?.trim() || null,
+        },
+        include: {
+          CHUYEN_KHOA: {
+            select: {
+              CK_MA: true,
+              CK_TEN: true,
+            },
+          },
+        },
+      });
+    } catch (e) {
+      mapPrismaError(e);
+    }
+  }
+
+  async updateRoom(id: number, dto: UpdateRoomDto) {
+    try {
+      await this.getRoomById(id);
+
+      if (dto.CK_MA !== undefined) {
+        await this.getSpecialtyById(dto.CK_MA);
+      }
+
+      return await this.prisma.pHONG.update({
+        where: { P_MA: id },
+        data: {
+          ...(dto.CK_MA !== undefined ? { CK_MA: dto.CK_MA } : {}),
+          ...(dto.P_TEN !== undefined ? { P_TEN: dto.P_TEN.trim() } : {}),
+          ...(dto.P_VI_TRI !== undefined ? { P_VI_TRI: dto.P_VI_TRI.trim() || null } : {}),
+        },
+        include: {
+          CHUYEN_KHOA: {
+            select: {
+              CK_MA: true,
+              CK_TEN: true,
+            },
+          },
+        },
+      });
+    } catch (e) {
+      mapPrismaError(e);
+    }
+  }
+
+  async deleteRoom(id: number) {
+    try {
+      await this.getRoomById(id);
+
+      await this.prisma.pHONG.delete({
+        where: { P_MA: id },
+      });
+
+      return { message: 'Xoa phong thanh cong' };
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2003') {
+        throw new ConflictException(
+          'Khong the xoa phong nay vi da co lich hoac du lieu lien quan. Vui long cap nhat du lieu lien quan truoc khi thu lai.',
+        );
+      }
+
+      mapPrismaError(e);
+    }
+  }
+
   async getServices(params?: {
     search?: string;
     page?: string;
@@ -694,6 +890,451 @@ export class AdminService {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2003') {
         throw new ConflictException(
           'KhĂ´ng thá»ƒ xĂ³a dá»‹ch vá»¥ vĂ¬ dá»‹ch vá»¥ nĂ y Ä‘Ă£ phĂ¡t sinh chá»‰ Ä‘á»‹nh hoáº·c káº¿t quáº£ cáº­n lĂ¢m sĂ ng trong há»“ sÆ¡ khĂ¡m. Vui lĂ²ng ngá»«ng sá»­ dá»¥ng hoáº·c cáº­p nháº­t dá»‹ch vá»¥ thay vĂ¬ xĂ³a.',
+        );
+      }
+      mapPrismaError(e);
+    }
+  }
+
+  async getMedicines(params?: {
+    search?: string;
+    page?: string;
+    limit?: string;
+    sortBy?: string;
+    sortOrder?: string;
+    groupId?: string;
+    manufacturerId?: string;
+    minPrice?: string;
+    maxPrice?: string;
+    expirationStatus?: string;
+  }) {
+    try {
+      const rawPage = Number.parseInt(params?.page || '1', 10);
+      const rawLimit = Number.parseInt(params?.limit || '10', 10);
+      const page = Number.isNaN(rawPage) ? 1 : Math.max(rawPage, 1);
+      const limit = Number.isNaN(rawLimit)
+        ? 10
+        : Math.min(Math.max(rawLimit, 1), 100);
+      const search = params?.search?.trim();
+      const sortBy: 'code' | 'price' =
+        params?.sortBy === 'price' ? 'price' : 'code';
+      const sortOrder: 'asc' | 'desc' =
+        params?.sortOrder === 'desc' ? 'desc' : 'asc';
+      const parsedGroupId = Number.parseInt(params?.groupId || '', 10);
+      const groupId =
+        Number.isNaN(parsedGroupId) || parsedGroupId <= 0
+          ? undefined
+          : parsedGroupId;
+      const parsedManufacturerId = Number.parseInt(
+        params?.manufacturerId || '',
+        10,
+      );
+      const manufacturerId =
+        Number.isNaN(parsedManufacturerId) || parsedManufacturerId <= 0
+          ? undefined
+          : parsedManufacturerId;
+      const parsedMinPrice = Number.parseFloat(params?.minPrice ?? '');
+      const parsedMaxPrice = Number.parseFloat(params?.maxPrice ?? '');
+      const minPrice =
+        Number.isFinite(parsedMinPrice) && parsedMinPrice >= 0
+          ? parsedMinPrice
+          : undefined;
+      const maxPrice =
+        Number.isFinite(parsedMaxPrice) && parsedMaxPrice >= 0
+          ? parsedMaxPrice
+          : undefined;
+      const expirationStatusRaw = params?.expirationStatus?.trim().toLowerCase();
+      const expirationStatus: 'all' | 'valid' | 'expiring' | 'expired' =
+        expirationStatusRaw === 'valid' ||
+        expirationStatusRaw === 'expiring' ||
+        expirationStatusRaw === 'expired'
+          ? expirationStatusRaw
+          : 'all';
+
+      const where: Prisma.THUOCWhereInput = {
+        OR: [{ T_DA_XOA: false }, { T_DA_XOA: null }],
+      };
+
+      if (search) {
+        where.T_TEN_THUOC = {
+          contains: search,
+          mode: 'insensitive',
+        };
+      }
+
+      if (groupId) {
+        where.NT_MA = groupId;
+      }
+
+      if (manufacturerId) {
+        where.NSX_MA = manufacturerId;
+      }
+
+      if (minPrice !== undefined || maxPrice !== undefined) {
+        where.T_GIA_THUOC = {
+          ...(minPrice !== undefined ? { gte: minPrice } : {}),
+          ...(maxPrice !== undefined ? { lte: maxPrice } : {}),
+        };
+      }
+
+      if (expirationStatus !== 'all') {
+        const now = new Date();
+        const today = new Date(
+          Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+        );
+        const sevenDaysLater = new Date(today);
+        sevenDaysLater.setUTCDate(today.getUTCDate() + 7);
+
+        if (expirationStatus === 'expired') {
+          where.T_HAN_SU_DUNG = { lt: today };
+        } else if (expirationStatus === 'expiring') {
+          where.T_HAN_SU_DUNG = { gte: today, lte: sevenDaysLater };
+        } else {
+          where.T_HAN_SU_DUNG = { gt: sevenDaysLater };
+        }
+      }
+
+      const orderBy: Prisma.THUOCOrderByWithRelationInput[] =
+        sortBy === 'price'
+          ? [{ T_GIA_THUOC: sortOrder }, { T_MA: 'asc' }]
+          : [{ T_MA: sortOrder }];
+
+      const [total, items] = await this.prisma.$transaction([
+        this.prisma.tHUOC.count({ where }),
+        this.prisma.tHUOC.findMany({
+          where,
+          orderBy,
+          skip: (page - 1) * limit,
+          take: limit,
+          include: {
+            NHOM_THUOC: {
+              select: {
+                NT_MA: true,
+                NT_TEN: true,
+              },
+            },
+            NHA_SAN_XUAT: {
+              select: {
+                NSX_MA: true,
+                NSX_TEN: true,
+              },
+            },
+            DON_VI_TINH: {
+              select: {
+                DVT_MA: true,
+                DVT_TEN: true,
+              },
+            },
+            BIET_DUOC: {
+              select: {
+                BD_MA: true,
+                BD_TEN: true,
+              },
+            },
+          },
+        }),
+      ]);
+
+      const totalPages = Math.max(1, Math.ceil(total / limit));
+
+      return {
+        items,
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages,
+          sortBy,
+          sortOrder,
+          search: search || '',
+          groupId: groupId ?? null,
+          manufacturerId: manufacturerId ?? null,
+          minPrice: minPrice ?? null,
+          maxPrice: maxPrice ?? null,
+          expirationStatus,
+        },
+      };
+    } catch (e) {
+      mapPrismaError(e);
+    }
+  }
+
+  async getMedicineFilterOptions() {
+    try {
+      const [groups, manufacturers, units, brands] = await this.prisma.$transaction([
+        this.prisma.nHOM_THUOC.findMany({
+          select: {
+            NT_MA: true,
+            NT_TEN: true,
+          },
+          orderBy: {
+            NT_TEN: 'asc',
+          },
+        }),
+        this.prisma.nHA_SAN_XUAT.findMany({
+          select: {
+            NSX_MA: true,
+            NSX_TEN: true,
+          },
+          orderBy: {
+            NSX_TEN: 'asc',
+          },
+        }),
+        this.prisma.dON_VI_TINH.findMany({
+          select: {
+            DVT_MA: true,
+            DVT_TEN: true,
+          },
+          orderBy: {
+            DVT_TEN: 'asc',
+          },
+        }),
+        this.prisma.bIET_DUOC.findMany({
+          select: {
+            BD_MA: true,
+            BD_TEN: true,
+          },
+          orderBy: {
+            BD_TEN: 'asc',
+          },
+        }),
+      ]);
+
+      return {
+        groups,
+        manufacturers,
+        units,
+        brands,
+      };
+    } catch (e) {
+      mapPrismaError(e);
+    }
+  }
+
+  async getMedicineById(id: number) {
+    try {
+      const medicine = await this.prisma.tHUOC.findFirst({
+        where: {
+          T_MA: id,
+          OR: [{ T_DA_XOA: false }, { T_DA_XOA: null }],
+        },
+        include: {
+          NHOM_THUOC: {
+            select: {
+              NT_MA: true,
+              NT_TEN: true,
+            },
+          },
+          NHA_SAN_XUAT: {
+            select: {
+              NSX_MA: true,
+              NSX_TEN: true,
+            },
+          },
+          DON_VI_TINH: {
+            select: {
+              DVT_MA: true,
+              DVT_TEN: true,
+            },
+          },
+          BIET_DUOC: {
+            select: {
+              BD_MA: true,
+              BD_TEN: true,
+              BD_CONG_DUNG: true,
+              BD_HAM_LUONG: true,
+              BD_LIEU_DUNG: true,
+            },
+          },
+        },
+      });
+
+      if (!medicine) {
+        throw new NotFoundException('Khong tim thay thuoc');
+      }
+
+      return medicine;
+    } catch (e) {
+      mapPrismaError(e);
+    }
+  }
+
+  async createMedicine(dto: CreateMedicineDto) {
+    try {
+      return await this.prisma.tHUOC.create({
+        data: {
+          T_TEN_THUOC: dto.T_TEN_THUOC.trim(),
+          BD_MA: dto.BD_MA ?? null,
+          DVT_MA: dto.DVT_MA ?? null,
+          NT_MA: dto.NT_MA ?? null,
+          NSX_MA: dto.NSX_MA ?? null,
+          T_GIA_THUOC: dto.T_GIA_THUOC ?? 0,
+          T_HAN_SU_DUNG: dto.T_HAN_SU_DUNG
+            ? this.parseDateOnlyOrThrow(dto.T_HAN_SU_DUNG)
+            : null,
+          T_DA_XOA: false,
+        },
+        include: {
+          NHOM_THUOC: {
+            select: {
+              NT_MA: true,
+              NT_TEN: true,
+            },
+          },
+          NHA_SAN_XUAT: {
+            select: {
+              NSX_MA: true,
+              NSX_TEN: true,
+            },
+          },
+          DON_VI_TINH: {
+            select: {
+              DVT_MA: true,
+              DVT_TEN: true,
+            },
+          },
+          BIET_DUOC: {
+            select: {
+              BD_MA: true,
+              BD_TEN: true,
+              BD_CONG_DUNG: true,
+              BD_HAM_LUONG: true,
+              BD_LIEU_DUNG: true,
+            },
+          },
+        },
+      });
+    } catch (e) {
+      mapPrismaError(e);
+    }
+  }
+
+  async updateMedicine(id: number, dto: UpdateMedicineDto) {
+    try {
+      await this.getMedicineById(id);
+      return await this.prisma.tHUOC.update({
+        where: { T_MA: id },
+        data: {
+          ...(dto.T_TEN_THUOC !== undefined
+            ? { T_TEN_THUOC: dto.T_TEN_THUOC.trim() }
+            : {}),
+          ...(dto.BD_MA !== undefined ? { BD_MA: dto.BD_MA ?? null } : {}),
+          ...(dto.DVT_MA !== undefined ? { DVT_MA: dto.DVT_MA ?? null } : {}),
+          ...(dto.NT_MA !== undefined ? { NT_MA: dto.NT_MA ?? null } : {}),
+          ...(dto.NSX_MA !== undefined ? { NSX_MA: dto.NSX_MA ?? null } : {}),
+          ...(dto.T_GIA_THUOC !== undefined
+            ? { T_GIA_THUOC: dto.T_GIA_THUOC }
+            : {}),
+          ...(dto.T_HAN_SU_DUNG !== undefined
+            ? {
+                T_HAN_SU_DUNG: dto.T_HAN_SU_DUNG
+                  ? this.parseDateOnlyOrThrow(dto.T_HAN_SU_DUNG)
+                  : null,
+              }
+            : {}),
+        },
+        include: {
+          NHOM_THUOC: {
+            select: {
+              NT_MA: true,
+              NT_TEN: true,
+            },
+          },
+          NHA_SAN_XUAT: {
+            select: {
+              NSX_MA: true,
+              NSX_TEN: true,
+            },
+          },
+          DON_VI_TINH: {
+            select: {
+              DVT_MA: true,
+              DVT_TEN: true,
+            },
+          },
+          BIET_DUOC: {
+            select: {
+              BD_MA: true,
+              BD_TEN: true,
+              BD_CONG_DUNG: true,
+              BD_HAM_LUONG: true,
+              BD_LIEU_DUNG: true,
+            },
+          },
+        },
+      });
+    } catch (e) {
+      mapPrismaError(e);
+    }
+  }
+
+  async updateMedicineBrandInfo(id: number, dto: UpdateMedicineBrandInfoDto) {
+    try {
+      const medicine = await this.getMedicineById(id);
+      const brandName = dto.BD_TEN?.trim();
+      if (dto.BD_TEN !== undefined && !brandName) {
+        throw new BadRequestException('Ten biet duoc khong duoc de trong.');
+      }
+      const brandData = {
+        ...(dto.BD_TEN !== undefined ? { BD_TEN: brandName } : {}),
+        ...(dto.BD_CONG_DUNG !== undefined
+          ? { BD_CONG_DUNG: dto.BD_CONG_DUNG.trim() || null }
+          : {}),
+        ...(dto.BD_HAM_LUONG !== undefined
+          ? { BD_HAM_LUONG: dto.BD_HAM_LUONG.trim() || null }
+          : {}),
+        ...(dto.BD_LIEU_DUNG !== undefined
+          ? { BD_LIEU_DUNG: dto.BD_LIEU_DUNG.trim() || null }
+          : {}),
+      };
+
+      if (medicine.BD_MA) {
+        await this.prisma.bIET_DUOC.update({
+          where: { BD_MA: medicine.BD_MA },
+          data: brandData,
+        });
+        return this.getMedicineById(id);
+      }
+
+      if (!brandName) {
+        throw new BadRequestException(
+          'Thuoc chua co biet duoc. Vui long nhap ten biet duoc de tao moi.',
+        );
+      }
+
+      const createdBrand = await this.prisma.bIET_DUOC.create({
+        data: {
+          BD_TEN: brandName,
+          BD_CONG_DUNG: dto.BD_CONG_DUNG?.trim() || null,
+          BD_HAM_LUONG: dto.BD_HAM_LUONG?.trim() || null,
+          BD_LIEU_DUNG: dto.BD_LIEU_DUNG?.trim() || null,
+        },
+      });
+
+      await this.prisma.tHUOC.update({
+        where: { T_MA: id },
+        data: {
+          BD_MA: createdBrand.BD_MA,
+        },
+      });
+
+      return this.getMedicineById(id);
+    } catch (e) {
+      mapPrismaError(e);
+    }
+  }
+
+  async deleteMedicine(id: number) {
+    try {
+      await this.getMedicineById(id);
+      await this.prisma.tHUOC.delete({
+        where: { T_MA: id },
+      });
+      return { message: 'Xoa thuoc thanh cong' };
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2003') {
+        throw new ConflictException(
+          'Khong the xoa thuoc nay vi da co trong don thuoc hoac du lieu lien quan.',
         );
       }
       mapPrismaError(e);
@@ -2027,6 +2668,357 @@ export class AdminService {
         hasAnyAvailableSession: availableSessions.length > 0,
       };
     } catch (e) {
+      mapPrismaError(e);
+    }
+  }
+
+  async getDoctorScheduleCycleOverview(BS_MA: number) {
+    const doctor = await this.getDoctorScheduleOwnerOrThrow(BS_MA);
+    const nextWeekStartIso = this.toDateOnlyIso(this.getNextWeekMondayFromNow());
+    const overview = await this.getScheduleCycleOverview(nextWeekStartIso);
+
+    return {
+      ...overview,
+      doctor: {
+        BS_MA: doctor.BS_MA,
+        BS_HO_TEN: doctor.BS_HO_TEN,
+        CK_MA: doctor.CK_MA,
+        CHUYEN_KHOA: doctor.CHUYEN_KHOA,
+      },
+      canRegister: overview.status === 'open',
+      canManageRegistrations: overview.status === 'open',
+    };
+  }
+
+  async getDoctorScheduleRegistrationOptions(BS_MA: number) {
+    const doctor = await this.getDoctorScheduleOwnerOrThrow(BS_MA);
+    const nextWeekMonday = this.getNextWeekMondayFromNow();
+    const { saturdayEnd } = this.resolveWeekRange(this.toDateOnlyIso(nextWeekMonday));
+
+    const [rooms, sessionRows] = await this.prisma.$transaction([
+      this.prisma.pHONG.findMany({
+        where: { CK_MA: doctor.CK_MA },
+        select: {
+          P_MA: true,
+          P_TEN: true,
+          CK_MA: true,
+          CHUYEN_KHOA: { select: { CK_TEN: true } },
+        },
+        orderBy: { P_TEN: 'asc' },
+      }),
+      this.prisma.bUOI.findMany({
+        select: { B_TEN: true, B_GIO_BAT_DAU: true, B_GIO_KET_THUC: true },
+        orderBy: { B_GIO_BAT_DAU: 'asc' },
+      }),
+    ]);
+
+    const sessions = sessionRows.filter((session) =>
+      this.isDoctorFacingSession(session.B_TEN),
+    );
+
+    const allowedDates: Array<{ date: string; weekday: number }> = [];
+    const cursor = new Date(nextWeekMonday);
+    cursor.setUTCHours(0, 0, 0, 0);
+    while (cursor <= saturdayEnd) {
+      allowedDates.push({
+        date: this.toDateOnlyIso(cursor),
+        weekday: this.getWeekdayFromDate(cursor),
+      });
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+
+    return {
+      weekStartDate: this.toDateOnlyIso(nextWeekMonday),
+      weekEndDate: this.toDateOnlyIso(saturdayEnd),
+      doctor: {
+        BS_MA: doctor.BS_MA,
+        BS_HO_TEN: doctor.BS_HO_TEN,
+        CK_MA: doctor.CK_MA,
+        CHUYEN_KHOA: doctor.CHUYEN_KHOA,
+      },
+      rooms,
+      sessions,
+      allowedDates,
+    };
+  }
+
+  async getDoctorScheduleRegistrations(BS_MA: number, weekStartRaw?: string) {
+    await this.getDoctorScheduleOwnerOrThrow(BS_MA);
+    const weekStart = weekStartRaw?.trim() || this.toDateOnlyIso(this.getNextWeekMondayFromNow());
+    return this.getScheduleRegistrations({
+      weekStart,
+      doctorId: String(BS_MA),
+      page: '1',
+      limit: '200',
+    });
+  }
+
+  async getDoctorOfficialSchedules(BS_MA: number, weekStartRaw?: string) {
+    await this.getDoctorScheduleOwnerOrThrow(BS_MA);
+    const weekStart = weekStartRaw?.trim() || this.toDateOnlyIso(this.getNextWeekMondayFromNow());
+    return this.getOfficialSchedules({
+      weekStart,
+      doctorId: String(BS_MA),
+      page: '1',
+      limit: '200',
+    });
+  }
+
+  async getDoctorRegistrationDayContext(
+    BS_MA: number,
+    params?: {
+      date?: string;
+      roomId?: string;
+      excludeDate?: string;
+      excludeSession?: string;
+    },
+  ) {
+    await this.getDoctorScheduleOwnerOrThrow(BS_MA);
+    if (!params?.date?.trim()) {
+      throw new BadRequestException('Vui lòng chọn ngày đăng ký.');
+    }
+
+    const targetDate = this.parseDateOnlyOrThrow(params.date.trim());
+    this.assertDoctorTargetsNextWeek(targetDate, 'xem ngữ cảnh đăng ký lịch trực');
+
+    const context = await this.getOfficialShiftFormContext({
+      date: this.toDateOnlyIso(targetDate),
+      roomId: params.roomId,
+      doctorId: String(BS_MA),
+      excludeBsMa:
+        params.excludeDate?.trim() && params.excludeSession?.trim()
+          ? String(BS_MA)
+          : undefined,
+      excludeDate: params.excludeDate,
+      excludeSession: params.excludeSession,
+    });
+
+    const filteredSessionContext = context.sessionContext.filter((item) =>
+      this.isDoctorFacingSession(item.session),
+    );
+    const availableSessions = context.availableSessions.filter((session) =>
+      this.isDoctorFacingSession(session),
+    );
+
+    return {
+      ...context,
+      sessionContext: filteredSessionContext,
+      availableSessions,
+      hasAnyAvailableSession: availableSessions.length > 0,
+    };
+  }
+
+  async createDoctorRegistration(BS_MA: number, payload: {
+    N_NGAY: string;
+    B_TEN: string;
+    P_MA: number;
+    LBSK_GHI_CHU?: string;
+  }) {
+    try {
+      await this.getDoctorScheduleOwnerOrThrow(BS_MA);
+      const targetDate = this.parseDateOnlyOrThrow(payload.N_NGAY);
+      const targetWeekStartIso = this.assertDoctorRegistrationWindowForDate(
+        targetDate,
+        'đăng ký lịch trực',
+      );
+
+      await this.ensureWeekNotFinalized(targetWeekStartIso);
+      await this.ensureScheduleDateExists(targetDate);
+      await this.validateDoctorRoomSpecialty(BS_MA, payload.P_MA);
+
+      return await this.prisma.lICH_BSK.create({
+        data: {
+          BS_MA,
+          P_MA: payload.P_MA,
+          N_NGAY: targetDate,
+          B_TEN: payload.B_TEN,
+          LBSK_TRANGTHAI_DUYET: 'pending',
+          LBSK_GHI_CHU: payload.LBSK_GHI_CHU?.trim() || null,
+          LBSK_DUYET_BOI: null,
+          LBSK_DUYET_LUC: null,
+        },
+      });
+    } catch (e) {
+      if (this.isMissingScheduleApprovalColumnsError(e)) {
+        const targetDate = this.parseDateOnlyOrThrow(payload.N_NGAY);
+        await this.ensureScheduleDateExists(targetDate);
+        return this.prisma.lICH_BSK.create({
+          data: {
+            BS_MA,
+            P_MA: payload.P_MA,
+            N_NGAY: targetDate,
+            B_TEN: payload.B_TEN,
+            LBSK_GHI_CHU: this.buildLegacyScheduleStatusNote(
+              'pending',
+              payload.LBSK_GHI_CHU,
+            ),
+          },
+        });
+      }
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        throw new ConflictException(
+          'Trùng lịch trực: bác sĩ hoặc phòng đã có lịch trong cùng ngày và buổi.',
+        );
+      }
+      mapPrismaError(e);
+    }
+  }
+
+  async updateDoctorRegistration(
+    BS_MA: number,
+    N_NGAY: string,
+    B_TEN: string,
+    payload: {
+      N_NGAY: string;
+      B_TEN: string;
+      P_MA: number;
+      LBSK_GHI_CHU?: string;
+    },
+  ) {
+    try {
+      await this.getDoctorScheduleOwnerOrThrow(BS_MA);
+      const currentDate = this.parseDateOnlyOrThrow(N_NGAY);
+      const nextDate = this.parseDateOnlyOrThrow(payload.N_NGAY);
+
+      this.assertDoctorRegistrationWindowForDate(
+        currentDate,
+        'cập nhật đăng ký lịch trực',
+      );
+      const nextWeekStartIso = this.assertDoctorRegistrationWindowForDate(
+        nextDate,
+        'cập nhật đăng ký lịch trực',
+      );
+
+      await this.ensureWeekNotFinalized(nextWeekStartIso);
+
+      const existing = await this.prisma.lICH_BSK.findUnique({
+        where: { BS_MA_N_NGAY_B_TEN: { BS_MA, N_NGAY: currentDate, B_TEN } },
+      });
+      if (!existing) {
+        throw new NotFoundException('Không tìm thấy đăng ký lịch trực cần cập nhật.');
+      }
+      if (existing.LBSK_DUYET_BOI === 'ADMIN_MANUAL') {
+        throw new ConflictException(
+          'Ca trực này là lịch chính thức, bác sĩ không thể tự chỉnh sửa.',
+        );
+      }
+
+      await this.ensureScheduleDateExists(nextDate);
+      await this.validateDoctorRoomSpecialty(BS_MA, payload.P_MA);
+
+      return await this.prisma.lICH_BSK.update({
+        where: { BS_MA_N_NGAY_B_TEN: { BS_MA, N_NGAY: currentDate, B_TEN } },
+        data: {
+          P_MA: payload.P_MA,
+          N_NGAY: nextDate,
+          B_TEN: payload.B_TEN,
+          LBSK_TRANGTHAI_DUYET: 'pending',
+          LBSK_GHI_CHU: payload.LBSK_GHI_CHU?.trim() || null,
+          LBSK_DUYET_BOI: null,
+          LBSK_DUYET_LUC: null,
+        },
+      });
+    } catch (e) {
+      if (this.isMissingScheduleApprovalColumnsError(e)) {
+        const currentDate = this.parseDateOnlyOrThrow(N_NGAY);
+        const nextDate = this.parseDateOnlyOrThrow(payload.N_NGAY);
+        const existingLegacy = await this.prisma.lICH_BSK.findUnique({
+          where: { BS_MA_N_NGAY_B_TEN: { BS_MA, N_NGAY: currentDate, B_TEN } },
+          select: {
+            LBSK_GHI_CHU: true,
+          },
+        });
+        if (!existingLegacy) {
+          throw new NotFoundException('Không tìm thấy đăng ký lịch trực cần cập nhật.');
+        }
+        const parsed = this.parseLegacyScheduleStatus(existingLegacy.LBSK_GHI_CHU);
+        if (parsed.status === 'official') {
+          throw new ConflictException(
+            'Ca trực này là lịch chính thức, bác sĩ không thể tự chỉnh sửa.',
+          );
+        }
+        return this.prisma.lICH_BSK.update({
+          where: { BS_MA_N_NGAY_B_TEN: { BS_MA, N_NGAY: currentDate, B_TEN } },
+          data: {
+            P_MA: payload.P_MA,
+            N_NGAY: nextDate,
+            B_TEN: payload.B_TEN,
+            LBSK_GHI_CHU: this.buildLegacyScheduleStatusNote(
+              'pending',
+              payload.LBSK_GHI_CHU,
+            ),
+          },
+        });
+      }
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        throw new ConflictException(
+          'Trùng lịch trực: bác sĩ hoặc phòng đã có lịch trong cùng ngày và buổi.',
+        );
+      }
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2003') {
+        throw new ConflictException(
+          'Không thể cập nhật đăng ký này vì đã có dữ liệu liên quan.',
+        );
+      }
+      mapPrismaError(e);
+    }
+  }
+
+  async cancelDoctorRegistration(BS_MA: number, N_NGAY: string, B_TEN: string) {
+    try {
+      await this.getDoctorScheduleOwnerOrThrow(BS_MA);
+      const currentDate = this.parseDateOnlyOrThrow(N_NGAY);
+      const targetWeekStartIso = this.assertDoctorRegistrationWindowForDate(
+        currentDate,
+        'hủy đăng ký lịch trực',
+      );
+      await this.ensureWeekNotFinalized(targetWeekStartIso);
+
+      const existing = await this.prisma.lICH_BSK.findUnique({
+        where: { BS_MA_N_NGAY_B_TEN: { BS_MA, N_NGAY: currentDate, B_TEN } },
+      });
+      if (!existing) {
+        throw new NotFoundException('Không tìm thấy đăng ký lịch trực cần hủy.');
+      }
+      if (existing.LBSK_DUYET_BOI === 'ADMIN_MANUAL') {
+        throw new ConflictException(
+          'Ca trực này là lịch chính thức, bác sĩ không thể tự hủy.',
+        );
+      }
+
+      await this.prisma.lICH_BSK.delete({
+        where: { BS_MA_N_NGAY_B_TEN: { BS_MA, N_NGAY: currentDate, B_TEN } },
+      });
+      return { message: 'Hủy đăng ký lịch trực thành công' };
+    } catch (e) {
+      if (this.isMissingScheduleApprovalColumnsError(e)) {
+        const currentDate = this.parseDateOnlyOrThrow(N_NGAY);
+        const existingLegacy = await this.prisma.lICH_BSK.findUnique({
+          where: { BS_MA_N_NGAY_B_TEN: { BS_MA, N_NGAY: currentDate, B_TEN } },
+          select: {
+            LBSK_GHI_CHU: true,
+          },
+        });
+        if (!existingLegacy) {
+          throw new NotFoundException('Không tìm thấy đăng ký lịch trực cần hủy.');
+        }
+        const parsed = this.parseLegacyScheduleStatus(existingLegacy.LBSK_GHI_CHU);
+        if (parsed.status === 'official') {
+          throw new ConflictException(
+            'Ca trực này là lịch chính thức, bác sĩ không thể tự hủy.',
+          );
+        }
+
+        await this.prisma.lICH_BSK.delete({
+          where: { BS_MA_N_NGAY_B_TEN: { BS_MA, N_NGAY: currentDate, B_TEN } },
+        });
+        return { message: 'Hủy đăng ký lịch trực thành công' };
+      }
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2003') {
+        throw new ConflictException(
+          'Không thể hủy đăng ký này vì đã có dữ liệu liên quan.',
+        );
+      }
       mapPrismaError(e);
     }
   }
@@ -3626,6 +4618,66 @@ export class AdminService {
       VALUES (${dateOnly})
       ON CONFLICT ("N_NGAY") DO NOTHING
     `);
+  }
+
+  private async getDoctorScheduleOwnerOrThrow(BS_MA: number) {
+    const doctor = await this.prisma.bAC_SI.findUnique({
+      where: { BS_MA },
+      select: {
+        BS_MA: true,
+        BS_HO_TEN: true,
+        CK_MA: true,
+        BS_DA_XOA: true,
+        CHUYEN_KHOA: { select: { CK_TEN: true } },
+      },
+    });
+
+    if (!doctor || doctor.BS_DA_XOA) {
+      throw new NotFoundException('Không tìm thấy bác sĩ hợp lệ');
+    }
+
+    return doctor;
+  }
+
+  private isDoctorFacingSession(session: string) {
+    const normalized = session.trim().toUpperCase();
+    return normalized === 'SANG' || normalized === 'CHIEU';
+  }
+
+  private assertDoctorTargetsNextWeek(targetDate: Date, action: string) {
+    const nextWeekMonday = this.getNextWeekMondayFromNow();
+    const { saturdayEnd } = this.resolveWeekRange(this.toDateOnlyIso(nextWeekMonday));
+    const day = targetDate.getUTCDay();
+
+    if (day < 1 || day > 6) {
+      throw new BadRequestException(
+        'Bác sĩ chỉ được thao tác lịch trực từ thứ 2 đến thứ 7.',
+      );
+    }
+
+    if (targetDate < nextWeekMonday || targetDate > saturdayEnd) {
+      throw new ForbiddenException(
+        `Chỉ được ${action} cho tuần kế tiếp từ ${this.toDateOnlyIso(nextWeekMonday)} đến ${this.toDateOnlyIso(saturdayEnd)}.`,
+      );
+    }
+
+    return this.toDateOnlyIso(nextWeekMonday);
+  }
+
+  private assertDoctorRegistrationWindowForDate(targetDate: Date, action: string) {
+    const weekStartIso = this.assertDoctorTargetsNextWeek(targetDate, action);
+    const nextWeekMonday = this.parseDateOnlyOrThrow(weekStartIso);
+    const registrationCloseAt = new Date(nextWeekMonday);
+    registrationCloseAt.setUTCDate(nextWeekMonday.getUTCDate() - 2);
+    registrationCloseAt.setUTCHours(23, 59, 59, 999);
+
+    if (new Date() > registrationCloseAt) {
+      throw new ForbiddenException(
+        'Đăng ký lịch trực đã bị khóa sau hết ngày thứ 7. Vui lòng chờ admin chốt lịch.',
+      );
+    }
+
+    return weekStartIso;
   }
 
   private isRawUniqueViolation(e: Prisma.PrismaClientKnownRequestError) {

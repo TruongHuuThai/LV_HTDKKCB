@@ -1,18 +1,29 @@
-import { IsDateString, IsNotEmpty, IsNumber, IsString } from 'class-validator';
+import {
+  IsDateString,
+  IsIn,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 
 export class RegisterScheduleDto {
-    @IsDateString({}, { message: 'Ngày không hợp lệ (định dạng YYYY-MM-DD)' })
-    @IsNotEmpty({ message: 'Ngày không được để trống' })
-    N_NGAY: string; // YYYY-MM-DD
+  @IsDateString({}, { message: 'Ngay khong hop le (dinh dang YYYY-MM-DD)' })
+  @IsNotEmpty({ message: 'Ngay khong duoc de trong' })
+  N_NGAY: string;
 
-    @IsString({ message: 'Tên buổi phải là chuỗi' })
-    @IsNotEmpty({ message: 'Tên buổi không được để trống' })
-    B_TEN: string; // SANG, CHIEU, TOI
+  @IsString({ message: 'Ten buoi phai la chuoi' })
+  @IsNotEmpty({ message: 'Ten buoi khong duoc de trong' })
+  @IsIn(['SANG', 'CHIEU'], {
+    message: 'Bac si chi duoc dang ky buoi Sang hoac Chieu',
+  })
+  B_TEN: string;
 
-    @IsNumber({}, { message: 'Phòng phải là số' })
-    @IsNotEmpty({ message: 'Phòng không được để trống' })
-    P_MA: number;
+  @IsNumber({}, { message: 'Phong phai la so' })
+  @IsNotEmpty({ message: 'Phong khong duoc de trong' })
+  P_MA: number;
 
-    @IsString()
-    LBSK_GHI_CHU?: string;
+  @IsOptional()
+  @IsString()
+  LBSK_GHI_CHU?: string;
 }

@@ -42,6 +42,7 @@ import ContactPage from '@/pages/contact/ContactPage';
 
 // Pages – Doctor
 import DoctorDashboardPage from '@/pages/DoctorDashboardPage';
+import DoctorSchedulePage from '@/pages/doctor/DoctorSchedulePage';
 
 // Pages – Auth
 import LoginPage from '@/pages/auth/LoginPage';
@@ -97,7 +98,8 @@ const router = createBrowserRouter([
                 element: <DoctorLayout />,
                 children: [
                     { path: '/doctor/dashboard', element: <DoctorDashboardPage /> },
-                    // Future: /doctor/schedules, /doctor/appointments, /doctor/profile
+                    { path: '/doctor/schedules', element: <DoctorSchedulePage /> },
+                    // Future: /doctor/appointments, /doctor/profile
                 ],
             },
         ],

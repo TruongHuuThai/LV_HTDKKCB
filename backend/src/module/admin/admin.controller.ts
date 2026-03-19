@@ -23,14 +23,19 @@ import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 import { CreateAccountDto } from './dto/create-account.dto';
 import { UpdateAccountDto } from './dto/update-account.dto';
-// Note: Assuming you have a JwtAuthGuard and RolesGuard setup for admin
-// import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-// import { RolesGuard } from '../auth/guards/roles.guard';
-// import { Roles } from '../auth/decorators/roles.decorator';
+import { CreateMedicineDto } from './dto/create-medicine.dto';
+import { UpdateMedicineDto } from './dto/update-medicine.dto';
+import { UpdateMedicineBrandInfoDto } from './dto/update-medicine-brand-info.dto';
+import { CreateRoomDto } from './dto/create-room.dto';
+import { UpdateRoomDto } from './dto/update-room.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+import { ROLE } from '../auth/auth.constants';
 
 @Controller('admin')
-// @UseGuards(JwtAuthGuard, RolesGuard)
-// @Roles('ADMIN') // Requires an admin role - adjust based on your actual auth setup
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(ROLE.ADMIN)
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
@@ -122,6 +127,53 @@ export class AdminController {
     return this.adminService.deleteSpecialty(id);
   }
 
+  @Get('rooms')
+  @HttpCode(HttpStatus.OK)
+  async getRooms(
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: string,
+    @Query('specialtyId') specialtyId?: string,
+  ) {
+    return this.adminService.getRooms({
+      search,
+      page,
+      limit,
+      sortBy,
+      sortOrder,
+      specialtyId,
+    });
+  }
+
+  @Get('rooms/:id')
+  @HttpCode(HttpStatus.OK)
+  async getRoomById(@Param('id', ParseIntPipe) id: number) {
+    return this.adminService.getRoomById(id);
+  }
+
+  @Post('rooms')
+  @HttpCode(HttpStatus.CREATED)
+  async createRoom(@Body() dto: CreateRoomDto) {
+    return this.adminService.createRoom(dto);
+  }
+
+  @Put('rooms/:id')
+  @HttpCode(HttpStatus.OK)
+  async updateRoom(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateRoomDto,
+  ) {
+    return this.adminService.updateRoom(id, dto);
+  }
+
+  @Delete('rooms/:id')
+  @HttpCode(HttpStatus.OK)
+  async deleteRoom(@Param('id', ParseIntPipe) id: number) {
+    return this.adminService.deleteRoom(id);
+  }
+
   @Get('services')
   @HttpCode(HttpStatus.OK)
   async getServices(
@@ -171,6 +223,76 @@ export class AdminController {
   @HttpCode(HttpStatus.OK)
   async deleteService(@Param('id', ParseIntPipe) id: number) {
     return this.adminService.deleteService(id);
+  }
+
+  @Get('medicines')
+  @HttpCode(HttpStatus.OK)
+  async getMedicines(
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: string,
+    @Query('groupId') groupId?: string,
+    @Query('manufacturerId') manufacturerId?: string,
+    @Query('minPrice') minPrice?: string,
+    @Query('maxPrice') maxPrice?: string,
+    @Query('expirationStatus') expirationStatus?: string,
+  ) {
+    return this.adminService.getMedicines({
+      search,
+      page,
+      limit,
+      sortBy,
+      sortOrder,
+      groupId,
+      manufacturerId,
+      minPrice,
+      maxPrice,
+      expirationStatus,
+    });
+  }
+
+  @Get('medicines/filter-options')
+  @HttpCode(HttpStatus.OK)
+  async getMedicineFilterOptions() {
+    return this.adminService.getMedicineFilterOptions();
+  }
+
+  @Get('medicines/:id')
+  @HttpCode(HttpStatus.OK)
+  async getMedicineById(@Param('id', ParseIntPipe) id: number) {
+    return this.adminService.getMedicineById(id);
+  }
+
+  @Post('medicines')
+  @HttpCode(HttpStatus.CREATED)
+  async createMedicine(@Body() dto: CreateMedicineDto) {
+    return this.adminService.createMedicine(dto);
+  }
+
+  @Put('medicines/:id')
+  @HttpCode(HttpStatus.OK)
+  async updateMedicine(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateMedicineDto,
+  ) {
+    return this.adminService.updateMedicine(id, dto);
+  }
+
+  @Put('medicines/:id/brand-info')
+  @HttpCode(HttpStatus.OK)
+  async updateMedicineBrandInfo(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateMedicineBrandInfoDto,
+  ) {
+    return this.adminService.updateMedicineBrandInfo(id, dto);
+  }
+
+  @Delete('medicines/:id')
+  @HttpCode(HttpStatus.OK)
+  async deleteMedicine(@Param('id', ParseIntPipe) id: number) {
+    return this.adminService.deleteMedicine(id);
   }
 
   @Get('doctors')

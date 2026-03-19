@@ -19,6 +19,7 @@ import {
     UserCircle,
     PackageSearch,
     CalendarClock,
+    Pill,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { authService } from '@/services/authService';
@@ -43,6 +44,7 @@ const sidebarGroups = [
         title: 'Quản lý Web',
         items: [
             { label: 'Dịch vụ', to: '/admin/services', icon: PackageSearch },
+            { label: 'Thuốc', to: '/admin/medicines', icon: Pill },
             { label: 'Chuyên khoa', to: '/admin/specialties', icon: BookOpen },
             { label: 'Đội ngũ Bác sĩ', to: '/admin/doctors', icon: Stethoscope },
             { label: 'Tin tức & Hướng dẫn', to: '/admin/news', icon: FileText },
@@ -71,6 +73,7 @@ export default function AdminLayout() {
     const navigate = useNavigate();
     const location = useLocation();
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const adminDisplayName = user?.TEN_HIEN_THI?.trim() || user?.TK_SDT || 'Quản trị hệ thống';
 
     const handleLogout = async () => {
         try {
@@ -182,7 +185,7 @@ export default function AdminLayout() {
                                 </div>
                                 <div className="hidden md:block text-left">
                                     <p className="text-sm font-medium text-gray-700 leading-tight">
-                                        {user?.TK_SDT ?? 'Admin'}
+                                        {adminDisplayName}
                                     </p>
                                     <p className="text-xs text-gray-500">Quản trị viên</p>
                                 </div>

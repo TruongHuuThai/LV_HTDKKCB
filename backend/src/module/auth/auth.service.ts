@@ -17,6 +17,32 @@ export class AuthService {
     private readonly jwt: JwtService,
   ) { }
 
+  private buildAuthUser(acc: Awaited<ReturnType<AuthRepository['findAccountByPhone']>>) {
+    const bsMa = acc?.BAC_SI?.BS_MA ?? null;
+    const bnMa = acc?.BENH_NHAN?.[0]?.BN_MA ?? null;
+    const doctorName = acc?.BAC_SI?.BS_HO_TEN?.trim() || null;
+    const patientName =
+      `${acc?.BENH_NHAN?.[0]?.BN_HO_CHU_LOT || ''} ${acc?.BENH_NHAN?.[0]?.BN_TEN || ''}`.trim() || null;
+    const displayName =
+      acc?.TK_VAI_TRO === ROLE.BAC_SI
+        ? doctorName
+        : acc?.TK_VAI_TRO === ROLE.BENH_NHAN
+          ? patientName
+          : acc?.TK_VAI_TRO === ROLE.ADMIN
+            ? 'Quản trị hệ thống'
+            : null;
+
+    return {
+      TK_SDT: acc?.TK_SDT ?? '',
+      TK_VAI_TRO: acc?.TK_VAI_TRO ?? null,
+      BS_MA: bsMa,
+      BN_MA: bnMa,
+      TEN_HIEN_THI: displayName,
+      BS_HO_TEN: doctorName,
+      BN_HO_TEN: patientName,
+    };
+  }
+
   async login(TK_SDT: string, TK_PASS: string) {
     const acc = await this.repo.findAccountByPhone(TK_SDT);
 
@@ -31,8 +57,15 @@ export class AuthService {
       : TK_PASS === acc.TK_PASS;
     if (!ok) throw new UnauthorizedException('Sai tài khoản hoặc mật khẩu');
 
+    const authUser = this.buildAuthUser(acc);
+
     const token = await this.jwt.signAsync(
-      { sub: acc.TK_SDT, role: acc.TK_VAI_TRO ?? undefined } as any,
+      {
+        sub: acc.TK_SDT,
+        role: acc.TK_VAI_TRO ?? undefined,
+        bsMa: authUser.BS_MA,
+        bnMa: authUser.BN_MA,
+      } as any,
       { expiresIn: process.env.JWT_EXPIRES_IN ?? '7d' } as any,
     );
 
@@ -47,12 +80,7 @@ export class AuthService {
     return {
       access_token: token,
       refresh_token: raw,
-      user: {
-        TK_SDT: acc.TK_SDT,
-        TK_VAI_TRO: acc.TK_VAI_TRO,
-        BS_MA: acc.BAC_SI?.BS_MA ?? null,
-        BN_MA: acc.BENH_NHAN?.[0]?.BN_MA ?? null,
-      },
+      user: authUser,
     };
   }
 
@@ -60,12 +88,7 @@ export class AuthService {
     const acc = await this.repo.findAccountByPhone(TK_SDT);
     if (!acc || acc.TK_DA_XOA) return null;
 
-    return {
-      TK_SDT: acc.TK_SDT,
-      TK_VAI_TRO: acc.TK_VAI_TRO,
-      BS_MA: acc.BAC_SI?.BS_MA ?? null,
-      BN_MA: acc.BENH_NHAN?.[0]?.BN_MA ?? null,
-    };
+    return this.buildAuthUser(acc);
   }
 
   async registerPatient(input: {
@@ -109,8 +132,15 @@ export class AuthService {
     await this.repo.revokeRefresh(rt.RT_ID);
 
     // Tạo JWT token mới
+    const authUser = this.buildAuthUser(acc);
+
     const token = await this.jwt.signAsync(
-      { sub: acc.TK_SDT, role: acc.TK_VAI_TRO ?? undefined } as any,
+      {
+        sub: acc.TK_SDT,
+        role: acc.TK_VAI_TRO ?? undefined,
+        bsMa: authUser.BS_MA,
+        bnMa: authUser.BN_MA,
+      } as any,
       { expiresIn: process.env.JWT_EXPIRES_IN ?? '7d' } as any,
     );
 
@@ -126,12 +156,7 @@ export class AuthService {
     return {
       access_token: token,
       refresh_token: newRt.raw,
-      user: {
-        TK_SDT: acc.TK_SDT,
-        TK_VAI_TRO: acc.TK_VAI_TRO,
-        BS_MA: acc.BAC_SI?.BS_MA ?? null,
-        BN_MA: acc.BENH_NHAN?.[0]?.BN_MA ?? null,
-      },
+      user: authUser,
     };
   }
 

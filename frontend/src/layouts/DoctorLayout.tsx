@@ -24,6 +24,7 @@ export default function DoctorLayout() {
     const { user, refreshToken, clearAuth } = useAuthStore();
     const navigate = useNavigate();
     const location = useLocation();
+    const doctorDisplayName = user?.TEN_HIEN_THI?.trim() || user?.BS_HO_TEN?.trim() || user?.TK_SDT || '---';
 
     const handleLogout = async () => {
         try {
@@ -58,7 +59,7 @@ export default function DoctorLayout() {
                             BS
                         </div>
                         <div className="overflow-hidden">
-                            <p className="text-sm font-medium truncate">{user?.TK_SDT ?? '---'}</p>
+                            <p className="text-sm font-medium truncate">{doctorDisplayName}</p>
                             <p className="text-xs text-[hsl(var(--sidebar-foreground))/0.55]">Bác sĩ</p>
                         </div>
                     </div>

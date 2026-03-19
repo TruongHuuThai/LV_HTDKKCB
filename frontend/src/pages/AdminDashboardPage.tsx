@@ -1,64 +1,233 @@
-// src/pages/AdminDashboardPage.tsx
+﻿// src/pages/AdminDashboardPage.tsx
 import { useEffect, useState } from 'react';
-import { Users, Stethoscope, Clock, CalendarCheck, UserRound, AlertTriangle, TrendingUp } from 'lucide-react';
-import { adminApi, type DashboardSummary } from '../services/api/adminApi';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Line, AreaChart, Area } from 'recharts';
-import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+    Activity,
+    AlertTriangle,
+    CalendarCheck,
+    CalendarRange,
+    Clock,
+    Stethoscope,
+    TrendingUp,
+    UserRound,
+    Users,
+} from 'lucide-react';
+import {
+    Area,
+    AreaChart,
+    Bar,
+    BarChart,
+    CartesianGrid,
+    ComposedChart,
+    Line,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
+
+import { adminApi, type DashboardSummary } from '@/services/api/adminApi';
+import {
+    AdminSelect,
+    AdminSelectContent,
+    AdminSelectItem,
+    AdminSelectTrigger,
+    AdminSelectValue,
+} from '@/components/admin/AdminSelect';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+
+type SpecialtyOption = {
+    CK_MA: number;
+    CK_TEN: string;
+};
+
+type VisitsDataPoint = {
+    date: string;
+    totalVisits: number;
+    specialtyVisits: number;
+};
+
+type TimeSlotsDataPoint = {
+    time: string;
+    count: number;
+};
+
+type RevenueDataPoint = {
+    date: string;
+    revenue: number;
+};
+
+type MetricCardProps = {
+    title: string;
+    value: number;
+    description: string;
+    badge: string;
+    icon: React.ComponentType<{ className?: string }>;
+    iconClassName: string;
+    iconBgClassName: string;
+    badgeClassName: string;
+    isCurrency?: boolean;
+};
+
+function formatCurrency(value: number) {
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
+}
+
+function formatDateTime(raw: string) {
+    const value = new Date(raw);
+    if (Number.isNaN(value.getTime())) return '--';
+
+    return new Intl.DateTimeFormat('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        day: '2-digit',
+        month: '2-digit',
+    }).format(value);
+}
+
+function formatRelativeTime(raw: string) {
+    const value = new Date(raw);
+    if (Number.isNaN(value.getTime())) return 'Không rõ thời điểm';
+
+    const diffMs = Date.now() - value.getTime();
+    const diffMinutes = Math.max(1, Math.floor(diffMs / (1000 * 60)));
+    if (diffMinutes < 60) return `${diffMinutes} phút trước`;
+
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) return `${diffHours} giờ trước`;
+
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays} ngày trước`;
+}
+
+function getPeriodLabel(year: string, month: string) {
+    if (month === 'all') return `Năm ${year}`;
+    return `Tháng ${month.padStart(2, '0')}/${year}`;
+}
+
+function hasAnyPositiveValue<T>(items: T[], getValue: (item: T) => number) {
+    return items.some((item) => getValue(item) > 0);
+}
+
+function MetricCard({
+    title,
+    value,
+    description,
+    badge,
+    icon: Icon,
+    iconBgClassName,
+    iconClassName,
+    badgeClassName,
+    isCurrency = false,
+}: MetricCardProps) {
+    return (
+        <Card className="border-gray-100 shadow-sm">
+            <CardContent className="flex h-full flex-col gap-4 pt-0">
+                <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                            {title}
+                        </p>
+                        <p className="text-[1.8rem] font-bold leading-none tracking-tight text-gray-950">
+                            {isCurrency ? formatCurrency(value) : value.toLocaleString('vi-VN')}
+                        </p>
+                    </div>
+                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${iconBgClassName}`}>
+                        <Icon className={`h-6 w-6 ${iconClassName}`} />
+                    </div>
+                </div>
+
+                <p className="text-sm leading-6 text-gray-600">{description}</p>
+
+                <div className="mt-auto">
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${badgeClassName}`}>
+                        {badge}
+                    </span>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+function FilterField({
+    label,
+    hint,
+    children,
+}: {
+    label: string;
+    hint: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <div className="space-y-1.5">
+            <p className="text-sm font-medium text-gray-900">{label}</p>
+            {children}
+            <p className="text-xs leading-5 text-gray-500">{hint}</p>
+        </div>
+    );
+}
+
+function ChartEmptyState({
+    title,
+    description,
+}: {
+    title: string;
+    description: string;
+}) {
+    return (
+        <div className="flex h-[260px] items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50/80 px-6 text-center">
+            <div className="max-w-md space-y-3">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-gray-200">
+                    <CalendarRange className="h-5 w-5 text-gray-400" />
+                </div>
+                <div className="space-y-1">
+                    <p className="text-sm font-semibold text-gray-900">{title}</p>
+                    <p className="text-sm leading-6 text-gray-500">{description}</p>
+                </div>
+            </div>
+        </div>
+    );
+}
 
 export default function AdminDashboardPage() {
     const [data, setData] = useState<DashboardSummary | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
-    const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
-    const [selectedMonth, setSelectedMonth] = useState<string>('all');
-    const [selectedSpecialty, setSelectedSpecialty] = useState<string>('all');
+    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+    const [selectedMonth, setSelectedMonth] = useState('all');
+    const [selectedSpecialty, setSelectedSpecialty] = useState('all');
 
-    const [visitsData, setVisitsData] = useState<any[]>([]);
-    const [timeSlotsData, setTimeSlotsData] = useState<any[]>([]);
-    const [revenueData, setRevenueData] = useState<any[]>([]);
-    const [specialties, setSpecialties] = useState<{CK_MA: number, CK_TEN: string}[]>([]);
-    
+    const [visitsData, setVisitsData] = useState<VisitsDataPoint[]>([]);
+    const [timeSlotsData, setTimeSlotsData] = useState<TimeSlotsDataPoint[]>([]);
+    const [revenueData, setRevenueData] = useState<RevenueDataPoint[]>([]);
+    const [specialties, setSpecialties] = useState<SpecialtyOption[]>([]);
     const [isLoadingCharts, setIsLoadingCharts] = useState(true);
 
-    const years = Array.from({length: 3}).map((_, i) => (new Date().getFullYear() - i).toString());
-    const months = Array.from({length: 12}).map((_, i) => (i + 1).toString());
+    const years = Array.from({ length: 3 }).map((_, index) => (new Date().getFullYear() - index).toString());
+    const months = Array.from({ length: 12 }).map((_, index) => (index + 1).toString());
 
     useEffect(() => {
         let isMounted = true;
-        
+
         const fetchDashboardData = async () => {
             try {
                 setIsLoading(true);
                 const [summaryResult, specialtiesResult] = await Promise.all([
                     adminApi.getDashboardSummary(),
-                    adminApi.getSpecialties()
+                    adminApi.getSpecialties(),
                 ]);
-                if (isMounted) {
-                    setData(summaryResult);
-                    
-                    let rawSpecs = Array.isArray(specialtiesResult) 
-                        ? specialtiesResult 
-                        : (specialtiesResult as any)?.data || [];
 
-                    const formattedSpecs = rawSpecs.map((s: any) => ({
-                        CK_MA: s.CK_MA ?? s.cK_MA ?? s.ck_ma ?? s.ck_Ma ?? s.id,
-                        CK_TEN: s.CK_TEN ?? s.cK_TEN ?? s.ck_ten ?? s.ck_Ten ?? s.name ?? "Unknown"
-                    }));
-                    setSpecialties(formattedSpecs);
-                }
-            } catch (error: any) {
-                console.error("Failed to fetch dashboard summary:", error);
-                if (error.response && error.response.data) {
-                    console.error("Dashboard summary API response:", error.response.data.message || error.response.data);
-                }
+                if (!isMounted) return;
+
+                setData(summaryResult);
+                setSpecialties(
+                    specialtiesResult.map((item) => ({
+                        CK_MA: item.CK_MA,
+                        CK_TEN: item.CK_TEN,
+                    })),
+                );
+            } catch (error) {
+                console.error('Failed to fetch dashboard summary:', error);
             } finally {
                 if (isMounted) {
                     setIsLoading(false);
@@ -66,28 +235,36 @@ export default function AdminDashboardPage() {
             }
         };
 
-        fetchDashboardData();
-        return () => { isMounted = false; };
+        void fetchDashboardData();
+
+        return () => {
+            isMounted = false;
+        };
     }, []);
 
     useEffect(() => {
         let isMounted = true;
+
         const fetchChartData = async () => {
             try {
                 setIsLoadingCharts(true);
                 const [visitsRes, timeSlotsRes, revenueRes] = await Promise.all([
-                    adminApi.getDashboardVisits(selectedYear, selectedMonth, selectedSpecialty === 'all' ? undefined : selectedSpecialty),
+                    adminApi.getDashboardVisits(
+                        selectedYear,
+                        selectedMonth,
+                        selectedSpecialty === 'all' ? undefined : selectedSpecialty,
+                    ),
                     adminApi.getDashboardTimeSlots(selectedYear, selectedMonth),
-                    adminApi.getDashboardRevenue(selectedYear, selectedMonth)
+                    adminApi.getDashboardRevenue(selectedYear, selectedMonth),
                 ]);
-                
-                if (isMounted) {
-                    setVisitsData(visitsRes);
-                    setTimeSlotsData(timeSlotsRes);
-                    setRevenueData(revenueRes);
-                }
+
+                if (!isMounted) return;
+
+                setVisitsData(visitsRes);
+                setTimeSlotsData(timeSlotsRes);
+                setRevenueData(revenueRes);
             } catch (error) {
-                console.error("Failed to fetch chart data:", error);
+                console.error('Failed to fetch chart data:', error);
             } finally {
                 if (isMounted) {
                     setIsLoadingCharts(false);
@@ -95,181 +272,274 @@ export default function AdminDashboardPage() {
             }
         };
 
-        fetchChartData();
-        return () => { isMounted = false; };
-    }, [selectedYear, selectedMonth, selectedSpecialty]);
+        void fetchChartData();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [selectedMonth, selectedSpecialty, selectedYear]);
 
     const dailyOps = data?.dailyOperations;
-    const statsConfig = [
+    const currentPeriodLabel = getPeriodLabel(selectedYear, selectedMonth);
+    const selectedSpecialtyLabel =
+        selectedSpecialty === 'all'
+            ? 'Tất cả chuyên khoa'
+            : specialties.find((item) => item.CK_MA.toString() === selectedSpecialty)?.CK_TEN || 'Chuyên khoa đã chọn';
+    const hasVisitsData = hasAnyPositiveValue(visitsData, (item) => item.totalVisits + item.specialtyVisits);
+    const hasTimeSlotsData = hasAnyPositiveValue(timeSlotsData, (item) => item.count);
+    const hasRevenueData = hasAnyPositiveValue(revenueData, (item) => item.revenue);
+
+    const dashboardStats: MetricCardProps[] = [
         {
-            title: 'Doanh thu hôm nay',
+            title: 'Doanh thu đã thu hôm nay',
             value: data?.financials?.todayRevenue ?? 0,
-            change: 'Chỉ tính thanh toán thành công',
+            description: 'Tổng tiền từ các giao dịch đã thanh toán thành công trong ngày.',
+            badge: 'Theo dõi tài chính trong ngày',
             icon: TrendingUp,
-            color: 'text-emerald-600',
-            bgColor: 'bg-emerald-100',
-            isCurrency: true
+            iconClassName: 'text-emerald-600',
+            iconBgClassName: 'bg-emerald-100',
+            badgeClassName: 'bg-emerald-50 text-emerald-700',
+            isCurrency: true,
         },
         {
-            title: 'Lượt khám hôm nay',
+            title: 'Lượt khám trong ngày',
             value: dailyOps?.totalPatientsToday ?? 0,
-            change: 'Tổng số lượt đăng ký',
+            description: 'Tổng số lượt khám có lịch trong hôm nay, bao gồm các trạng thái xử lý.',
+            badge: 'Chỉ số vận hành hôm nay',
             icon: Users,
-            color: 'text-blue-600',
-            bgColor: 'bg-blue-100',
+            iconClassName: 'text-blue-600',
+            iconBgClassName: 'bg-blue-100',
+            badgeClassName: 'bg-blue-50 text-blue-700',
         },
         {
-            title: 'Đang chờ khám',
+            title: 'Bệnh nhân đang chờ khám',
             value: dailyOps?.pendingVisitsToday ?? 0,
-            change: 'Bệnh nhân đang đợi',
+            description: 'Số lượt đang ở trạng thái chờ khám, cần ưu tiên theo dõi tại quầy tiếp đón.',
+            badge: 'Ưu tiên điều phối',
             icon: Clock,
-            color: 'text-amber-600',
-            bgColor: 'bg-amber-100',
+            iconClassName: 'text-amber-600',
+            iconBgClassName: 'bg-amber-100',
+            badgeClassName: 'bg-amber-50 text-amber-700',
         },
         {
-            title: 'Đã hoàn thành',
+            title: 'Ca khám đã hoàn tất',
             value: dailyOps?.completedVisitsToday ?? 0,
-            change: 'Ca khám đã xong',
+            description: 'Các lượt khám đã được xử lý xong và cập nhật hoàn thành trong ngày.',
+            badge: 'Tiến độ trong ngày',
             icon: CalendarCheck,
-            color: 'text-indigo-600',
-            bgColor: 'bg-indigo-100',
+            iconClassName: 'text-indigo-600',
+            iconBgClassName: 'bg-indigo-100',
+            badgeClassName: 'bg-indigo-50 text-indigo-700',
         },
         {
-            title: 'Bác sĩ trực hôm nay',
+            title: 'Bác sĩ có lịch hôm nay',
             value: dailyOps?.doctorsOnDutyToday ?? 0,
-            change: 'BS có lịch làm việc',
+            description: 'Số bác sĩ đã được phân công lịch làm việc hoặc lịch trực trong ngày.',
+            badge: 'Nhân sự đang phân công',
             icon: Stethoscope,
-            color: 'text-rose-600',
-            bgColor: 'bg-rose-100',
+            iconClassName: 'text-rose-600',
+            iconBgClassName: 'bg-rose-100',
+            badgeClassName: 'bg-rose-50 text-rose-700',
         },
     ];
 
-    const formatCurrency = (value: number) => {
-        return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
-    };
-
     return (
         <div className="space-y-6 pb-12">
-            <div>
-                <h1 className="text-2xl font-bold text-gray-900">Tổng quan</h1>
-                <p className="text-sm text-gray-500 mt-1">
-                    Theo dõi các chỉ số quan trọng của hệ thống UMC Clinic.
-                </p>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div className="space-y-1.5">
+                    <h1 className="text-2xl font-bold text-gray-900">Tổng quan</h1>
+                    <p className="text-sm leading-6 text-gray-500">
+                        Theo dõi nhanh tình hình vận hành, lượt khám và doanh thu của hệ thống UMC Clinic.
+                    </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                    <span className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
+                        Hôm nay
+                    </span>
+                    <span className="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
+                        {dailyOps?.pendingVisitsToday ?? 0} đang chờ khám
+                    </span>
+                    <span className="inline-flex items-center rounded-full bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700">
+                        {dailyOps?.canceledVisitsToday ?? 0} lịch đã hủy
+                    </span>
+                </div>
             </div>
 
-            {/* Stats Cards - Today's Operations */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
                 {isLoading ? (
-                    Array.from({ length: 4 }).map((_, i) => (
-                        <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col gap-3">
-                            <Skeleton className="w-12 h-12 rounded-lg shrink-0" />
-                            <Skeleton className="h-4 w-3/4" />
-                            <Skeleton className="h-8 w-1/2 mt-1" />
-                            <Skeleton className="h-3 w-2/3 mt-2" />
+                    Array.from({ length: 5 }).map((_, index) => (
+                        <div key={index} className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+                            <div className="flex items-start justify-between gap-4">
+                                <div className="space-y-3">
+                                    <Skeleton className="h-3 w-28" />
+                                    <Skeleton className="h-8 w-24" />
+                                </div>
+                                <Skeleton className="h-12 w-12 rounded-2xl" />
+                            </div>
+                            <Skeleton className="mt-5 h-4 w-full" />
+                            <Skeleton className="mt-2 h-4 w-5/6" />
+                            <Skeleton className="mt-5 h-6 w-28 rounded-full" />
                         </div>
                     ))
                 ) : (
-                    statsConfig.map((stat, idx) => (
-                        <div key={idx} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-start gap-4 transition-shadow hover:shadow-md">
-                            <div className={`w-12 h-12 rounded-lg flex items-center justify-center shrink-0 ${stat.bgColor}`}>
-                                <stat.icon className={`w-6 h-6 ${stat.color}`} />
-                            </div>
-                            <div>
-                                <p className="text-sm font-medium text-gray-500">{stat.title}</p>
-                                <p className="text-2xl font-bold text-gray-900 mt-0.5">
-                                    {stat.isCurrency ? formatCurrency(stat.value) : stat.value.toLocaleString('vi-VN')}
-                                </p>
-                                <p className="text-xs text-gray-400 mt-1">{stat.change}</p>
-                            </div>
-                        </div>
-                    ))
+                    dashboardStats.map((stat) => <MetricCard key={stat.title} {...stat} />)
                 )}
             </div>
 
-            {/* Filters */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex flex-wrap items-center gap-4">
-                <span className="text-sm font-semibold text-gray-700">Bộ lọc biểu đồ:</span>
-                <Select value={selectedYear} onValueChange={setSelectedYear}>
-                    <SelectTrigger className="w-[120px] bg-white">
-                        <SelectValue placeholder="Chọn năm" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-white z-50">
-                        {years.map(year => (
-                            <SelectItem key={year} value={year}>Năm {year}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-
-                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                    <SelectTrigger className="w-[150px] bg-white">
-                        <SelectValue placeholder="Chọn tháng" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-white z-50">
-                        <SelectItem value="all" className="py-2 text-sm font-medium">Tất cả các tháng</SelectItem>
-                        {months.map(month => (
-                            <SelectItem key={month} value={month.toString()}>Tháng {month}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
-
-            {/* Charts Grid */}
-            <div className="grid grid-cols-1 gap-6">
-                
-                {/* Chart 1: Visits (Row 1 - Full Width) */}
-                <Card className="col-span-1 min-w-0 shadow-sm border border-gray-100">
-                    <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between pb-2">
+            <Card className="border-gray-100 shadow-sm">
+                <CardHeader className="gap-4 border-b border-gray-100 pb-4">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                         <div className="space-y-1">
-                            <CardTitle className="text-lg font-bold text-gray-800">Biểu đồ lượt khám</CardTitle>
-                            <p className="text-sm text-gray-500">Tổng quan lượt khám và theo khoa cụ thể</p>
+                            <CardTitle className="text-lg font-semibold text-gray-900">Bộ lọc dữ liệu biểu đồ</CardTitle>
+                            <CardDescription>
+                                Bộ lọc năm và tháng áp dụng cho tất cả biểu đồ bên dưới. Riêng biểu đồ lượt khám có thêm bộ lọc chuyên khoa riêng.
+                            </CardDescription>
                         </div>
-                        <div className="mt-4 sm:mt-0 sm:ml-4">
-                            <Select value={selectedSpecialty} onValueChange={setSelectedSpecialty}>
-                                <SelectTrigger className="w-full sm:w-[220px] bg-white border-gray-200 shadow-sm">
-                                    <SelectValue placeholder="Chọn chuyên khoa" />
-                                </SelectTrigger>
-                                <SelectContent className="z-50 max-h-72 min-w-[220px] overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-md">
-                                    <SelectItem value="all" className="py-2 text-sm font-medium">Tất cả Khoa</SelectItem>
-                                    {specialties.map(spec => (
-                                        <SelectItem
-                                            key={spec.CK_MA}
-                                            value={spec.CK_MA.toString()}
-                                            className="py-2 text-sm leading-5 whitespace-normal break-words"
-                                        >
-                                            {spec.CK_TEN}
-                                        </SelectItem>
+                        <div className="inline-flex items-center rounded-full bg-gray-50 px-3 py-1 text-xs font-medium text-gray-600 ring-1 ring-gray-200">
+                            Đang xem: {currentPeriodLabel}
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent className="pt-4">
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[180px_200px]">
+                        <FilterField label="Năm dữ liệu" hint="Dùng cho toàn bộ xu hướng và biểu đồ phụ.">
+                            <AdminSelect value={selectedYear} onValueChange={setSelectedYear}>
+                                <AdminSelectTrigger>
+                                    <AdminSelectValue placeholder="Chọn năm" />
+                                </AdminSelectTrigger>
+                                <AdminSelectContent>
+                                    {years.map((year) => (
+                                        <AdminSelectItem key={year} value={year}>
+                                            Năm {year}
+                                        </AdminSelectItem>
                                     ))}
-                                </SelectContent>
-                            </Select>
+                                </AdminSelectContent>
+                            </AdminSelect>
+                        </FilterField>
+
+                        <FilterField label="Tháng" hint="Chọn một tháng cụ thể hoặc xem toàn bộ năm đã chọn.">
+                            <AdminSelect value={selectedMonth} onValueChange={setSelectedMonth}>
+                                <AdminSelectTrigger>
+                                    <AdminSelectValue placeholder="Chọn tháng" />
+                                </AdminSelectTrigger>
+                                <AdminSelectContent>
+                                    <AdminSelectItem value="all">Toàn bộ 12 tháng</AdminSelectItem>
+                                    {months.map((month) => (
+                                        <AdminSelectItem key={month} value={month}>
+                                            Tháng {month}
+                                        </AdminSelectItem>
+                                    ))}
+                                </AdminSelectContent>
+                            </AdminSelect>
+                        </FilterField>
+
+                    </div>
+                </CardContent>
+            </Card>
+
+            <div className="grid grid-cols-1 gap-6">
+                <Card className="border-gray-100 shadow-sm">
+                    <CardHeader className="gap-4 border-b border-gray-100 pb-4">
+                        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+                            <div className="space-y-1.5">
+                                <CardTitle className="text-lg font-semibold text-gray-900">Biểu đồ lượt khám</CardTitle>
+                                <CardDescription>
+                                    Cột thể hiện tổng lượt khám trong khoảng thời gian đã chọn. Đường xu hướng dùng để so sánh theo chuyên khoa khi cần đi sâu vào từng nhóm dịch vụ.
+                                </CardDescription>
+                            </div>
+
+                            <div className="grid gap-1.5 xl:min-w-[240px]">
+                                <p className="text-sm font-medium text-gray-900">Chuyên khoa cho đường xu hướng</p>
+                                <AdminSelect value={selectedSpecialty} onValueChange={setSelectedSpecialty}>
+                                    <AdminSelectTrigger>
+                                        <AdminSelectValue placeholder="Chọn chuyên khoa" />
+                                    </AdminSelectTrigger>
+                                    <AdminSelectContent className="max-h-72">
+                                        <AdminSelectItem value="all">Tất cả chuyên khoa</AdminSelectItem>
+                                        {specialties.map((specialty) => (
+                                            <AdminSelectItem
+                                                key={specialty.CK_MA}
+                                                value={specialty.CK_MA.toString()}
+                                                className="whitespace-normal leading-5"
+                                            >
+                                                {specialty.CK_TEN}
+                                            </AdminSelectItem>
+                                        ))}
+                                    </AdminSelectContent>
+                                </AdminSelect>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                            <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                                Cột xám: Tổng lượt khám toàn hệ thống
+                            </span>
+                            <span className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
+                                {selectedSpecialty === 'all'
+                                    ? 'Chọn chuyên khoa để bật đường so sánh riêng'
+                                    : `Đường xanh: ${selectedSpecialtyLabel}`}
+                            </span>
                         </div>
                     </CardHeader>
-                    <CardContent>
+
+                    <CardContent className="pt-4">
                         {isLoadingCharts ? (
-                            <Skeleton className="w-full h-[350px]" />
+                            <Skeleton className="h-[300px] w-full rounded-xl" />
+                        ) : !hasVisitsData ? (
+                            <ChartEmptyState
+                                title="Chưa có dữ liệu lượt khám"
+                                description={`Không ghi nhận dữ liệu phù hợp trong ${currentPeriodLabel.toLowerCase()}. Hãy thử đổi mốc thời gian hoặc chuyên khoa để kiểm tra lại.`}
+                            />
                         ) : (
-                            <div className="w-full min-w-0 mt-4">
-                                <ResponsiveContainer width="100%" height={350}>
-                                    <ComposedChart data={visitsData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                            <div className="w-full">
+                                <ResponsiveContainer width="100%" height={300}>
+                                    <ComposedChart data={visitsData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                                        <XAxis 
-                                            dataKey="date" 
-                                            stroke="#888888" 
-                                            fontSize={12} 
-                                            tickLine={false} 
-                                            axisLine={false} 
+                                        <XAxis
+                                            dataKey="date"
+                                            stroke="#6b7280"
+                                            fontSize={12}
+                                            tickLine={false}
+                                            axisLine={false}
                                             interval={selectedMonth === 'all' ? 0 : 'preserveStartEnd'}
-                                            tickFormatter={(value) => typeof value === 'string' ? value.replace('Tháng ', '') : value}
+                                            tickFormatter={(value) =>
+                                                typeof value === 'string' ? value.replace('Tháng ', '') : value
+                                            }
                                         />
-                                        <YAxis 
-                                            stroke="#888888" 
-                                            fontSize={12} 
-                                            tickLine={false} 
-                                            axisLine={false} 
+                                        <YAxis
+                                            stroke="#6b7280"
+                                            fontSize={12}
+                                            tickLine={false}
+                                            axisLine={false}
                                             allowDecimals={false}
                                         />
-                                        <Tooltip cursor={{fill: 'transparent'}} contentStyle={{borderRadius: '8px', border: '1px solid #f3f4f6', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
-                                        <Bar dataKey="totalVisits" name="Tổng Số Lượt Khám" fill="#e2e8f0" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                                        <Line type="monotone" name={`Lượt Khám Khoa ${selectedSpecialty !== 'all' ? specialties.find(s => s.CK_MA.toString() === selectedSpecialty)?.CK_TEN || '' : ''}`} dataKey="specialtyVisits" stroke="#2563eb" strokeWidth={3} dot={{ r: 4 }} />
+                                        <Tooltip
+                                            cursor={{ fill: 'rgba(148, 163, 184, 0.08)' }}
+                                            contentStyle={{
+                                                borderRadius: '12px',
+                                                border: '1px solid #e5e7eb',
+                                                boxShadow: '0 10px 30px rgba(15, 23, 42, 0.08)',
+                                            }}
+                                        />
+                                        <Bar
+                                            dataKey="totalVisits"
+                                            name="Tổng lượt khám"
+                                            fill="#cbd5e1"
+                                            radius={[6, 6, 0, 0]}
+                                            maxBarSize={32}
+                                        />
+                                        {selectedSpecialty !== 'all' ? (
+                                            <Line
+                                                type="monotone"
+                                                dataKey="specialtyVisits"
+                                                name={selectedSpecialtyLabel}
+                                                stroke="#2563eb"
+                                                strokeWidth={3}
+                                                dot={{ r: 4 }}
+                                                activeDot={{ r: 5 }}
+                                            />
+                                        ) : null}
                                     </ComposedChart>
                                 </ResponsiveContainer>
                             </div>
@@ -277,181 +547,284 @@ export default function AdminDashboardPage() {
                     </CardContent>
                 </Card>
 
-                {/* Chart 2 & 3: Time Slots & Revenue (Row 2 - Two Columns) */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-w-0">
-                    
-                    {/* Chart 2: Time Slots */}
-                    <Card className="min-w-0 shadow-sm border border-gray-100">
-                        <CardHeader>
-                            <CardTitle className="text-lg font-bold text-gray-800">Phân bố khung giờ khám</CardTitle>
-                            <p className="text-sm text-gray-500">Nhận diện giờ cao điểm</p>
-                        </CardHeader>
-                        <CardContent>
-                            {isLoadingCharts ? (
-                                <Skeleton className="w-full h-[300px]" />
-                            ) : (
-                                <div className="w-full min-w-0 mt-4">
-                                    <ResponsiveContainer width="100%" height={300}>
-                                        <BarChart data={timeSlotsData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                                            <XAxis 
-                                                dataKey="time" 
-                                                stroke="#888888" 
-                                                fontSize={12} 
-                                                tickLine={false} 
-                                                axisLine={false} 
-                                            />
-                                            <YAxis 
-                                                stroke="#888888" 
-                                                fontSize={12} 
-                                                tickLine={false} 
-                                                axisLine={false} 
-                                                allowDecimals={false}
-                                            />
-                                            <Tooltip cursor={{fill: 'transparent'}} contentStyle={{borderRadius: '8px', border: '1px solid #f3f4f6', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
-                                            <Bar dataKey="count" name="Số lượng" fill="#8b5cf6" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                                        </BarChart>
-                                    </ResponsiveContainer>
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                    <Card className="border-gray-100 shadow-sm">
+                        <CardHeader className="gap-2 border-b border-gray-100 pb-4">
+                            <div className="flex items-start justify-between gap-4">
+                                <div className="space-y-1">
+                                    <CardTitle className="text-lg font-semibold text-gray-900">Phân bố khung giờ khám</CardTitle>
+                                    <CardDescription>
+                                        Giúp nhận diện khung giờ cao điểm để điều phối quầy tiếp đón và bác sĩ.
+                                    </CardDescription>
                                 </div>
+                                <span className="inline-flex items-center rounded-full bg-purple-50 px-3 py-1 text-xs font-medium text-purple-700">
+                                    {currentPeriodLabel}
+                                </span>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="pt-4">
+                            {isLoadingCharts ? (
+                                <Skeleton className="h-[250px] w-full rounded-xl" />
+                            ) : !hasTimeSlotsData ? (
+                                <ChartEmptyState
+                                    title="Chưa có dữ liệu khung giờ"
+                                    description={`Không ghi nhận lượt đăng ký trong ${currentPeriodLabel.toLowerCase()} để phân tích khung giờ.`}
+                                />
+                            ) : (
+                                <ResponsiveContainer width="100%" height={250}>
+                                    <BarChart data={timeSlotsData} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                                        <XAxis
+                                            dataKey="time"
+                                            stroke="#6b7280"
+                                            fontSize={12}
+                                            tickLine={false}
+                                            axisLine={false}
+                                        />
+                                        <YAxis
+                                            stroke="#6b7280"
+                                            fontSize={12}
+                                            tickLine={false}
+                                            axisLine={false}
+                                            allowDecimals={false}
+                                        />
+                                        <Tooltip
+                                            cursor={{ fill: 'rgba(139, 92, 246, 0.08)' }}
+                                            contentStyle={{
+                                                borderRadius: '12px',
+                                                border: '1px solid #e5e7eb',
+                                                boxShadow: '0 10px 30px rgba(15, 23, 42, 0.08)',
+                                            }}
+                                        />
+                                        <Bar
+                                            dataKey="count"
+                                            name="Số lượt đăng ký"
+                                            fill="#8b5cf6"
+                                            radius={[6, 6, 0, 0]}
+                                            maxBarSize={28}
+                                        />
+                                    </BarChart>
+                                </ResponsiveContainer>
                             )}
                         </CardContent>
                     </Card>
 
-                    {/* Chart 3: Revenue */}
-                    <Card className="min-w-0 shadow-sm border border-gray-100">
-                        <CardHeader>
-                            <CardTitle className="text-lg font-bold text-gray-800">Thống kê doanh thu</CardTitle>
-                            <p className="text-sm text-gray-500">Doanh thu từ các lịch khám đã thanh toán</p>
-                        </CardHeader>
-                        <CardContent>
-                            {isLoadingCharts ? (
-                                <Skeleton className="w-full h-[300px]" />
-                            ) : (
-                                <div className="w-full min-w-0 mt-4">
-                                    <ResponsiveContainer width="100%" height={300}>
-                                        <AreaChart data={revenueData} margin={{ top: 20, right: 20, bottom: 20, left: 40 }}>
-                                            <defs>
-                                                <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="5%" stopColor="#d1fae5" stopOpacity={0.8}/>
-                                                    <stop offset="95%" stopColor="#d1fae5" stopOpacity={0}/>
-                                                </linearGradient>
-                                            </defs>
-                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                                            <XAxis 
-                                                dataKey="date" 
-                                                stroke="#888888" 
-                                                fontSize={12} 
-                                                tickLine={false} 
-                                                axisLine={false} 
-                                                interval={selectedMonth === 'all' ? 0 : 'preserveStartEnd'}
-                                                tickFormatter={(value) => typeof value === 'string' ? value.replace('Tháng ', '') : value}
-                                            />
-                                            <YAxis 
-                                                stroke="#888888" 
-                                                fontSize={12} 
-                                                tickLine={false} 
-                                                axisLine={false} 
-                                                tickFormatter={(value) => new Intl.NumberFormat('vi-VN', { notation: "compact", compactDisplay: "short" }).format(value)}
-                                            />
-                                            <Tooltip 
-                                                formatter={(value: any) => formatCurrency(Number(value))}
-                                                contentStyle={{borderRadius: '8px', border: '1px solid #f3f4f6', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} 
-                                            />
-                                            <Area type="monotone" name="Doanh Thu" dataKey="revenue" stroke="#10b981" fillOpacity={1} fill="url(#colorRevenue)" />
-                                        </AreaChart>
-                                    </ResponsiveContainer>
+                    <Card className="border-gray-100 shadow-sm">
+                        <CardHeader className="gap-2 border-b border-gray-100 pb-4">
+                            <div className="flex items-start justify-between gap-4">
+                                <div className="space-y-1">
+                                    <CardTitle className="text-lg font-semibold text-gray-900">Xu hướng doanh thu</CardTitle>
+                                    <CardDescription>
+                                        Theo dõi doanh thu từ các lượt khám đã thanh toán thành công trong giai đoạn đã chọn.
+                                    </CardDescription>
                                 </div>
+                                <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+                                    {currentPeriodLabel}
+                                </span>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="pt-4">
+                            {isLoadingCharts ? (
+                                <Skeleton className="h-[250px] w-full rounded-xl" />
+                            ) : !hasRevenueData ? (
+                                <ChartEmptyState
+                                    title="Chưa có dữ liệu doanh thu"
+                                    description={`Chưa ghi nhận giao dịch thanh toán thành công trong ${currentPeriodLabel.toLowerCase()}.`}
+                                />
+                            ) : (
+                                <ResponsiveContainer width="100%" height={250}>
+                                    <AreaChart data={revenueData} margin={{ top: 10, right: 12, left: 12, bottom: 0 }}>
+                                        <defs>
+                                            <linearGradient id="dashboardRevenueFill" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#10b981" stopOpacity={0.22} />
+                                                <stop offset="95%" stopColor="#10b981" stopOpacity={0.03} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                                        <XAxis
+                                            dataKey="date"
+                                            stroke="#6b7280"
+                                            fontSize={12}
+                                            tickLine={false}
+                                            axisLine={false}
+                                            interval={selectedMonth === 'all' ? 0 : 'preserveStartEnd'}
+                                            tickFormatter={(value) =>
+                                                typeof value === 'string' ? value.replace('Tháng ', '') : value
+                                            }
+                                        />
+                                        <YAxis
+                                            stroke="#6b7280"
+                                            fontSize={12}
+                                            tickLine={false}
+                                            axisLine={false}
+                                            tickFormatter={(value) =>
+                                                new Intl.NumberFormat('vi-VN', {
+                                                    notation: 'compact',
+                                                    compactDisplay: 'short',
+                                                }).format(value)
+                                            }
+                                        />
+                                        <Tooltip
+                                            formatter={(value) => formatCurrency(Number(value ?? 0))}
+                                            contentStyle={{
+                                                borderRadius: '12px',
+                                                border: '1px solid #e5e7eb',
+                                                boxShadow: '0 10px 30px rgba(15, 23, 42, 0.08)',
+                                            }}
+                                        />
+                                        <Area
+                                            type="monotone"
+                                            dataKey="revenue"
+                                            name="Doanh thu"
+                                            stroke="#10b981"
+                                            strokeWidth={2.5}
+                                            fill="url(#dashboardRevenueFill)"
+                                        />
+                                    </AreaChart>
+                                </ResponsiveContainer>
                             )}
                         </CardContent>
                     </Card>
-
                 </div>
             </div>
 
-            {/* Bottom Row: Widgets */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-                {/* Top Doctors Widget */}
-                <Card className="shadow-sm border border-gray-100">
-                    <CardHeader>
-                        <CardTitle className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                            <UserRound className="w-5 h-5 text-blue-600" />
-                            Bác sĩ nổi bật (Tháng này)
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+                <Card className="border-gray-100 shadow-sm">
+                    <CardHeader className="gap-2 border-b border-gray-100 pb-4">
+                        <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-900">
+                            <UserRound className="h-5 w-5 text-blue-600" />
+                            Bác sĩ nổi bật tháng này
                         </CardTitle>
+                        <CardDescription>
+                            Top bác sĩ có nhiều lượt khám đã hoàn tất nhất trong tháng hiện tại.
+                        </CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="pt-4">
                         {isLoading ? (
-                            <Skeleton className="w-full h-[200px]" />
+                            <Skeleton className="h-[220px] w-full rounded-xl" />
+                        ) : (data?.topDoctors?.length ?? 0) === 0 ? (
+                            <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/80 px-4 py-8 text-center text-sm text-gray-500">
+                                Chưa có dữ liệu lượt khám hoàn tất để xếp hạng bác sĩ trong tháng này.
+                            </div>
                         ) : (
-                            <div className="space-y-4">
-                                {data?.topDoctors?.length === 0 ? (
-                                    <p className="text-sm text-gray-500 text-center py-4">Chưa có dữ liệu khám bệnh tháng này.</p>
-                                ) : (
-                                    data?.topDoctors?.map((doc, idx) => (
-                                        <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold overflow-hidden">
-                                                    {doc.avatar ? (
-                                                        <img src={doc.avatar} alt={doc.name} className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        doc.name.charAt(0)
-                                                    )}
-                                                </div>
-                                                <div>
-                                                    <p className="text-sm font-semibold text-gray-900">{doc.name}</p>
-                                                    <p className="text-xs text-gray-500">{doc.specialty}</p>
-                                                </div>
+                            <div className="space-y-3">
+                                {data?.topDoctors.map((doctor, index) => (
+                                    <div
+                                        key={doctor.id}
+                                        className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50/70 px-3.5 py-3"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
+                                                {index + 1}
                                             </div>
-                                            <div className="text-right">
-                                                <p className="text-sm font-bold text-blue-600">{doc.visits}</p>
-                                                <p className="text-xs text-gray-500">lượt khám</p>
+                                            <div className="min-w-0">
+                                                <p className="truncate text-sm font-semibold text-gray-900">{doctor.name}</p>
+                                                <p className="truncate text-xs text-gray-500">{doctor.specialty}</p>
                                             </div>
                                         </div>
-                                    ))
-                                )}
+                                        <div className="text-right">
+                                            <p className="text-sm font-bold text-blue-600">
+                                                {doctor.visits.toLocaleString('vi-VN')}
+                                            </p>
+                                            <p className="text-xs text-gray-500">lượt khám</p>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         )}
                     </CardContent>
                 </Card>
 
-                {/* Expiring Medicines Alert Widget */}
-                <Card className="shadow-sm border border-gray-100">
-                    <CardHeader>
-                        <CardTitle className="text-lg font-bold text-rose-600 flex items-center gap-2">
-                            <AlertTriangle className="w-5 h-5" />
-                            Cảnh báo thuốc sắp hết hạn
+                <Card className="border-gray-100 shadow-sm">
+                    <CardHeader className="gap-2 border-b border-gray-100 pb-4">
+                        <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-900">
+                            <Activity className="h-5 w-5 text-sky-600" />
+                            Hoạt động gần đây
                         </CardTitle>
+                        <CardDescription>
+                            5 cập nhật mới nhất để admin theo dõi luồng khám và xử lý phát sinh.
+                        </CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="pt-4">
                         {isLoading ? (
-                            <Skeleton className="w-full h-[200px]" />
+                            <Skeleton className="h-[220px] w-full rounded-xl" />
+                        ) : (data?.recentActivities?.length ?? 0) === 0 ? (
+                            <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/80 px-4 py-8 text-center text-sm text-gray-500">
+                                Chưa có hoạt động nào gần đây để hiển thị.
+                            </div>
                         ) : (
                             <div className="space-y-3">
-                                {data?.expiringMedicines?.length === 0 ? (
-                                    <div className="p-4 bg-emerald-50 rounded-lg text-emerald-700 text-sm flex items-center gap-2">
-                                        Không có thuốc nào sắp hết hạn trong 30 ngày tới.
-                                    </div>
-                                ) : (
-                                    data?.expiringMedicines?.map((med, idx) => {
-                                        const expiryDate = new Date(med.expiryDate);
-                                        const now = new Date();
-                                        const diffTime = Math.abs(expiryDate.getTime() - now.getTime());
-                                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                                        
-                                        return (
-                                            <div key={idx} className="flex items-center justify-between p-3 border-l-4 border-rose-500 bg-rose-50 rounded-r-lg">
-                                                <div>
-                                                    <p className="text-sm font-semibold text-gray-900">{med.name}</p>
-                                                    <p className="text-xs text-rose-600 mt-1">
-                                                        Còn {diffDays} ngày (HSD: {expiryDate.toLocaleDateString('vi-VN')})
-                                                    </p>
-                                                </div>
-                                                <span className="px-2 py-1 bg-rose-100 text-rose-700 text-xs font-medium rounded-full">
-                                                    Sắp Hết Hạn
-                                                </span>
+                                {data?.recentActivities.map((item) => (
+                                    <div
+                                        key={item.id}
+                                        className="rounded-xl border border-gray-100 bg-white px-3.5 py-3 shadow-sm"
+                                    >
+                                        <div className="flex items-start gap-3">
+                                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sm font-semibold text-sky-700">
+                                                {item.patientName.charAt(0).toUpperCase()}
                                             </div>
-                                        );
-                                    })
-                                )}
+                                            <div className="min-w-0 flex-1">
+                                                <p className="truncate text-sm font-semibold text-gray-900">{item.patientName}</p>
+                                                <p className="mt-1 text-sm leading-6 text-gray-600">{item.action}</p>
+                                                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
+                                                    <span>{formatRelativeTime(item.createdAt)}</span>
+                                                    <span>{formatDateTime(item.createdAt)}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                <Card className="border-gray-100 shadow-sm">
+                    <CardHeader className="gap-2 border-b border-gray-100 pb-4">
+                        <CardTitle className="flex items-center gap-2 text-lg font-semibold text-rose-700">
+                            <AlertTriangle className="h-5 w-5" />
+                            Cảnh báo thuốc sắp hết hạn
+                        </CardTitle>
+                        <CardDescription>
+                            Danh sách thuốc sẽ hết hạn trong vòng 30 ngày tới để chủ động xử lý kho.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="pt-4">
+                        {isLoading ? (
+                            <Skeleton className="h-[220px] w-full rounded-xl" />
+                        ) : (data?.expiringMedicines?.length ?? 0) === 0 ? (
+                            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-8 text-center text-sm text-emerald-700">
+                                Không có thuốc nào sắp hết hạn trong 30 ngày tới.
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {data?.expiringMedicines.map((medicine) => {
+                                    const expiryDate = new Date(medicine.expiryDate);
+                                    const diffDays = Math.max(
+                                        0,
+                                        Math.ceil((expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)),
+                                    );
+
+                                    return (
+                                        <div
+                                            key={medicine.id}
+                                            className="flex items-start justify-between gap-3 rounded-xl border border-rose-100 bg-rose-50/80 px-3.5 py-3"
+                                        >
+                                            <div className="min-w-0">
+                                                <p className="truncate text-sm font-semibold text-gray-900">{medicine.name}</p>
+                                                <p className="mt-1 text-xs leading-5 text-rose-700">
+                                                    Còn {diffDays} ngày, hạn dùng{' '}
+                                                    {Number.isNaN(expiryDate.getTime())
+                                                        ? '--'
+                                                        : expiryDate.toLocaleDateString('vi-VN')}
+                                                </p>
+                                            </div>
+                                            <span className="inline-flex shrink-0 items-center rounded-full bg-rose-100 px-2.5 py-1 text-xs font-medium text-rose-700">
+                                                Ưu tiên xử lý
+                                            </span>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         )}
                     </CardContent>
@@ -460,4 +833,3 @@ export default function AdminDashboardPage() {
         </div>
     );
 }
-

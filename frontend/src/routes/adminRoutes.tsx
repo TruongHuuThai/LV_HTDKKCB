@@ -8,6 +8,9 @@ import DoctorListPage from '@/pages/admin/doctors/DoctorListPage';
 import DoctorFormPage from '@/pages/admin/doctors/DoctorFormPage';
 import ServiceListPage from '@/pages/admin/services/ServiceListPage';
 import ServiceFormPage from '@/pages/admin/services/ServiceFormPage';
+import MedicineListPage from '@/pages/admin/medicines/MedicineListPage';
+import MedicineFormPage from '@/pages/admin/medicines/MedicineFormPage';
+import MedicineDetailPage from '@/pages/admin/medicines/MedicineDetailPage';
 import SpecialtyListPage from '@/pages/admin/specialties/SpecialtyListPage';
 import SpecialtyFormPage from '@/pages/admin/specialties/SpecialtyFormPage';
 import PatientListPage from '@/pages/admin/patients/PatientListPage';
@@ -15,6 +18,8 @@ import PatientFormPage from '@/pages/admin/patients/PatientFormPage';
 import AccountListPage from '@/pages/admin/accounts/AccountListPage';
 import AccountFormPage from '@/pages/admin/accounts/AccountFormPage';
 import DoctorShiftManagementPage from '@/pages/admin/schedules/DoctorShiftManagementPage';
+import RoomListPage from '@/pages/admin/facilities/RoomListPage';
+import RoomFormPage from '@/pages/admin/facilities/RoomFormPage';
 
 export const adminRoutes: RouteObject = {
     element: <AdminLayout />,
@@ -46,6 +51,22 @@ export const adminRoutes: RouteObject = {
         {
             path: '/admin/services/edit/:id',
             element: <ServiceFormPage />,
+        },
+        {
+            path: '/admin/medicines',
+            element: <MedicineListPage />,
+        },
+        {
+            path: '/admin/medicines/create',
+            element: <MedicineFormPage />,
+        },
+        {
+            path: '/admin/medicines/edit/:id',
+            element: <MedicineFormPage />,
+        },
+        {
+            path: '/admin/medicines/detail/:id',
+            element: <MedicineDetailPage />,
         },
         {
             path: '/admin/specialties',
@@ -82,6 +103,18 @@ export const adminRoutes: RouteObject = {
         {
             path: '/admin/accounts/edit/:id',
             element: <AccountFormPage />,
+        },
+        {
+            path: '/admin/facilities',
+            element: <RoomListPage />,
+        },
+        {
+            path: '/admin/facilities/create',
+            element: <RoomFormPage />,
+        },
+        {
+            path: '/admin/facilities/edit/:id',
+            element: <RoomFormPage />,
         },
         {
             path: '/admin/schedules',

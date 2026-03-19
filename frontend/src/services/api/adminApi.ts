@@ -1,7 +1,7 @@
-// src/services/api/adminApi.ts
+﻿// src/services/api/adminApi.ts
 import axiosClient from './axiosClient';
 
-// Tạm thời định nghĩa types ở đây, có thể chuyển ra file types/ riêng sau
+// Táº¡m thá»i Ä‘á»‹nh nghÄ©a types á»Ÿ Ä‘Ă¢y, cĂ³ thá»ƒ chuyá»ƒn ra file types/ riĂªng sau
 export interface AdminDoctor {
     BS_MA: number;
     BS_HO_TEN: string;
@@ -84,6 +84,87 @@ export interface ServiceListResponse {
     meta: ServiceListMeta;
 }
 
+export interface AdminMedicineItem {
+    T_MA: number;
+    BD_MA: number | null;
+    DVT_MA: number | null;
+    NT_MA: number | null;
+    NSX_MA: number | null;
+    T_TEN_THUOC: string;
+    T_DA_XOA: boolean | null;
+    T_GIA_THUOC: number | string | null;
+    T_HAN_SU_DUNG: string | null;
+    BIET_DUOC?: {
+        BD_MA: number;
+        BD_TEN: string;
+        BD_CONG_DUNG?: string | null;
+        BD_HAM_LUONG?: string | null;
+        BD_LIEU_DUNG?: string | null;
+    } | null;
+    DON_VI_TINH?: {
+        DVT_MA: number;
+        DVT_TEN: string;
+    } | null;
+    NHOM_THUOC?: {
+        NT_MA: number;
+        NT_TEN: string;
+    } | null;
+    NHA_SAN_XUAT?: {
+        NSX_MA: number;
+        NSX_TEN: string;
+    } | null;
+}
+
+export interface CreateMedicineInput {
+    T_TEN_THUOC: string;
+    BD_MA?: number | null;
+    DVT_MA?: number | null;
+    NT_MA?: number | null;
+    NSX_MA?: number | null;
+    T_GIA_THUOC?: number;
+    T_HAN_SU_DUNG?: string | null;
+}
+
+export type UpdateMedicineInput = Partial<CreateMedicineInput>;
+
+export interface UpdateMedicineBrandInfoInput {
+    BD_TEN?: string;
+    BD_CONG_DUNG?: string;
+    BD_HAM_LUONG?: string;
+    BD_LIEU_DUNG?: string;
+}
+
+export type MedicineSortBy = 'code' | 'price';
+export type MedicineSortOrder = 'asc' | 'desc';
+export type MedicineExpirationStatus = 'all' | 'valid' | 'expiring' | 'expired';
+
+export interface MedicineListMeta {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    sortBy: MedicineSortBy;
+    sortOrder: MedicineSortOrder;
+    search: string;
+    groupId: number | null;
+    manufacturerId: number | null;
+    minPrice: number | null;
+    maxPrice: number | null;
+    expirationStatus: MedicineExpirationStatus;
+}
+
+export interface MedicineListResponse {
+    items: AdminMedicineItem[];
+    meta: MedicineListMeta;
+}
+
+export interface MedicineFilterOptions {
+    groups: Array<{ NT_MA: number; NT_TEN: string }>;
+    manufacturers: Array<{ NSX_MA: number; NSX_TEN: string }>;
+    units: Array<{ DVT_MA: number; DVT_TEN: string }>;
+    brands: Array<{ BD_MA: number; BD_TEN: string }>;
+}
+
 export interface AdminSpecialtyItem {
     CK_MA: number;
     CK_TEN: string;
@@ -115,6 +196,44 @@ export interface SpecialtyListMeta {
 export interface SpecialtyListResponse {
     items: AdminSpecialtyItem[];
     meta: SpecialtyListMeta;
+}
+
+export interface AdminRoomItem {
+    P_MA: number;
+    CK_MA: number;
+    P_TEN: string;
+    P_VI_TRI: string | null;
+    CHUYEN_KHOA?: {
+        CK_MA: number;
+        CK_TEN: string;
+    };
+}
+
+export interface CreateRoomInput {
+    CK_MA: number;
+    P_TEN: string;
+    P_VI_TRI?: string;
+}
+
+export type UpdateRoomInput = Partial<CreateRoomInput>;
+
+export type RoomSortBy = 'code' | 'name';
+export type RoomSortOrder = 'asc' | 'desc';
+
+export interface RoomListMeta {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    sortBy: RoomSortBy;
+    sortOrder: RoomSortOrder;
+    search: string;
+    specialtyId: number | null;
+}
+
+export interface RoomListResponse {
+    items: AdminRoomItem[];
+    meta: RoomListMeta;
 }
 
 export interface AdminPatient {
@@ -347,7 +466,7 @@ export interface OfficialShiftFormContextResponse {
     hasAnyAvailableSession: boolean;
 }
 
-// ─── DASHBOARD INTERFACES ─────────────────────────────────────
+// â”€â”€â”€ DASHBOARD INTERFACES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export interface DailyOperationsStats {
     totalPatientsToday: number;
     pendingVisitsToday: number;
@@ -397,7 +516,7 @@ export interface DashboardSummary {
 
 
 export const adminApi = {
-    // ─── DOCTORS CRUD ─────────────────────────────────────────────
+    // â”€â”€â”€ DOCTORS CRUD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     
     getDoctors: async (params?: {
         search?: string;
@@ -633,7 +752,7 @@ export const adminApi = {
         return res.data;
     },
 
-    // ─── SERVICES CRUD ────────────────────────────────────────────
+    // â”€â”€â”€ SERVICES CRUD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     getServices: async (params?: {
         search?: string;
         page?: number;
@@ -667,7 +786,55 @@ export const adminApi = {
         await axiosClient.delete(`/admin/services/${id}`);
     },
 
-    // ─── SPECIALTIES CRUD ────────────────────────────────────────────────────
+    getMedicines: async (params?: {
+        search?: string;
+        page?: number;
+        limit?: number;
+        sortBy?: MedicineSortBy;
+        sortOrder?: MedicineSortOrder;
+        groupId?: number;
+        manufacturerId?: number;
+        minPrice?: number;
+        maxPrice?: number;
+        expirationStatus?: MedicineExpirationStatus;
+    }): Promise<MedicineListResponse> => {
+        const res = await axiosClient.get<MedicineListResponse>('/admin/medicines', { params });
+        return res.data;
+    },
+
+    getMedicineFilterOptions: async (): Promise<MedicineFilterOptions> => {
+        const res = await axiosClient.get<MedicineFilterOptions>('/admin/medicines/filter-options');
+        return res.data;
+    },
+
+    getMedicineById: async (id: number): Promise<AdminMedicineItem> => {
+        const res = await axiosClient.get<AdminMedicineItem>(`/admin/medicines/${id}`);
+        return res.data;
+    },
+
+    createMedicine: async (data: CreateMedicineInput): Promise<AdminMedicineItem> => {
+        const res = await axiosClient.post<AdminMedicineItem>('/admin/medicines', data);
+        return res.data;
+    },
+
+    updateMedicine: async (id: number, data: UpdateMedicineInput): Promise<AdminMedicineItem> => {
+        const res = await axiosClient.put<AdminMedicineItem>(`/admin/medicines/${id}`, data);
+        return res.data;
+    },
+
+    updateMedicineBrandInfo: async (
+        id: number,
+        data: UpdateMedicineBrandInfoInput,
+    ): Promise<AdminMedicineItem> => {
+        const res = await axiosClient.put<AdminMedicineItem>(`/admin/medicines/${id}/brand-info`, data);
+        return res.data;
+    },
+
+    deleteMedicine: async (id: number): Promise<void> => {
+        await axiosClient.delete(`/admin/medicines/${id}`);
+    },
+
+    // â”€â”€â”€ SPECIALTIES CRUD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     getSpecialtiesList: async (params?: {
         search?: string;
         page?: number;
@@ -698,7 +865,38 @@ export const adminApi = {
         await axiosClient.delete(`/admin/specialties/${id}`);
     },
 
-    // ─── DASHBOARD ───────────────────────────────────────────────
+    getRooms: async (params?: {
+        search?: string;
+        page?: number;
+        limit?: number;
+        sortBy?: RoomSortBy;
+        sortOrder?: RoomSortOrder;
+        specialtyId?: number;
+    }): Promise<RoomListResponse> => {
+        const res = await axiosClient.get<RoomListResponse>('/admin/rooms', { params });
+        return res.data;
+    },
+
+    getRoomById: async (id: number): Promise<AdminRoomItem> => {
+        const res = await axiosClient.get<AdminRoomItem>(`/admin/rooms/${id}`);
+        return res.data;
+    },
+
+    createRoom: async (data: CreateRoomInput): Promise<AdminRoomItem> => {
+        const res = await axiosClient.post<AdminRoomItem>('/admin/rooms', data);
+        return res.data;
+    },
+
+    updateRoom: async (id: number, data: UpdateRoomInput): Promise<AdminRoomItem> => {
+        const res = await axiosClient.put<AdminRoomItem>(`/admin/rooms/${id}`, data);
+        return res.data;
+    },
+
+    deleteRoom: async (id: number): Promise<void> => {
+        await axiosClient.delete(`/admin/rooms/${id}`);
+    },
+
+    // â”€â”€â”€ DASHBOARD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     
     getDashboardSummary: async (): Promise<DashboardSummary> => {
         const res = await axiosClient.get<DashboardSummary>('/admin/dashboard/summary');
@@ -730,3 +928,5 @@ export const adminApi = {
         return res.data;
     }
 };
+
+
