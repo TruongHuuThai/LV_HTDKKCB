@@ -1,4 +1,3 @@
-// src/modules/booking/booking.service.ts
 import {
   BadRequestException,
   ConflictException,
@@ -20,11 +19,19 @@ export class BookingService {
     private readonly repo: BookingRepository,
     private readonly vnpay: VnpayService,
     private readonly paymentRepo: PaymentRepository,
-  ) { }
+  ) {}
 
-  private async resolvePatientIdOrThrow(TK_SDT: string): Promise<number> {
-    const bn = await this.repo.findActivePatientByPhone(TK_SDT);
-    if (!bn) throw new NotFoundException('Tài khoản chưa có hồ sơ bệnh nhân');
+  private async ensureOwnedPatientProfileOrThrow(
+    TK_SDT: string,
+    BN_MA: number,
+    options?: { allowDisabled?: boolean },
+  ): Promise<number> {
+    const bn = await this.repo.findOwnedPatientProfile(TK_SDT, BN_MA);
+    if (!bn || (!options?.allowDisabled && bn.BN_DA_VO_HIEU === true)) {
+      throw new NotFoundException(
+        'Khong tim thay ho so benh nhan hop le thuoc tai khoan hien tai',
+      );
+    }
     return bn.BN_MA;
   }
 
@@ -32,12 +39,14 @@ export class BookingService {
     const N_NGAY = parseDateOnly(yyyy_mm_dd);
 
     const lich = await this.repo.findDoctorSchedule(BS_MA, N_NGAY, B_TEN);
-    if (!lich)
-      throw new NotFoundException('Bác sĩ không có lịch ngày/buổi này');
+    if (!lich) {
+      throw new NotFoundException('Bac si khong co lich ngay/buoi nay');
+    }
 
     const slots = await this.repo.listTimeSlotsByBuoi(B_TEN);
     const booked = await this.repo.listBookedSlots(BS_MA, N_NGAY, B_TEN);
     const bookedSet = new Set(booked.map((x) => x.KG_MA));
+    const now = new Date();
 
     return {
       schedule: lich,
@@ -45,7 +54,9 @@ export class BookingService {
         KG_MA: s.KG_MA,
         KG_BAT_DAU: s.KG_BAT_DAU,
         KG_KET_THUC: s.KG_KET_THUC,
-        available: !bookedSet.has(s.KG_MA),
+        available:
+          !bookedSet.has(s.KG_MA) &&
+          combineDateAndTime(N_NGAY, s.KG_BAT_DAU).getTime() > now.getTime(),
       })),
     };
   }
@@ -53,7 +64,7 @@ export class BookingService {
   async getAvailableDoctors(YYYY_MM_DD?: string, CK_MA?: number) {
     const N_NGAY = YYYY_MM_DD ? parseDateOnly(YYYY_MM_DD) : undefined;
     const docs = await this.repo.findAvailableDoctors(N_NGAY, CK_MA);
-    return docs.map(d => ({
+    return docs.map((d) => ({
       BS_MA: d.BS_MA,
       BS_HO_TEN: d.BS_HO_TEN,
       BS_HOC_HAM: d.BS_HOC_HAM,
@@ -71,14 +82,17 @@ export class BookingService {
     }
 
     const booked = await this.repo.listBookedSlotsForDate(BS_MA, N_NGAY);
-    const bookedSet = new Set(booked.map(x => x.KG_MA));
+    const bookedSet = new Set(booked.map((x) => x.KG_MA));
+    const now = new Date();
 
-    return sches.map(sch => {
+    return sches.map((sch) => {
       const slots = sch.BUOI.KHUNG_GIO.map((kg: any) => ({
         KG_MA: kg.KG_MA,
         KG_BAT_DAU: kg.KG_BAT_DAU,
         KG_KET_THUC: kg.KG_KET_THUC,
-        available: !bookedSet.has(kg.KG_MA),
+        available:
+          !bookedSet.has(kg.KG_MA) &&
+          combineDateAndTime(N_NGAY, kg.KG_BAT_DAU).getTime() > now.getTime(),
       }));
 
       return {
@@ -94,26 +108,27 @@ export class BookingService {
     dto: CreateBookingDto,
     clientIp = '127.0.0.1',
   ) {
-    const BN_MA = await this.resolvePatientIdOrThrow(user.TK_SDT);
+    const BN_MA = await this.ensureOwnedPatientProfileOrThrow(
+      user.TK_SDT,
+      dto.BN_MA,
+    );
     const N_NGAY = parseDateOnly(dto.N_NGAY);
 
     const kg = await this.repo.findTimeSlot(dto.KG_MA);
-    if (!kg) throw new NotFoundException('Khung giờ không tồn tại');
+    if (!kg) {
+      throw new NotFoundException('Khung gio khong ton tai');
+    }
 
     const startAt = combineDateAndTime(N_NGAY, kg.KG_BAT_DAU);
+    if (startAt.getTime() <= Date.now()) {
+      throw new BadRequestException('Khong the dat lich o thoi diem da qua');
+    }
 
-    if (startAt.getTime() <= Date.now())
-      throw new BadRequestException('Không thể đặt lịch ở thời điểm đã qua');
+    const lich = await this.repo.findDoctorSchedule(dto.BS_MA, N_NGAY, dto.B_TEN);
+    if (!lich) {
+      throw new NotFoundException('Bac si khong co lich ngay/buoi nay');
+    }
 
-    const lich = await this.repo.findDoctorSchedule(
-      dto.BS_MA,
-      N_NGAY,
-      dto.B_TEN,
-    );
-    if (!lich)
-      throw new NotFoundException('Bác sĩ không có lịch ngày/buổi này');
-
-    // Lấy giá khám từ loại hình khám (nếu có)
     const price = dto.LHK_MA
       ? (await this.repo.findLoaiHinhKham(dto.LHK_MA))?.LHK_GIA ?? 0
       : 0;
@@ -133,12 +148,11 @@ export class BookingService {
         e instanceof Prisma.PrismaClientKnownRequestError &&
         e.code === 'P2002'
       ) {
-        throw new ConflictException('Khung giờ này đã có người đặt');
+        throw new ConflictException('Khung gio nay da co nguoi dat');
       }
       throw e;
     }
 
-    // Tạo bản ghi THANH_TOAN với trạng thái CHUA_THANH_TOAN
     const payment = await this.paymentRepo.createPayment({
       DK_MA: booking.DK_MA,
       TT_TONG_TIEN: Number(price),
@@ -147,10 +161,9 @@ export class BookingService {
       TT_PHUONG_THUC: 'VNPAY',
     });
 
-    // Sinh URL thanh toán VNPAY
     const orderInfo = `Dat lich kham BS ${dto.BS_MA} ngay ${dto.N_NGAY}`;
     const paymentUrl = this.vnpay.createPaymentUrl(
-      Number(price) || 10000, // tối thiểu 10,000 VND để test
+      Number(price) || 10000,
       String(payment.TT_MA),
       orderInfo,
       clientIp,
@@ -163,8 +176,16 @@ export class BookingService {
     };
   }
 
-  async listMyBookings(user: { TK_SDT: string; role?: string }) {
-    const BN_MA = await this.resolvePatientIdOrThrow(user.TK_SDT);
+  async listMyBookings(
+    user: { TK_SDT: string; role?: string; bnMa?: number | null },
+    requestedPatientId?: number,
+  ) {
+    const targetPatientId = requestedPatientId ?? user.bnMa ?? 0;
+    const BN_MA = await this.ensureOwnedPatientProfileOrThrow(
+      user.TK_SDT,
+      targetPatientId,
+      { allowDisabled: true },
+    );
     return this.repo.listBookingsOfPatient(BN_MA);
   }
 
@@ -174,17 +195,24 @@ export class BookingService {
     reason?: string,
   ) {
     const dk = await this.repo.findBookingById(DK_MA);
-    if (!dk) throw new NotFoundException('Không tìm thấy đăng ký');
-
-    // ✅ Patient chỉ được huỷ của mình, Admin được huỷ tất cả
-    if (user.role !== ROLE.ADMIN) {
-      const BN_MA = await this.resolvePatientIdOrThrow(user.TK_SDT);
-      if (dk.BN_MA !== BN_MA)
-        throw new ForbiddenException('Bạn không có quyền hủy đăng ký này');
+    if (!dk) {
+      throw new NotFoundException('Khong tim thay dang ky');
     }
 
-    if (dk.DK_TRANG_THAI === 'HUY') return dk; // idempotent
+    if (user.role !== ROLE.ADMIN) {
+      const BN_MA = await this.ensureOwnedPatientProfileOrThrow(
+        user.TK_SDT,
+        dk.BN_MA,
+        { allowDisabled: true },
+      );
+      if (dk.BN_MA !== BN_MA) {
+        throw new ForbiddenException('Ban khong co quyen huy dang ky nay');
+      }
+    }
+
+    if (dk.DK_TRANG_THAI === 'HUY') {
+      return dk;
+    }
     return this.repo.cancelBooking(DK_MA, reason);
   }
 }
-

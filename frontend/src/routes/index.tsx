@@ -14,6 +14,8 @@ import DoctorsPage from '@/pages/doctors/DoctorsPage';
 import BookingPage from '@/pages/BookingPage';
 import ProfilePage from '@/pages/ProfilePage';
 import NotFoundPage from '@/pages/NotFoundPage';
+import PatientProfileFormPage from '@/pages/patient/PatientProfileFormPage';
+import PatientProfileDetailPage from '@/pages/patient/PatientProfileDetailPage';
 
 // Pages – Specialty
 import SpecialtyListPage from '@/pages/specialty/SpecialtyListPage';
@@ -66,8 +68,6 @@ const router = createBrowserRouter([
             { path: '/doctors', element: <DoctorsPage /> },
             { path: '/doi-ngu-bac-si', element: <DoctorsPage /> },
             { path: '/doi-ngu-bac-si/:slug', element: <DoctorsPage /> },
-            { path: '/booking', element: <BookingPage /> },
-            { path: '/profile', element: <ProfilePage /> },
             // Specialty pages
             { path: '/chuyen-khoa', element: <SpecialtyListPage /> },
             { path: '/chuyen-khoa/:slug', element: <SpecialtyDetailPage /> },
@@ -87,6 +87,17 @@ const router = createBrowserRouter([
             { path: '/huong-dan/:slug', element: <GuideDetailPage /> },
             // Contact page
             { path: '/lien-he', element: <ContactPage /> },
+            {
+                element: <ProtectedRoute allowedRoles={['BENH_NHAN']} />,
+                children: [
+                    { path: '/booking', element: <BookingPage /> },
+                    { path: '/profile', element: <ProfilePage /> },
+                    { path: '/patient-profiles', element: <ProfilePage /> },
+                    { path: '/patient-profiles/create', element: <PatientProfileFormPage /> },
+                    { path: '/patient-profiles/:id', element: <PatientProfileDetailPage /> },
+                    { path: '/patient-profiles/:id/edit', element: <PatientProfileFormPage /> },
+                ],
+            },
         ],
     },
 

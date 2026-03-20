@@ -5,7 +5,6 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { Response } from 'express';
-// đổi path này theo generated client của bạn
 import { Prisma } from '@prisma/client';
 
 @Catch(Prisma.PrismaClientKnownRequestError)
@@ -19,13 +18,16 @@ export class PrismaExceptionFilter implements ExceptionFilter {
 
     if (exception.code === 'P2002') {
       status = HttpStatus.CONFLICT;
-      message = 'Dữ liệu bị trùng (unique).';
+      message = 'Du lieu bi trung (unique).';
     } else if (exception.code === 'P2003') {
       status = HttpStatus.BAD_REQUEST;
-      message = 'Khóa ngoại không hợp lệ.';
+      message = 'Khoa ngoai khong hop le.';
+    } else if (exception.code === 'P2022') {
+      status = HttpStatus.BAD_REQUEST;
+      message = 'Cau truc co so du lieu chua duoc cap nhat dung voi ma nguon hien tai.';
     } else if (exception.code === 'P2025') {
       status = HttpStatus.NOT_FOUND;
-      message = 'Không tìm thấy dữ liệu.';
+      message = 'Khong tim thay du lieu.';
     }
 
     return res.status(status).json({

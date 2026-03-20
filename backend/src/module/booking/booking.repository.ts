@@ -7,11 +7,14 @@ export class BookingRepository {
   constructor(private readonly prisma: PrismaService) { }
 
   // ✅ map TK_SDT -> BN_MA (không tin client)
-  findActivePatientByPhone(TK_SDT: string) {
+  findOwnedPatientProfile(TK_SDT: string, BN_MA: number) {
     return this.prisma.bENH_NHAN.findFirst({
-      where: { TK_SDT },
-      orderBy: { BN_MA: 'desc' },
-      select: { BN_MA: true, TK_SDT: true },
+      where: { TK_SDT, BN_MA },
+      select: {
+        BN_MA: true,
+        TK_SDT: true,
+        BN_DA_VO_HIEU: true,
+      },
     });
   }
 

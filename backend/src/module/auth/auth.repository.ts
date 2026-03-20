@@ -12,7 +12,14 @@ export class AuthRepository {
       where: { TK_SDT },
       include: {
         BAC_SI: true,
-        BENH_NHAN: true, // array theo schema
+        BENH_NHAN: {
+          select: {
+            BN_MA: true,
+            BN_HO_CHU_LOT: true,
+            BN_TEN: true,
+          },
+          orderBy: { BN_MA: 'asc' },
+        }, // array theo schema
       },
     });
   }

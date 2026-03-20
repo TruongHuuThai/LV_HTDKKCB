@@ -18,7 +18,11 @@ export interface RegisterInput {
 
 export const authService = {
     login: async (TK_SDT: string, TK_PASS: string): Promise<LoginResponse> => {
-        const res = await api.post<LoginResponse>('/auth/login', { TK_SDT, TK_PASS });
+        const normalizedPhone = TK_SDT.replace(/\D/g, '').trim();
+        const res = await api.post<LoginResponse>('/auth/login', {
+            TK_SDT: normalizedPhone,
+            TK_PASS,
+        });
         return res.data;
     },
 

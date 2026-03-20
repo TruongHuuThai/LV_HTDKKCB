@@ -9,6 +9,7 @@ import { Eye, EyeOff, Phone, Lock, ArrowRight, Heart, Loader2, AlertCircle } fro
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { getApiErrorMessage } from '@/lib/apiError';
 import { authService } from '@/services/authService';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -16,6 +17,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 const loginSchema = z.object({
     TK_SDT: z
         .string()
+        .trim()
         .min(1, 'Vui lòng nhập số điện thoại')
         .regex(/^\d{10}$/, 'Số điện thoại phải là 10 chữ số'),
     TK_PASS: z
@@ -85,7 +87,7 @@ export default function LoginPage() {
     const onSubmit = async (data: LoginFormData) => {
         setServerError(null);
         try {
-            const res = await authService.login(data.TK_SDT, data.TK_PASS);
+            const res = await authService.login(data.TK_SDT.replace(/\D/g, '').trim(), data.TK_PASS);
             setAuth(res.access_token, res.refresh_token, res.user);
 
             // Redirect based on role
@@ -93,8 +95,7 @@ export default function LoginPage() {
             else if (res.user.TK_VAI_TRO === 'BAC_SI') navigate('/doctor/dashboard', { replace: true });
             else navigate('/', { replace: true });
         } catch (err: unknown) {
-            const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            setServerError(msg ?? 'Đăng nhập thất bại. Vui lòng thử lại.');
+            setServerError(getApiErrorMessage(err, 'Dang nhap that bai. Vui long thu lai.'));
         }
     };
 
@@ -235,3 +236,4 @@ export default function LoginPage() {
         </div>
     );
 }
+

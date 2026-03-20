@@ -1,14 +1,17 @@
 // src/modules/auth/dto/login.dto.ts
-import { IsNotEmpty, IsPhoneNumber, IsString, MinLength } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsNotEmpty, IsString, MinLength } from 'class-validator';
 
 export class LoginDto {
-  /* @IsPhoneNumber('VN', { message: 'Số điện thoại không hợp lệ' }) */
-  @IsString({ message: 'Số điện thoại phải là chuỗi' })
-  @IsNotEmpty({ message: 'Số điện thoại không được để trống' })
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.replace(/\D/g, '').trim() : value,
+  )
+  @IsString({ message: 'So dien thoai phai la chuoi' })
+  @IsNotEmpty({ message: 'So dien thoai khong duoc de trong' })
   TK_SDT: string;
 
-  @IsString({ message: 'Mật khẩu phải là chuỗi' })
-  @IsNotEmpty({ message: 'Mật khẩu không được để trống' })
-  @MinLength(6, { message: 'Mật khẩu phải có ít nhất 6 ký tự' })
+  @IsString({ message: 'Mat khau phai la chuoi' })
+  @IsNotEmpty({ message: 'Mat khau khong duoc de trong' })
+  @MinLength(6, { message: 'Mat khau phai co it nhat 6 ky tu' })
   TK_PASS: string;
 }

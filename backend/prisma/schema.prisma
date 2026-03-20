@@ -61,15 +61,20 @@ model BENH_NHAN {
   TK_SDT          String?
   AK_MA           Int?
   BN_LA_NAM       Boolean?
+  BN_NGAY_SINH    DateTime?         @db.Date
   BN_HO_CHU_LOT   String?
   BN_TEN          String?
   BN_EMAIL        String?
   BN_CCCD         String?
+  BN_SO_BHYT      String?
   BN_QUOC_GIA     String?
   BN_DAN_TOC      String?
   BN_SO_DDCN      String?
   BN_MOI          Boolean?          @default(false)
   BN_SDT_DANG_KY  String?
+  BN_DIA_CHI      String?
+  BN_QUAN_HE_VOI_TK String?
+  BN_DA_VO_HIEU   Boolean?          @default(false)
   BN_ANH          String?
   AP_KV           AP_KV?            @relation(fields: [AK_MA], references: [AK_MA], onDelete: NoAction, onUpdate: NoAction)
   TAI_KHOAN       TAI_KHOAN?        @relation(fields: [TK_SDT], references: [TK_SDT], onDelete: NoAction, onUpdate: NoAction)

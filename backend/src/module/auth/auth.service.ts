@@ -19,10 +19,11 @@ export class AuthService {
 
   private buildAuthUser(acc: Awaited<ReturnType<AuthRepository['findAccountByPhone']>>) {
     const bsMa = acc?.BAC_SI?.BS_MA ?? null;
-    const bnMa = acc?.BENH_NHAN?.[0]?.BN_MA ?? null;
+    const primaryPatient = acc?.BENH_NHAN?.[0];
+    const bnMa = primaryPatient?.BN_MA ?? null;
     const doctorName = acc?.BAC_SI?.BS_HO_TEN?.trim() || null;
     const patientName =
-      `${acc?.BENH_NHAN?.[0]?.BN_HO_CHU_LOT || ''} ${acc?.BENH_NHAN?.[0]?.BN_TEN || ''}`.trim() || null;
+      `${primaryPatient?.BN_HO_CHU_LOT || ''} ${primaryPatient?.BN_TEN || ''}`.trim() || null;
     const displayName =
       acc?.TK_VAI_TRO === ROLE.BAC_SI
         ? doctorName

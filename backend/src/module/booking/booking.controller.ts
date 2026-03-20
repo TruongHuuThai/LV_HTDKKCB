@@ -82,9 +82,11 @@ export class BookingController {
   @Roles(ROLE.BENH_NHAN)
   async my(
     // @ts-ignore
-    @CurrentUser() user: CurrentUserPayload
+    @CurrentUser() user: CurrentUserPayload,
+    @Query('BN_MA') BN_MA?: string,
   ): Promise<any> {
-    return this.booking.listMyBookings(user);
+    const patientId = BN_MA ? parseInt(BN_MA, 10) : undefined;
+    return this.booking.listMyBookings(user, patientId);
   }
 
   // @ts-ignore
