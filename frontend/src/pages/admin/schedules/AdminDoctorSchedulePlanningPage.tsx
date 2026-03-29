@@ -7,7 +7,9 @@ import {
   useDroppable,
   useSensor,
   useSensors,
+  type DragCancelEvent,
   type DragEndEvent,
+  type DragOverEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
@@ -74,6 +76,8 @@ type DoctorDragData = {
   doctorId: number;
   specialtyId: number;
   doctorName: string;
+  specialtyName: string;
+  assignedCount: number;
 };
 
 type SlotDropData = {
@@ -251,6 +255,8 @@ function DoctorCard({
       doctorId: id,
       specialtyId,
       doctorName: name,
+      specialtyName,
+      assignedCount,
     } satisfies DoctorDragData,
     disabled,
   });
@@ -258,14 +264,14 @@ function DoctorCard({
   return (
     <div
       ref={setNodeRef}
-      style={{ transform: CSS.Translate.toString(transform) }}
+      style={!active ? { transform: CSS.Translate.toString(transform) } : undefined}
       {...attributes}
       {...listeners}
       className={cn(
-        'rounded-lg border p-3 text-sm shadow-sm transition-colors',
+        'rounded-lg border p-3 text-sm shadow-sm transition-all',
         disabled && 'cursor-not-allowed opacity-60',
         !disabled && 'cursor-grab active:cursor-grabbing',
-        active ? 'border-blue-300 bg-blue-50' : 'border-slate-200 bg-white',
+        active ? 'border-blue-300 bg-blue-50 opacity-45 ring-2 ring-blue-200' : 'border-slate-200 bg-white',
       )}
     >
       <div className='flex items-start justify-between gap-2'>
@@ -290,6 +296,8 @@ function PlanningCell({
   canDropWhenDragging,
   specialtyId,
   onRemoveDoctor,
+  dropReason,
+  dragging,
 }: {
   slot: Slot;
   roomName: string;
@@ -300,6 +308,8 @@ function PlanningCell({
   canDropWhenDragging: boolean;
   specialtyId: number | null;
   onRemoveDoctor: (slotKeyValue: string) => void;
+  dropReason?: string;
+  dragging: boolean;
 }) {
   const blockedByLeave = slot.status === 'cancelled_by_doctor_leave';
   const assigned = slot.doctorId !== null;
@@ -324,11 +334,19 @@ function PlanningCell({
     <div
       ref={setNodeRef}
       className={cn(
-        'rounded-md border p-2 transition-colors',
+        'rounded-md border p-2 transition-all',
         visualMeta.cellClass,
         blockedByLeave && 'opacity-70',
-        isOver && !blockedByLeave && canDropWhenDragging && 'ring-2 ring-blue-300',
-        isOver && !blockedByLeave && !canDropWhenDragging && 'ring-2 ring-rose-300',
+        dragging && !blockedByLeave && canDropWhenDragging && 'border-blue-300 bg-blue-50/70',
+        dragging && !blockedByLeave && !canDropWhenDragging && 'border-rose-300 bg-rose-50/70',
+        isOver &&
+          !blockedByLeave &&
+          canDropWhenDragging &&
+          'scale-[1.01] border-blue-500 bg-blue-100 ring-2 ring-blue-500 shadow-sm',
+        isOver &&
+          !blockedByLeave &&
+          !canDropWhenDragging &&
+          'border-rose-500 bg-rose-100 ring-2 ring-rose-500',
       )}
     >
       <div className='text-[11px] text-slate-500'>{roomName}</div>
@@ -353,6 +371,16 @@ function PlanningCell({
       >
         {visualMeta.label}
       </div>
+      {dragging && !blockedByLeave ? (
+        <div
+          className={cn(
+            'mt-1 text-[10px] font-medium',
+            canDropWhenDragging ? 'text-blue-700' : 'text-rose-700',
+          )}
+        >
+          {canDropWhenDragging ? 'Co the tha vao o nay' : dropReason || 'Khong the tha vao o nay'}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -369,6 +397,9 @@ export default function AdminDoctorSchedulePlanningPage() {
   const [sessionView, setSessionView] = useState('all');
   const [search, setSearch] = useState('');
   const [activeDoctor, setActiveDoctor] = useState<number | null>(null);
+  const [activeDoctorDragData, setActiveDoctorDragData] = useState<DoctorDragData | null>(null);
+  const [activeDoctorWidth, setActiveDoctorWidth] = useState<number | null>(null);
+  const [hoveredSlotKey, setHoveredSlotKey] = useState<string | null>(null);
 
   const [slots, setSlots] = useState<Record<string, Slot>>({});
   const [baseSlots, setBaseSlots] = useState<Record<string, Slot>>({});
@@ -479,6 +510,9 @@ export default function AdminDoctorSchedulePlanningPage() {
       setSlots({});
       setBaseSlots({});
       setActiveDoctor(null);
+      setActiveDoctorDragData(null);
+      setActiveDoctorWidth(null);
+      setHoveredSlotKey(null);
       setCopyPreview(null);
       return;
     }
@@ -864,10 +898,24 @@ export default function AdminDoctorSchedulePlanningPage() {
     const data = event.active.data.current as DoctorDragData | undefined;
     if (!data || data.type !== 'doctor') return;
     setActiveDoctor(data.doctorId);
+    setActiveDoctorDragData(data);
+    setActiveDoctorWidth(event.active.rect.current.initial?.width ?? null);
+  };
+
+  const onDragOver = (event: DragOverEvent) => {
+    const dropData = event.over?.data.current as SlotDropData | undefined;
+    if (!dropData || dropData.type !== 'slot') {
+      setHoveredSlotKey(null);
+      return;
+    }
+    setHoveredSlotKey(dropData.slotKey);
   };
 
   const onDragEnd = (event: DragEndEvent) => {
     setActiveDoctor(null);
+    setActiveDoctorDragData(null);
+    setActiveDoctorWidth(null);
+    setHoveredSlotKey(null);
 
     if (!canUseBoard) return;
 
@@ -897,6 +945,13 @@ export default function AdminDoctorSchedulePlanningPage() {
     toast.success(
       `Đã gán ${dragData.doctorName} vào ${roomNameById.get(targetSlot.roomId) || `Phòng ${targetSlot.roomId}`}.`,
     );
+  };
+
+  const onDragCancel = (_event: DragCancelEvent) => {
+    setActiveDoctor(null);
+    setActiveDoctorDragData(null);
+    setActiveDoctorWidth(null);
+    setHoveredSlotKey(null);
   };
 
   return (
@@ -1051,7 +1106,13 @@ export default function AdminDoctorSchedulePlanningPage() {
         </div>
       </section>
 
-      <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+      <DndContext
+        sensors={sensors}
+        onDragStart={onDragStart}
+        onDragOver={onDragOver}
+        onDragEnd={onDragEnd}
+        onDragCancel={onDragCancel}
+      >
         <div className='grid gap-4 xl:grid-cols-[340px_1fr]'>
           <div className='space-y-4 xl:sticky xl:top-4 xl:self-start'>
             <section className='rounded-xl border bg-white p-4 shadow-sm'>
@@ -1238,6 +1299,7 @@ export default function AdminDoctorSchedulePlanningPage() {
                                   if (!currentSlot) return null;
                                   const dropCheck =
                                     activeDoctor != null ? validateDrop(currentSlot, activeDoctor) : { ok: true };
+                                  const dragging = activeDoctor != null;
 
                                   return (
                                     <PlanningCell
@@ -1253,6 +1315,8 @@ export default function AdminDoctorSchedulePlanningPage() {
                                       conflict={conflicts.has(currentSlot.key)}
                                       disabled={!canUseBoard}
                                       canDropWhenDragging={dropCheck.ok}
+                                      dropReason={dropCheck.reason}
+                                      dragging={dragging}
                                       specialtyId={hasSpecialty ? Number(specialtyId) : null}
                                       onRemoveDoctor={removeDoctorFromSlot}
                                     />
@@ -1271,10 +1335,25 @@ export default function AdminDoctorSchedulePlanningPage() {
           </section>
         </div>
 
-        <DragOverlay>
-          {activeDoctor ? (
-            <div className='rounded border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-medium'>
-              {doctorNameById.get(activeDoctor) || `BS #${activeDoctor}`}
+        <DragOverlay zIndex={1200}>
+          {activeDoctor && activeDoctorDragData ? (
+            <div
+              className={cn(
+                'rounded-lg border border-blue-300 bg-white p-3 text-sm shadow-xl ring-1 ring-blue-200',
+                hoveredSlotKey && 'border-blue-500',
+              )}
+              style={activeDoctorWidth ? { width: activeDoctorWidth } : undefined}
+            >
+              <div className='flex items-start justify-between gap-2'>
+                <div className='font-medium text-slate-900'>
+                  {activeDoctorDragData.doctorName || `BS #${activeDoctor}`}
+                </div>
+                <GripVertical className='h-4 w-4 text-slate-400' />
+              </div>
+              <div className='mt-1 text-xs text-slate-500'>{activeDoctorDragData.specialtyName}</div>
+              <div className='mt-2 inline-flex rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-700'>
+                {activeDoctorDragData.assignedCount} ca truc
+              </div>
             </div>
           ) : null}
         </DragOverlay>

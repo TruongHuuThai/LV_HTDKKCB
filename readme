@@ -10,3 +10,7 @@ npm run start:dev
 
 cd frontend
 npm run dev
+
+git add .
+git commit -m "tự động"
+git push
