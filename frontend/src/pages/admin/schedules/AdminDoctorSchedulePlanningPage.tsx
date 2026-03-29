@@ -7,7 +7,6 @@ import {
   useDroppable,
   useSensor,
   useSensors,
-  type DragCancelEvent,
   type DragEndEvent,
   type DragOverEvent,
   type DragStartEvent,
@@ -106,6 +105,17 @@ const weekRange = (weekStart: string) => ({
   dateFrom: weekStart,
   dateTo: format(addDays(parseISO(weekStart), 5), 'yyyy-MM-dd'),
 });
+
+const workingWeekBounds = (dateIso: string) => {
+  const monday = startOfWeek(parseISO(dateIso), { weekStartsOn: 1 });
+  return {
+    monday: format(monday, 'yyyy-MM-dd'),
+    saturday: format(addDays(monday, 5), 'yyyy-MM-dd'),
+  };
+};
+
+const isSameWorkingWeek = (dateA: string, dateB: string) =>
+  workingWeekBounds(dateA).monday === workingWeekBounds(dateB).monday;
 
 const rangeDates = (dateFrom: string, dateTo: string) => {
   if (!dateFrom || !dateTo) return [] as string[];
@@ -783,19 +793,61 @@ export default function AdminDoctorSchedulePlanningPage() {
   const openDateToPicker = () => openDatePicker(dateToPickerRef.current);
 
   const updateDateFrom = (dateFrom: string) => {
-    setRange((prev) => ({
-      ...prev,
-      dateFrom,
-      dateTo: !prev.dateTo && dateFrom ? dateFrom : prev.dateTo,
-    }));
+    setRange((prev) => {
+      const nextDateTo = !prev.dateTo && dateFrom ? dateFrom : prev.dateTo;
+      if (!dateFrom || !nextDateTo) {
+        return {
+          ...prev,
+          dateFrom,
+          dateTo: nextDateTo,
+        };
+      }
+
+      const notSameWeek = !isSameWorkingWeek(dateFrom, nextDateTo);
+      const fromAfterTo = isAfter(parseISO(dateFrom), parseISO(nextDateTo));
+      if (notSameWeek || fromAfterTo) {
+        return {
+          ...prev,
+          dateFrom,
+          dateTo: workingWeekBounds(dateFrom).saturday,
+        };
+      }
+
+      return {
+        ...prev,
+        dateFrom,
+        dateTo: nextDateTo,
+      };
+    });
   };
 
   const updateDateTo = (dateTo: string) => {
-    setRange((prev) => ({
-      ...prev,
-      dateTo,
-      dateFrom: !prev.dateFrom && dateTo ? dateTo : prev.dateFrom,
-    }));
+    setRange((prev) => {
+      const nextDateFrom = !prev.dateFrom && dateTo ? dateTo : prev.dateFrom;
+      if (!dateTo || !nextDateFrom) {
+        return {
+          ...prev,
+          dateTo,
+          dateFrom: nextDateFrom,
+        };
+      }
+
+      const notSameWeek = !isSameWorkingWeek(nextDateFrom, dateTo);
+      const toBeforeFrom = isAfter(parseISO(nextDateFrom), parseISO(dateTo));
+      if (notSameWeek || toBeforeFrom) {
+        return {
+          ...prev,
+          dateTo,
+          dateFrom: workingWeekBounds(dateTo).monday,
+        };
+      }
+
+      return {
+        ...prev,
+        dateTo,
+        dateFrom: nextDateFrom,
+      };
+    });
   };
 
   const shiftWeek = (direction: number) => {
@@ -947,7 +999,7 @@ export default function AdminDoctorSchedulePlanningPage() {
     );
   };
 
-  const onDragCancel = (_event: DragCancelEvent) => {
+  const onDragCancel = () => {
     setActiveDoctor(null);
     setActiveDoctorDragData(null);
     setActiveDoctorWidth(null);
