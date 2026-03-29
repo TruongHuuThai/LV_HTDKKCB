@@ -17,7 +17,8 @@ import PatientListPage from '@/pages/admin/patients/PatientListPage';
 import PatientFormPage from '@/pages/admin/patients/PatientFormPage';
 import AccountListPage from '@/pages/admin/accounts/AccountListPage';
 import AccountFormPage from '@/pages/admin/accounts/AccountFormPage';
-import DoctorShiftManagementPage from '@/pages/admin/schedules/DoctorShiftManagementPage';
+import AdminScheduleWorkflowPage from '@/pages/admin/schedules/AdminScheduleWorkflowPage';
+import AdminDoctorSchedulePlanningPage from '@/pages/admin/schedules/AdminDoctorSchedulePlanningPage';
 import RoomListPage from '@/pages/admin/facilities/RoomListPage';
 import RoomFormPage from '@/pages/admin/facilities/RoomFormPage';
 
@@ -118,7 +119,11 @@ export const adminRoutes: RouteObject = {
         },
         {
             path: '/admin/schedules',
-            element: <DoctorShiftManagementPage />,
+            element: <AdminScheduleWorkflowPage />,
+        },
+        {
+            path: '/admin/schedules/plan',
+            element: <AdminDoctorSchedulePlanningPage />,
         },
         // Other admin routes to be added here
     ],

@@ -27,6 +27,15 @@ function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function maxBookingDateIso() {
+  const now = new Date();
+  const max = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+  );
+  max.setUTCMonth(max.getUTCMonth() + 3);
+  return max.toISOString().slice(0, 10);
+}
+
 export default function BookingPage() {
   const user = useAuthStore((state) => state.user);
   const selectedProfileId = usePatientProfilesStore(
@@ -276,7 +285,14 @@ export default function BookingPage() {
                   </div>
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-slate-700">Ngày khám</p>
-                    <Input type="date" min={todayIso()} value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} disabled={!selectedProfile} />
+                    <Input
+                      type="date"
+                      min={todayIso()}
+                      max={maxBookingDateIso()}
+                      value={selectedDate}
+                      onChange={(event) => setSelectedDate(event.target.value)}
+                      disabled={!selectedProfile}
+                    />
                   </div>
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-slate-700">Tìm bác sĩ</p>

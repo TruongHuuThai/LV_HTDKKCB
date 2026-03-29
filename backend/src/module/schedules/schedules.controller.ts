@@ -1,17 +1,14 @@
 import {
   Body,
   Controller,
-  Delete,
   ForbiddenException,
   Get,
   Param,
   Post,
-  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
 import { SchedulesService } from './schedules.service';
-import { RegisterScheduleDto } from './dto/register-schedule.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -25,109 +22,84 @@ import type { CurrentUserPayload } from '../auth/current-user.decorator';
 export class SchedulesController {
   constructor(private readonly schedulesService: SchedulesService) {}
 
-  @Get('registration-cycle')
-  async getRegistrationCycle(@CurrentUser() user: CurrentUserPayload) {
-    return this.schedulesService.getRegistrationCycle(this.requireDoctorId(user));
-  }
-
-  @Get('registration-options')
-  async getRegistrationOptions(@CurrentUser() user: CurrentUserPayload) {
-    return this.schedulesService.getRegistrationOptions(this.requireDoctorId(user));
-  }
-
-  @Get('my-registrations')
-  async getMyRegistrations(
+  @Get('weekly-overview')
+  async getWeeklyOverview(
     @CurrentUser() user: CurrentUserPayload,
     @Query('weekStart') weekStart?: string,
   ) {
-    return this.schedulesService.getMyRegistrations(
+    return this.schedulesService.getWeeklyOverview(
       this.requireDoctorId(user),
       weekStart,
     );
   }
 
-  @Get('my-official-shifts')
-  async getMyOfficialShifts(
+  @Get('weekly-schedules')
+  async getMyWeeklySchedules(
     @CurrentUser() user: CurrentUserPayload,
     @Query('weekStart') weekStart?: string,
   ) {
-    return this.schedulesService.getMyOfficialShifts(
+    return this.schedulesService.getMyWeeklySchedules(
       this.requireDoctorId(user),
       weekStart,
     );
   }
 
-  @Get('day-context')
-  async getRegistrationDayContext(
+  @Get('exception-requests')
+  async getMyExceptionRequests(
     @CurrentUser() user: CurrentUserPayload,
-    @Query('date') date?: string,
-    @Query('roomId') roomId?: string,
-    @Query('excludeDate') excludeDate?: string,
-    @Query('excludeSession') excludeSession?: string,
+    @Query('weekStart') weekStart?: string,
   ) {
-    return this.schedulesService.getRegistrationDayContext(
+    return this.schedulesService.getMyExceptionRequests(
       this.requireDoctorId(user),
-      {
-        date,
-        roomId,
-        excludeDate,
-        excludeSession,
-      },
+      weekStart,
     );
   }
 
-  @Post('registrations')
-  async createRegistration(
+  @Post('weeks/:weekStart/confirm')
+  async confirmWeek(
     @CurrentUser() user: CurrentUserPayload,
-    @Body() dto: RegisterScheduleDto,
+    @Param('weekStart') weekStart: string,
   ) {
-    return this.schedulesService.register(this.requireDoctorId(user), dto);
-  }
-
-  @Put('registrations/:date/:session')
-  async updateRegistration(
-    @CurrentUser() user: CurrentUserPayload,
-    @Param('date') date: string,
-    @Param('session') session: string,
-    @Body() dto: RegisterScheduleDto,
-  ) {
-    return this.schedulesService.updateRegistration(
+    return this.schedulesService.confirmWeek(
       this.requireDoctorId(user),
-      date,
-      session,
-      dto,
+      weekStart,
+      user.TK_SDT,
     );
   }
 
-  @Delete('registrations/:date/:session')
-  async cancelRegistration(
+  @Post('shifts/:date/:session/confirm')
+  async confirmShift(
     @CurrentUser() user: CurrentUserPayload,
     @Param('date') date: string,
     @Param('session') session: string,
   ) {
-    return this.schedulesService.cancelRegistration(
+    return this.schedulesService.confirmShift(
       this.requireDoctorId(user),
       date,
       session,
+      user.TK_SDT,
     );
   }
 
-  @Post('register')
-  async register(
+  @Post('exception-requests')
+  async createExceptionRequest(
     @CurrentUser() user: CurrentUserPayload,
-    @Body() dto: RegisterScheduleDto,
+    @Body()
+    body: {
+      targetDate: string;
+      targetSession: string;
+      type: 'leave' | 'shift_change' | 'room_change' | 'other';
+      reason: string;
+      requestedDate?: string | null;
+      requestedSession?: string | null;
+      requestedRoomId?: number | null;
+      suggestedDoctorId?: number | null;
+    },
   ) {
-    return this.schedulesService.register(this.requireDoctorId(user), dto);
-  }
-
-  @Get('my-schedules')
-  async getMySchedules(
-    @CurrentUser() user: CurrentUserPayload,
-    @Query('weekStart') weekStart?: string,
-  ) {
-    return this.schedulesService.getMySchedules(
+    return this.schedulesService.createExceptionRequest(
       this.requireDoctorId(user),
-      weekStart,
+      body,
+      user.TK_SDT,
     );
   }
 

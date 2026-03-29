@@ -1,30 +1,45 @@
-// src/layouts/DoctorLayout.tsx
+﻿// src/layouts/DoctorLayout.tsx
+import { useEffect, useState } from 'react';
 import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
-    Heart,
     LayoutDashboard,
     CalendarDays,
     ClipboardList,
     UserCircle,
-    LogOut,
     ChevronRight,
+    Menu,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { authService } from '@/services/authService';
 import { cn } from '@/lib/utils';
+import AppSidebar from '@/components/layout/AppSidebar';
 
-const sidebarLinks = [
-    { label: 'Tổng quan', to: '/doctor/dashboard', icon: LayoutDashboard },
-    { label: 'Lịch trực', to: '/doctor/schedules', icon: CalendarDays },
-    { label: 'Lịch hẹn', to: '/doctor/appointments', icon: ClipboardList },
-    { label: 'Hồ sơ của tôi', to: '/doctor/profile', icon: UserCircle },
+const sidebarItems = [
+    { label: 'Tổng quan', to: '/doctor/dashboard', icon: LayoutDashboard, exact: true },
+    { label: 'Lịch trực', to: '/doctor/schedules', icon: CalendarDays, exact: true },
+    { label: 'Lịch hẹn', to: '/doctor/appointments', icon: ClipboardList, exact: true },
+    { label: 'Hồ sơ của tôi', to: '/doctor/profile', icon: UserCircle, exact: true },
 ];
 
 export default function DoctorLayout() {
     const { user, refreshToken, clearAuth } = useAuthStore();
     const navigate = useNavigate();
     const location = useLocation();
-    const doctorDisplayName = user?.TEN_HIEN_THI?.trim() || user?.BS_HO_TEN?.trim() || user?.TK_SDT || '---';
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [isPinned, setIsPinned] = useState(false);
+    const [isHovering, setIsHovering] = useState(false);
+    const doctorDisplayName =
+        user?.TEN_HIEN_THI?.trim() || user?.BS_HO_TEN?.trim() || user?.TK_SDT || '---';
+    const collapsed = !isPinned && !isHovering;
+
+    useEffect(() => {
+        const stored = localStorage.getItem('doctor-sidebar-pinned');
+        if (stored) setIsPinned(stored === '1');
+    }, []);
+
+    useEffect(() => {
+        localStorage.setItem('doctor-sidebar-pinned', isPinned ? '1' : '0');
+    }, [isPinned]);
 
     const handleLogout = async () => {
         try {
@@ -36,74 +51,74 @@ export default function DoctorLayout() {
     };
 
     return (
-        <div className="min-h-screen flex bg-[hsl(210,30%,97%)]">
-            {/* ─── Sidebar ──────────────────────────────────────── */}
-            <aside className="w-64 min-h-screen bg-[hsl(var(--sidebar))] text-[hsl(var(--sidebar-foreground))] flex flex-col shadow-xl">
-                {/* Logo */}
-                <div className="px-6 py-5 border-b border-[hsl(var(--sidebar-border))]">
-                    <div className="flex items-center gap-2.5">
-                        <div className="w-9 h-9 bg-[hsl(var(--sidebar-primary))/0.15] rounded-xl flex items-center justify-center">
-                            <Heart className="w-5 h-5 text-[hsl(var(--sidebar-primary))]" />
-                        </div>
-                        <div>
-                            <p className="font-bold text-base leading-tight">UMC Clinic</p>
-                            <p className="text-[10px] text-[hsl(var(--sidebar-foreground))/0.55] uppercase tracking-wider">Bác sĩ</p>
-                        </div>
-                    </div>
-                </div>
+        <div
+            className="relative h-screen overflow-hidden bg-[hsl(210,30%,97%)]"
+            style={{
+                ['--sidebar-rail-width' as never]: '80px',
+                ['--sidebar-expanded-width' as never]: '260px',
+            }}
+        >
+            {sidebarOpen && (
+                <div
+                    className="fixed inset-0 bg-black/50 z-40 md:hidden"
+                    onClick={() => setSidebarOpen(false)}
+                />
+            )}
 
-                {/* User info */}
-                <div className="px-4 py-4 border-b border-[hsl(var(--sidebar-border))]">
-                    <div className="flex items-center gap-3 px-2 py-2 rounded-lg bg-[hsl(var(--sidebar-accent))]">
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[hsl(var(--sidebar-primary))] to-[hsl(200,60%,55%)] flex items-center justify-center text-sm font-bold">
-                            BS
-                        </div>
-                        <div className="overflow-hidden">
-                            <p className="text-sm font-medium truncate">{doctorDisplayName}</p>
-                            <p className="text-xs text-[hsl(var(--sidebar-foreground))/0.55]">Bác sĩ</p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Nav links */}
-                <nav className="flex-1 px-4 py-4 space-y-1">
-                    {sidebarLinks.map(({ label, to, icon: Icon }) => {
-                        const active = location.pathname === to;
-                        return (
-                            <Link
-                                key={to}
-                                to={to}
-                                className={cn(
-                                    'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group',
-                                    active
-                                        ? 'bg-[hsl(var(--sidebar-primary))/0.15] text-[hsl(var(--sidebar-primary))] shadow-sm'
-                                        : 'text-[hsl(var(--sidebar-foreground))/0.7] hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-foreground))]',
-                                )}
-                            >
-                                <Icon className="w-4.5 h-4.5 shrink-0" />
-                                <span className="flex-1">{label}</span>
-                                {active && <ChevronRight className="w-3.5 h-3.5 opacity-60" />}
-                            </Link>
-                        );
-                    })}
-                </nav>
-
-                {/* Logout */}
-                <div className="px-4 pb-6">
-                    <button
-                        onClick={handleLogout}
-                        className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-[hsl(var(--sidebar-foreground))/0.6] hover:bg-red-500/10 hover:text-red-300 transition-colors"
-                    >
-                        <LogOut className="w-4 h-4 shrink-0" />
-                        Đăng xuất
-                    </button>
+            <aside
+                style={{
+                    ['--sidebar-width' as never]: collapsed
+                        ? 'var(--sidebar-rail-width)'
+                        : 'var(--sidebar-expanded-width)',
+                }}
+                className={cn(
+                    'fixed inset-y-0 left-0 z-50 w-[var(--sidebar-width)] bg-slate-950 text-slate-100 flex flex-col shadow-2xl overflow-hidden transition-[width,transform] duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] md:translate-x-0',
+                    sidebarOpen ? 'translate-x-0' : '-translate-x-full',
+                )}
+                onMouseEnter={() => setIsHovering(true)}
+                onMouseLeave={() => setIsHovering(false)}
+            >
+                <div className="h-full w-[var(--sidebar-expanded-width)]">
+                    <AppSidebar
+                        variant="doctor"
+                        brandLabel="UMC Clinic"
+                        brandTo="/doctor/dashboard"
+                        roleLabel="Bác sĩ"
+                        displayName={doctorDisplayName}
+                        initials="BS"
+                        items={sidebarItems}
+                        activePath={location.pathname}
+                        collapsed={collapsed}
+                        pinned={isPinned}
+                        onTogglePin={() => setIsPinned((prev) => !prev)}
+                        onNavigate={() => setSidebarOpen(false)}
+                        onLogout={handleLogout}
+                    />
                 </div>
             </aside>
 
-            {/* ─── Main content ─────────────────────────────────── */}
-            <main className="flex-1 overflow-auto">
-                <Outlet />
-            </main>
+            <div className="relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden pl-0 md:pl-[var(--sidebar-rail-width)]">
+                <header className="h-14 md:h-0 md:invisible bg-white border-b border-gray-200 flex items-center gap-3 px-4 shrink-0 md:border-none">
+                    <button
+                        className="md:hidden p-2 -ml-2 text-gray-500 hover:bg-gray-100 rounded-lg"
+                        onClick={() => setSidebarOpen(true)}
+                    >
+                        <Menu className="w-5 h-5" />
+                    </button>
+                    <div className="flex items-center text-sm font-medium text-gray-600">
+                        Bác sĩ
+                        <ChevronRight className="w-4 h-4 mx-1" />
+                        <span className="text-gray-900 capitalize">
+                            {location.pathname.split('/').pop() || 'Dashboard'}
+                        </span>
+                    </div>
+                </header>
+
+                <main className="flex-1 min-h-0 overflow-y-auto">
+                    <Outlet />
+                </main>
+            </div>
         </div>
     );
 }
+

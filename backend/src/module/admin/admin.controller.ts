@@ -32,6 +32,10 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { ROLE } from '../auth/auth.constants';
+import {
+  CurrentUser,
+  type CurrentUserPayload,
+} from '../auth/current-user.decorator';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -462,15 +466,226 @@ export class AdminController {
     return this.adminService.getScheduleManagementOptions();
   }
 
+  @Get('schedule-management/planning/existing')
+  @HttpCode(HttpStatus.OK)
+  async getSchedulePlanningExisting(
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+    @Query('specialtyId') specialtyId?: string,
+  ) {
+    return this.adminService.getSchedulePlanningExisting({
+      dateFrom: dateFrom || '',
+      dateTo: dateTo || '',
+      specialtyId,
+    });
+  }
+
+  @Post('schedule-management/planning/drafts')
+  @HttpCode(HttpStatus.CREATED)
+  async createSchedulePlanningDraft(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body()
+    body: {
+      dateFrom: string;
+      dateTo: string;
+      specialtyId: number;
+      assignments: Array<{
+        date: string;
+        session: string;
+        roomId: number;
+        doctorId: number;
+      }>;
+    },
+  ) {
+    return this.adminService.createSchedulePlanningDraft(body, user.TK_SDT);
+  }
+
+  @Put('schedule-management/planning/drafts/:id')
+  @HttpCode(HttpStatus.OK)
+  async updateSchedulePlanningDraft(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: CurrentUserPayload,
+    @Body()
+    body: {
+      dateFrom: string;
+      dateTo: string;
+      specialtyId: number;
+      assignments: Array<{
+        date: string;
+        session: string;
+        roomId: number;
+        doctorId: number;
+      }>;
+    },
+  ) {
+    return this.adminService.updateSchedulePlanningDraft(id, body, user.TK_SDT);
+  }
+
+  @Get('schedule-management/planning/drafts/:id')
+  @HttpCode(HttpStatus.OK)
+  async getSchedulePlanningDraft(@Param('id', ParseIntPipe) id: number) {
+    return this.adminService.getSchedulePlanningDraft(id);
+  }
+
+  @Get('schedule-management/planning/drafts')
+  @HttpCode(HttpStatus.OK)
+  async getLatestSchedulePlanningDraft(@Query('specialtyId') specialtyId?: string) {
+    return this.adminService.getLatestSchedulePlanningDraft({ specialtyId });
+  }
+
+  @Post('schedule-management/planning/generate')
+  @HttpCode(HttpStatus.OK)
+  async generateSchedulePlanning(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body()
+    body: {
+      dateFrom: string;
+      dateTo: string;
+      specialtyId: number;
+      assignments: Array<{
+        date: string;
+        session: string;
+        roomId: number;
+        doctorId: number;
+      }>;
+      overwriteMode?: 'skip' | 'overwrite' | 'only_empty';
+      status?: 'approved' | 'official';
+    },
+  ) {
+    return this.adminService.generateSchedulePlanning(body, user.TK_SDT);
+  }
+
+  @Post('schedule-management/archive')
+  @HttpCode(HttpStatus.OK)
+  async archiveSchedules(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body()
+    body: {
+      dateFrom: string;
+      dateTo: string;
+      specialtyId?: number;
+      source?: string;
+      reason?: string;
+      confirm?: boolean;
+    },
+  ) {
+    return this.adminService.archiveSchedules(body, user.TK_SDT);
+  }
+
+  @Post('schedule-management/copy-week')
+  @HttpCode(HttpStatus.OK)
+  async copyWeekToFutureMonths(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body()
+    body: {
+      sourceWeekStart: string;
+      specialtyId: number;
+      copyRangeOption: 'ONE_MONTH' | 'TWO_MONTHS' | 'THREE_MONTHS';
+      conflictMode: 'SKIP_EXISTING' | 'ARCHIVE_OLD_GENERATED' | 'ONLY_EMPTY';
+      confirm?: boolean;
+    },
+  ) {
+    return this.adminService.copyWeekToFutureMonths(body, user.TK_SDT);
+  }
+
+  @Get('schedule-management/templates')
+  @HttpCode(HttpStatus.OK)
+  async getScheduleTemplates(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('doctorId') doctorId?: string,
+    @Query('specialtyId') specialtyId?: string,
+    @Query('roomId') roomId?: string,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.adminService.getScheduleTemplates({
+      page,
+      limit,
+      doctorId,
+      specialtyId,
+      roomId,
+      status,
+      search,
+    });
+  }
+
+  @Post('schedule-management/templates')
+  @HttpCode(HttpStatus.CREATED)
+  async createScheduleTemplate(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body()
+    body: {
+      BS_MA: number;
+      CK_MA: number;
+      P_MA: number;
+      B_TEN: string;
+      weekday: number;
+      effectiveStartDate: string;
+      effectiveEndDate?: string | null;
+      status?: 'active' | 'inactive';
+      note?: string;
+    },
+  ) {
+    return this.adminService.createScheduleTemplate(body, user.TK_SDT);
+  }
+
+  @Put('schedule-management/templates/:id')
+  @HttpCode(HttpStatus.OK)
+  async updateScheduleTemplate(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: CurrentUserPayload,
+    @Body()
+    body: {
+      BS_MA?: number;
+      CK_MA?: number;
+      P_MA?: number;
+      B_TEN?: string;
+      weekday?: number;
+      effectiveStartDate?: string;
+      effectiveEndDate?: string | null;
+      status?: 'active' | 'inactive';
+      note?: string | null;
+    },
+  ) {
+    return this.adminService.updateScheduleTemplate(id, body, user.TK_SDT);
+  }
+
+  @Post('schedule-management/cycles/:weekStart/generate-from-templates')
+  @HttpCode(HttpStatus.OK)
+  async generateWeeklySchedulesFromTemplates(
+    @Param('weekStart') weekStart: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.adminService.generateWeeklySchedulesFromTemplates(
+      weekStart,
+      user.TK_SDT,
+    );
+  }
+
+  @Post('schedule-management/cycles/:weekStart/confirm')
+  @HttpCode(HttpStatus.OK)
+  async confirmWeeklySchedulesByAdmin(
+    @Param('weekStart') weekStart: string,
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() body?: { doctorId?: number },
+  ) {
+    return this.adminService.confirmGeneratedSchedulesByAdmin(
+      weekStart,
+      user.TK_SDT,
+      body,
+    );
+  }
+
   @Get('schedule-management/cycle-overview')
   @HttpCode(HttpStatus.OK)
   async getScheduleCycleOverview(@Query('weekStart') weekStart?: string) {
     return this.adminService.getScheduleCycleOverview(weekStart);
   }
 
-  @Get('schedule-management/registrations')
+  @Get('schedule-management/weekly-shifts')
   @HttpCode(HttpStatus.OK)
-  async getScheduleRegistrations(
+  async getWeeklySchedules(
     @Query('weekStart') weekStart?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
@@ -479,10 +694,12 @@ export class AdminController {
     @Query('roomId') roomId?: string,
     @Query('status') status?: string,
     @Query('session') session?: string,
+    @Query('weekday') weekday?: string,
     @Query('date') date?: string,
     @Query('search') search?: string,
+    @Query('source') source?: string,
   ) {
-    return this.adminService.getScheduleRegistrations({
+    return this.adminService.getWeeklySchedules({
       weekStart,
       page,
       limit,
@@ -491,20 +708,41 @@ export class AdminController {
       roomId,
       status,
       session,
+      weekday,
       date,
+      search,
+      source,
+    });
+  }
+
+  @Get('schedule-management/exception-requests')
+  @HttpCode(HttpStatus.OK)
+  async getScheduleExceptionRequests(
+    @Query('weekStart') weekStart?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('doctorId') doctorId?: string,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.adminService.getScheduleExceptionRequests({
+      weekStart,
+      page,
+      limit,
+      doctorId,
+      status,
       search,
     });
   }
 
-  @Put('schedule-management/registrations/:bsMa/:date/:session/status')
+  @Put('schedule-management/exception-requests/:id/review')
   @HttpCode(HttpStatus.OK)
-  async updateScheduleRegistrationStatus(
-    @Param('bsMa', ParseIntPipe) bsMa: number,
-    @Param('date') date: string,
-    @Param('session') session: string,
+  async reviewScheduleExceptionRequest(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: CurrentUserPayload,
     @Body() body: { status: 'approved' | 'rejected'; adminNote?: string },
   ) {
-    return this.adminService.updateScheduleRegistrationStatus(bsMa, date, session, body);
+    return this.adminService.reviewScheduleExceptionRequest(id, body, user.TK_SDT);
   }
 
   @Get('schedule-management/official-shifts')
@@ -606,6 +844,7 @@ export class AdminController {
   @HttpCode(HttpStatus.OK)
   async finalizeScheduleWeek(
     @Param('weekStart') weekStart: string,
+    @CurrentUser() _user: CurrentUserPayload,
     @Body()
     body?: {
       forceRefinalize?: boolean;
@@ -620,8 +859,15 @@ export class AdminController {
   @HttpCode(HttpStatus.OK)
   async generateSlotsFromOfficialSchedule(
     @Param('weekStart') weekStart: string,
+    @CurrentUser() _user: CurrentUserPayload,
     @Body() body?: { forceRegenerate?: boolean },
   ) {
     return this.adminService.generateSlotsFromOfficialSchedule(weekStart, body);
+  }
+
+  @Post('schedule-management/automation/run')
+  @HttpCode(HttpStatus.OK)
+  async runScheduleAutomation(@CurrentUser() user: CurrentUserPayload) {
+    return this.adminService.runScheduleAutomation(user.TK_SDT);
   }
 }

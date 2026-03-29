@@ -24,12 +24,15 @@ export class BookingRepository {
         BS_MA,
         N_NGAY,
         B_TEN,
+        LBSK_IS_ARCHIVED: false,
+        LBSK_TRANG_THAI: 'finalized',
+        DOT_LICH_TUAN: {
+          is: {
+            DLT_TRANG_THAI: 'slot_opened',
+          },
+        },
       },
-      include: { PHONG: true, BAC_SI: true, BUOI: true },
-    }).then((schedule) => {
-      if (!schedule) return schedule;
-      if (schedule.LBSK_TRANGTHAI_DUYET !== 'approved') return null;
-      return schedule;
+      include: { PHONG: true, BAC_SI: true, BUOI: true, DOT_LICH_TUAN: true },
     });
   }
 
@@ -42,8 +45,61 @@ export class BookingRepository {
 
   listBookedSlots(BS_MA: number, N_NGAY: Date, B_TEN: string) {
     return this.prisma.dANG_KY.findMany({
-      where: { BS_MA, N_NGAY, B_TEN, DK_TRANG_THAI: { not: 'HUY' } },
+      where: {
+        BS_MA,
+        N_NGAY,
+        B_TEN,
+        DK_TRANG_THAI: { notIn: ['HUY', 'HUY_BS_NGHI'] },
+      },
       select: { KG_MA: true, DK_MA: true },
+    });
+  }
+
+  countActiveBookingsForSlot(BS_MA: number, N_NGAY: Date, B_TEN: string, KG_MA: number) {
+    return this.prisma.dANG_KY.count({
+      where: {
+        BS_MA,
+        N_NGAY,
+        B_TEN,
+        KG_MA,
+        DK_TRANG_THAI: { notIn: ['HUY', 'HUY_BS_NGHI'] },
+      },
+    });
+  }
+
+  countPatientBookingsInSpecialtySlot(
+    BN_MA: number,
+    N_NGAY: Date,
+    KG_MA: number,
+    CK_MA: number,
+  ) {
+    return this.prisma.dANG_KY.count({
+      where: {
+        BN_MA,
+        N_NGAY,
+        KG_MA,
+        DK_TRANG_THAI: { notIn: ['HUY', 'HUY_BS_NGHI'] },
+        LICH_BSK: {
+          is: {
+            BAC_SI: {
+              CK_MA,
+            },
+          },
+        },
+      },
+    });
+  }
+
+  getMaxSttForSlot(BS_MA: number, N_NGAY: Date, B_TEN: string, KG_MA: number) {
+    return this.prisma.dANG_KY.aggregate({
+      where: {
+        BS_MA,
+        N_NGAY,
+        B_TEN,
+        KG_MA,
+        DK_TRANG_THAI: { notIn: ['HUY', 'HUY_BS_NGHI'] },
+      },
+      _max: { DK_STT: true },
     });
   }
 
@@ -54,6 +110,7 @@ export class BookingRepository {
     B_TEN: string;
     KG_MA: number;
     LHK_MA?: number;
+    DK_STT?: number;
   }) {
     const payload: any = {
       BN_MA: data.BN_MA,
@@ -61,6 +118,7 @@ export class BookingRepository {
       N_NGAY: data.N_NGAY,
       B_TEN: data.B_TEN,
       KG_MA: data.KG_MA,
+      DK_STT: data.DK_STT ?? null,
       DK_TRANG_THAI: 'CHO_KHAM',
       BENH_NHAN: { connect: { BN_MA: data.BN_MA } },
       KHUNG_GIO: { connect: { KG_MA: data.KG_MA } },
@@ -126,21 +184,37 @@ export class BookingRepository {
       where: {
         BS_DA_XOA: false,
         ...(specialtyId ? { CK_MA: specialtyId } : {}),
-        ...(date ? {
-          LICH_BSK: {
-            some: {
-              N_NGAY: date,
+        ...(date
+          ? {
+              LICH_BSK: {
+                some: {
+                  N_NGAY: date,
+                  LBSK_IS_ARCHIVED: false,
+                  LBSK_TRANG_THAI: 'finalized',
+                  DOT_LICH_TUAN: {
+                    is: {
+                      DLT_TRANG_THAI: 'slot_opened',
+                    },
+                  },
+                },
+              },
             }
-          }
-        } : {})
+          : {}),
       },
       include: {
         CHUYEN_KHOA: true,
         ...(date
           ? {
               LICH_BSK: {
-                where: { N_NGAY: date },
-                select: { LBSK_TRANGTHAI_DUYET: true },
+                where: {
+                  N_NGAY: date,
+                  LBSK_IS_ARCHIVED: false,
+                  LBSK_TRANG_THAI: 'finalized',
+                },
+                select: {
+                  LBSK_TRANG_THAI: true,
+                  DOT_LICH_TUAN: { select: { DLT_TRANG_THAI: true } },
+                },
               },
             }
           : {}),
@@ -149,7 +223,10 @@ export class BookingRepository {
       if (!date) return doctors;
       return doctors.filter((doctor) =>
         (doctor.LICH_BSK || []).some((schedule: any) => {
-          return schedule.LBSK_TRANGTHAI_DUYET === 'approved';
+          return (
+            schedule.LBSK_TRANG_THAI === 'finalized' &&
+            schedule.DOT_LICH_TUAN?.DLT_TRANG_THAI === 'slot_opened'
+          );
         }),
       );
     });
@@ -157,18 +234,32 @@ export class BookingRepository {
 
   listDoctorSchedulesForDate(BS_MA: number, N_NGAY: Date) {
     return this.prisma.lICH_BSK.findMany({
-      where: { BS_MA, N_NGAY },
-      include: { BUOI: { include: { KHUNG_GIO: { orderBy: { KG_BAT_DAU: 'asc' } } } }, PHONG: true }
-    }).then((schedules) =>
-      schedules.filter((schedule) => {
-        return schedule.LBSK_TRANGTHAI_DUYET === 'approved';
-      }),
-    );
+      where: {
+        BS_MA,
+        N_NGAY,
+        LBSK_IS_ARCHIVED: false,
+        LBSK_TRANG_THAI: 'finalized',
+        DOT_LICH_TUAN: {
+          is: {
+            DLT_TRANG_THAI: 'slot_opened',
+          },
+        },
+      },
+      include: {
+        BUOI: { include: { KHUNG_GIO: { orderBy: { KG_BAT_DAU: 'asc' } } } },
+        PHONG: true,
+        DOT_LICH_TUAN: true,
+      }
+    });
   }
 
   listBookedSlotsForDate(BS_MA: number, N_NGAY: Date) {
     return this.prisma.dANG_KY.findMany({
-      where: { BS_MA, N_NGAY, DK_TRANG_THAI: { not: 'HUY' } },
+      where: {
+        BS_MA,
+        N_NGAY,
+        DK_TRANG_THAI: { notIn: ['HUY', 'HUY_BS_NGHI'] },
+      },
       select: { KG_MA: true, B_TEN: true },
     });
   }

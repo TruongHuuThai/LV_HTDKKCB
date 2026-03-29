@@ -26,6 +26,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get pHIEU_CDCLS() { return this.prismaClient.pHIEU_CDCLS; }
   get tAI_KHOAN() { return this.prismaClient.tAI_KHOAN; }
   get lICH_BSK() { return this.prismaClient.lICH_BSK; }
+  get lICH_BSK_MAU() { return this.prismaClient.lICH_BSK_MAU; }
+  get lICH_BSK_NHAP() { return this.prismaClient.lICH_BSK_NHAP; }
+  get dOT_LICH_TUAN() { return this.prismaClient.dOT_LICH_TUAN; }
+  get yEU_CAU_LICH_BSK() { return this.prismaClient.yEU_CAU_LICH_BSK; }
   get pHONG() { return this.prismaClient.pHONG; }
   get bUOI() { return this.prismaClient.bUOI; }
   get lOAI_HINH_KHAM() { return this.prismaClient.lOAI_HINH_KHAM; }

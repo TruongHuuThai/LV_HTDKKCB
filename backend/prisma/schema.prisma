@@ -45,6 +45,9 @@ model BAC_SI {
   CHUYEN_KHOA      CHUYEN_KHOA @relation(fields: [CK_MA], references: [CK_MA], onDelete: NoAction, onUpdate: NoAction)
   TAI_KHOAN        TAI_KHOAN?  @relation(fields: [TK_SDT], references: [TK_SDT], onDelete: NoAction, onUpdate: NoAction)
   LICH_BSK         LICH_BSK[]
+  LICH_BSK_MAU     LICH_BSK_MAU[]
+  YEU_CAU_LICH_BSK YEU_CAU_LICH_BSK[] @relation("YCL_BACSI")
+  YEU_CAU_BS_GOI_Y YEU_CAU_LICH_BSK[] @relation("YCL_BACSI_GOI_Y")
 
   @@index([CK_MA], map: "idx_bs_ck")
 }
@@ -97,6 +100,8 @@ model BUOI {
   B_GIO_KET_THUC DateTime?   @db.Time(6)
   KHUNG_GIO      KHUNG_GIO[]
   LICH_BSK       LICH_BSK[]
+  LICH_BSK_MAU   LICH_BSK_MAU[]
+  YEU_CAU_BUOI_MOI YEU_CAU_LICH_BSK[] @relation("YCL_BUOI_MOI")
 }
 
 model CHAN_DOAN {
@@ -144,6 +149,8 @@ model CHUYEN_KHOA {
   BAC_SI            BAC_SI[]
   LOAI_HINH_KHAM    LOAI_HINH_KHAM[]
   PHONG             PHONG[]
+  LICH_BSK_MAU      LICH_BSK_MAU[]
+  LICH_BSK_NHAP     LICH_BSK_NHAP[]
 }
 
 model DANG_KY {
@@ -165,7 +172,7 @@ model DANG_KY {
   PHIEU_KHAM_BENH  PHIEU_KHAM_BENH?
   THANH_TOAN       THANH_TOAN[]
 
-  @@unique([BS_MA, N_NGAY, B_TEN, KG_MA], map: "uq_dk_slot", where: raw("(\"DK_TRANG_THAI\" <> 'HUY'::text)"))
+  @@index([BS_MA, N_NGAY, B_TEN, KG_MA], map: "idx_dk_slot")
   @@index([BN_MA], map: "idx_dk_bn")
   @@index([BS_MA, N_NGAY, B_TEN], map: "idx_dk_lich")
 }
@@ -210,6 +217,7 @@ model KHUNG_GIO {
   B_TEN       String
   KG_BAT_DAU  DateTime  @db.Time(6)
   KG_KET_THUC DateTime  @db.Time(6)
+  KG_SO_BN_TOI_DA Int?  @db.SmallInt
   DANG_KY     DANG_KY[]
   BUOI        BUOI      @relation(fields: [B_TEN], references: [B_TEN], onDelete: NoAction, onUpdate: NoAction)
 
@@ -221,6 +229,17 @@ model LICH_BSK {
   P_MA         Int
   N_NGAY       DateTime  @db.Date
   B_TEN        String
+  LBM_ID       Int?
+  DLT_TUAN_BAT_DAU DateTime? @db.Date
+  LBSK_NGUON   String    @default("legacy_registration")
+  LBSK_TRANG_THAI String @default("generated")
+  LBSK_TAO_LUC DateTime? @default(now()) @db.Timestamp(6)
+  LBSK_CAP_NHAT_LUC DateTime? @default(now()) @db.Timestamp(6)
+  LBSK_XAC_NHAN_LUC DateTime? @db.Timestamp(6)
+  LBSK_IS_ARCHIVED Boolean @default(false)
+  LBSK_ARCHIVED_AT DateTime? @db.Timestamp(6)
+  LBSK_ARCHIVED_BY String?
+  LBSK_ARCHIVE_REASON String?
   LBSK_TRANGTHAI_DUYET String    @default("pending")
   LBSK_GHI_CHU String?
   LBSK_DUYET_BOI       String?
@@ -230,9 +249,16 @@ model LICH_BSK {
   BUOI         BUOI      @relation(fields: [B_TEN], references: [B_TEN], onDelete: NoAction, onUpdate: NoAction)
   NGAY         NGAY      @relation(fields: [N_NGAY], references: [N_NGAY], onDelete: NoAction, onUpdate: NoAction)
   PHONG        PHONG     @relation(fields: [P_MA], references: [P_MA], onDelete: NoAction, onUpdate: NoAction)
+  LICH_BSK_MAU LICH_BSK_MAU? @relation(fields: [LBM_ID], references: [LBM_ID], onDelete: SetNull, onUpdate: NoAction)
+  DOT_LICH_TUAN DOT_LICH_TUAN? @relation(fields: [DLT_TUAN_BAT_DAU], references: [DLT_TUAN_BAT_DAU], onDelete: SetNull, onUpdate: NoAction)
+  YEU_CAU_LICH_BSK YEU_CAU_LICH_BSK[]
 
   @@id([BS_MA, N_NGAY, B_TEN])
   @@unique([P_MA, N_NGAY, B_TEN], map: "uq_lich_phong_ngay_buoi")
+  @@index([LBM_ID], map: "idx_lich_bsk_mau")
+  @@index([DLT_TUAN_BAT_DAU], map: "idx_lich_bsk_tuan")
+  @@index([LBSK_TRANG_THAI], map: "idx_lich_bsk_trang_thai")
+  @@index([LBSK_IS_ARCHIVED], map: "idx_lich_bsk_archived")
 }
 
 model LIEU_DUNG_HOAT_CHAT {
@@ -308,9 +334,102 @@ model PHONG {
   P_TEN       String
   P_VI_TRI    String?
   LICH_BSK    LICH_BSK[]
+  LICH_BSK_MAU LICH_BSK_MAU[]
+  YEU_CAU_PHONG_MOI YEU_CAU_LICH_BSK[] @relation("YCL_PHONG_MOI")
   CHUYEN_KHOA CHUYEN_KHOA @relation(fields: [CK_MA], references: [CK_MA], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([CK_MA], map: "idx_phong_ck")
+}
+
+model LICH_BSK_MAU {
+  LBM_ID             Int         @id @default(autoincrement())
+  BS_MA              Int
+  CK_MA              Int
+  P_MA               Int
+  B_TEN              String
+  LBM_THU_TRONG_TUAN Int
+  LBM_HIEU_LUC_TU    DateTime    @db.Date
+  LBM_HIEU_LUC_DEN   DateTime?   @db.Date
+  LBM_TRANG_THAI     String      @default("active")
+  LBM_GHI_CHU        String?
+  LBM_TAO_LUC        DateTime?   @default(now()) @db.Timestamp(6)
+  LBM_TAO_BOI        String?
+  LBM_CAP_NHAT_LUC   DateTime?   @default(now()) @db.Timestamp(6)
+  LBM_CAP_NHAT_BOI   String?
+  BAC_SI             BAC_SI      @relation(fields: [BS_MA], references: [BS_MA], onDelete: NoAction, onUpdate: NoAction)
+  CHUYEN_KHOA        CHUYEN_KHOA @relation(fields: [CK_MA], references: [CK_MA], onDelete: NoAction, onUpdate: NoAction)
+  PHONG              PHONG       @relation(fields: [P_MA], references: [P_MA], onDelete: NoAction, onUpdate: NoAction)
+  BUOI               BUOI        @relation(fields: [B_TEN], references: [B_TEN], onDelete: NoAction, onUpdate: NoAction)
+  LICH_BSK           LICH_BSK[]
+
+  @@index([BS_MA], map: "idx_lbm_bs")
+  @@index([CK_MA], map: "idx_lbm_ck")
+  @@index([P_MA], map: "idx_lbm_phong")
+  @@index([LBM_TRANG_THAI, LBM_THU_TRONG_TUAN, B_TEN], map: "idx_lbm_status_slot")
+  @@index([BS_MA, LBM_THU_TRONG_TUAN, B_TEN], map: "idx_lbm_bs_slot")
+  @@index([P_MA, LBM_THU_TRONG_TUAN, B_TEN], map: "idx_lbm_phong_slot")
+  @@index([LBM_HIEU_LUC_TU, LBM_HIEU_LUC_DEN], map: "idx_lbm_hieu_luc")
+}
+
+model LICH_BSK_NHAP {
+  LBN_ID           Int         @id @default(autoincrement())
+  CK_MA            Int
+  LBN_TU_NGAY      DateTime    @db.Date
+  LBN_DEN_NGAY     DateTime    @db.Date
+  LBN_DU_LIEU      Json
+  LBN_TAO_LUC      DateTime?   @default(now()) @db.Timestamp(6)
+  LBN_TAO_BOI      String?
+  LBN_CAP_NHAT_LUC DateTime?   @default(now()) @db.Timestamp(6)
+  LBN_CAP_NHAT_BOI String?
+  CHUYEN_KHOA      CHUYEN_KHOA @relation(fields: [CK_MA], references: [CK_MA], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([CK_MA], map: "idx_lbn_ck")
+  @@index([LBN_TU_NGAY, LBN_DEN_NGAY], map: "idx_lbn_khoang")
+}
+
+model DOT_LICH_TUAN {
+  DLT_TUAN_BAT_DAU DateTime  @id @db.Date
+  DLT_TUAN_KET_THUC DateTime @db.Date
+  DLT_TRANG_THAI   String    @default("generated")
+  DLT_SINH_LUC     DateTime? @default(now()) @db.Timestamp(6)
+  DLT_SINH_BOI     String?
+  DLT_CHOT_LUC     DateTime? @db.Timestamp(6)
+  DLT_CHOT_BOI     String?
+  DLT_MO_SLOT_LUC  DateTime? @db.Timestamp(6)
+  DLT_MO_SLOT_BOI  String?
+  DLT_GHI_CHU      String?
+  LICH_BSK         LICH_BSK[]
+
+  @@index([DLT_TRANG_THAI], map: "idx_dlt_trang_thai")
+}
+
+model YEU_CAU_LICH_BSK {
+  YCL_ID                Int        @id @default(autoincrement())
+  BS_MA                 Int
+  LBSK_N_NGAY           DateTime   @db.Date
+  LBSK_B_TEN            String
+  YCL_LOAI              String
+  YCL_LY_DO             String
+  YCL_TRANG_THAI        String     @default("pending")
+  YCL_TRANG_THAI_TRUOC  String?
+  YCL_NGAY_MOI          DateTime?  @db.Date
+  YCL_BUOI_MOI          String?
+  YCL_P_MA_MOI          Int?
+  YCL_GOI_Y_BS_MA       Int?
+  YCL_GHI_CHU_ADMIN     String?
+  YCL_TAO_LUC           DateTime?  @default(now()) @db.Timestamp(6)
+  YCL_TAO_BOI           String?
+  YCL_DUYET_LUC         DateTime?  @db.Timestamp(6)
+  YCL_DUYET_BOI         String?
+  BAC_SI                BAC_SI     @relation("YCL_BACSI", fields: [BS_MA], references: [BS_MA], onDelete: NoAction, onUpdate: NoAction)
+  LICH_BSK              LICH_BSK   @relation(fields: [BS_MA, LBSK_N_NGAY, LBSK_B_TEN], references: [BS_MA, N_NGAY, B_TEN], onDelete: NoAction, onUpdate: NoAction)
+  BUOI_MOI_REL          BUOI?      @relation("YCL_BUOI_MOI", fields: [YCL_BUOI_MOI], references: [B_TEN], onDelete: NoAction, onUpdate: NoAction)
+  PHONG_MOI             PHONG?     @relation("YCL_PHONG_MOI", fields: [YCL_P_MA_MOI], references: [P_MA], onDelete: NoAction, onUpdate: NoAction)
+  BAC_SI_GOI_Y          BAC_SI?    @relation("YCL_BACSI_GOI_Y", fields: [YCL_GOI_Y_BS_MA], references: [BS_MA], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([BS_MA, YCL_TRANG_THAI], map: "idx_ycl_bs_trang_thai")
+  @@index([LBSK_N_NGAY], map: "idx_ycl_ngay")
+  @@index([YCL_TAO_LUC], map: "idx_ycl_tao_luc")
 }
 
 model TAI_KHOAN {

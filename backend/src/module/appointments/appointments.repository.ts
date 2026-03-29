@@ -10,6 +10,11 @@ export class AppointmentsRepository {
     return this.prisma.lICH_BSK.findUnique({
       where: { BS_MA_N_NGAY_B_TEN: { BS_MA: bsMa, N_NGAY: ngay, B_TEN: buoi } },
       include: { PHONG: true, BAC_SI: true, BUOI: true },
+    }).then((row) => {
+      if (!row) return null;
+      // Ignore archived schedules for booking flows.
+      if ((row as any).LBSK_IS_ARCHIVED) return null;
+      return row;
     });
   }
 

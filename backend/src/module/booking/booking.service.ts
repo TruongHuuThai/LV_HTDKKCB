@@ -21,6 +21,22 @@ export class BookingService {
     private readonly paymentRepo: PaymentRepository,
   ) {}
 
+  private assertDateWithinBookingHorizon(date: Date) {
+    const now = new Date();
+    const todayUtc = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    );
+    const horizonEnd = new Date(todayUtc);
+    horizonEnd.setUTCMonth(horizonEnd.getUTCMonth() + 3);
+
+    if (date < todayUtc) {
+      throw new BadRequestException('Chi ho tro dat lich tu hom nay tro di');
+    }
+    if (date > horizonEnd) {
+      throw new BadRequestException('Chi ho tro dat lich toi da 3 thang toi');
+    }
+  }
+
   private async ensureOwnedPatientProfileOrThrow(
     TK_SDT: string,
     BN_MA: number,
@@ -37,6 +53,7 @@ export class BookingService {
 
   async getAvailability(BS_MA: number, yyyy_mm_dd: string, B_TEN: string) {
     const N_NGAY = parseDateOnly(yyyy_mm_dd);
+    this.assertDateWithinBookingHorizon(N_NGAY);
 
     const lich = await this.repo.findDoctorSchedule(BS_MA, N_NGAY, B_TEN);
     if (!lich) {
@@ -45,7 +62,10 @@ export class BookingService {
 
     const slots = await this.repo.listTimeSlotsByBuoi(B_TEN);
     const booked = await this.repo.listBookedSlots(BS_MA, N_NGAY, B_TEN);
-    const bookedSet = new Set(booked.map((x) => x.KG_MA));
+    const bookedCount = new Map<number, number>();
+    booked.forEach((item) => {
+      bookedCount.set(item.KG_MA, (bookedCount.get(item.KG_MA) ?? 0) + 1);
+    });
     const now = new Date();
 
     return {
@@ -55,7 +75,7 @@ export class BookingService {
         KG_BAT_DAU: s.KG_BAT_DAU,
         KG_KET_THUC: s.KG_KET_THUC,
         available:
-          !bookedSet.has(s.KG_MA) &&
+          (bookedCount.get(s.KG_MA) ?? 0) < (s.KG_SO_BN_TOI_DA ?? 5) &&
           combineDateAndTime(N_NGAY, s.KG_BAT_DAU).getTime() > now.getTime(),
       })),
     };
@@ -63,6 +83,9 @@ export class BookingService {
 
   async getAvailableDoctors(YYYY_MM_DD?: string, CK_MA?: number) {
     const N_NGAY = YYYY_MM_DD ? parseDateOnly(YYYY_MM_DD) : undefined;
+    if (N_NGAY) {
+      this.assertDateWithinBookingHorizon(N_NGAY);
+    }
     const docs = await this.repo.findAvailableDoctors(N_NGAY, CK_MA);
     return docs.map((d) => ({
       BS_MA: d.BS_MA,
@@ -76,13 +99,17 @@ export class BookingService {
 
   async getDoctorSlotsForDay(BS_MA: number, yyyy_mm_dd: string) {
     const N_NGAY = parseDateOnly(yyyy_mm_dd);
+    this.assertDateWithinBookingHorizon(N_NGAY);
     const sches = await this.repo.listDoctorSchedulesForDate(BS_MA, N_NGAY);
     if (!sches || sches.length === 0) {
       return [];
     }
 
     const booked = await this.repo.listBookedSlotsForDate(BS_MA, N_NGAY);
-    const bookedSet = new Set(booked.map((x) => x.KG_MA));
+    const bookedCount = new Map<number, number>();
+    booked.forEach((item) => {
+      bookedCount.set(item.KG_MA, (bookedCount.get(item.KG_MA) ?? 0) + 1);
+    });
     const now = new Date();
 
     return sches.map((sch) => {
@@ -91,7 +118,7 @@ export class BookingService {
         KG_BAT_DAU: kg.KG_BAT_DAU,
         KG_KET_THUC: kg.KG_KET_THUC,
         available:
-          !bookedSet.has(kg.KG_MA) &&
+          (bookedCount.get(kg.KG_MA) ?? 0) < (kg.KG_SO_BN_TOI_DA ?? 5) &&
           combineDateAndTime(N_NGAY, kg.KG_BAT_DAU).getTime() > now.getTime(),
       }));
 
@@ -113,6 +140,7 @@ export class BookingService {
       dto.BN_MA,
     );
     const N_NGAY = parseDateOnly(dto.N_NGAY);
+    this.assertDateWithinBookingHorizon(N_NGAY);
 
     const kg = await this.repo.findTimeSlot(dto.KG_MA);
     if (!kg) {
@@ -129,12 +157,40 @@ export class BookingService {
       throw new NotFoundException('Bac si khong co lich ngay/buoi nay');
     }
 
+    const currentCount = await this.repo.countActiveBookingsForSlot(
+      dto.BS_MA,
+      N_NGAY,
+      dto.B_TEN,
+      dto.KG_MA,
+    );
+    const maxCapacity = kg.KG_SO_BN_TOI_DA ?? 5;
+    if (currentCount >= maxCapacity) {
+      throw new ConflictException('Khung gio nay da du so luong benh nhan');
+    }
+
+    const specialtyId = lich.BAC_SI?.CK_MA;
+    if (specialtyId) {
+      const patientSameSlotCount = await this.repo.countPatientBookingsInSpecialtySlot(
+        BN_MA,
+        N_NGAY,
+        dto.KG_MA,
+        specialtyId,
+      );
+      if (patientSameSlotCount > 0) {
+        throw new ConflictException(
+          'Benh nhan da dang ky 1 lich trong khung gio nay thuoc chuyen khoa nay',
+        );
+      }
+    }
+
     const price = dto.LHK_MA
       ? (await this.repo.findLoaiHinhKham(dto.LHK_MA))?.LHK_GIA ?? 0
       : 0;
 
     let booking: any;
     try {
+      const maxStt = await this.repo.getMaxSttForSlot(dto.BS_MA, N_NGAY, dto.B_TEN, dto.KG_MA);
+      const nextStt = (maxStt._max?.DK_STT ?? 0) + 1;
       booking = await this.repo.createBooking({
         BN_MA,
         BS_MA: dto.BS_MA,
@@ -142,6 +198,7 @@ export class BookingService {
         B_TEN: dto.B_TEN,
         KG_MA: dto.KG_MA,
         LHK_MA: dto.LHK_MA,
+        DK_STT: nextStt,
       });
     } catch (e: any) {
       if (
@@ -210,7 +267,7 @@ export class BookingService {
       }
     }
 
-    if (dk.DK_TRANG_THAI === 'HUY') {
+    if (dk.DK_TRANG_THAI === 'HUY' || dk.DK_TRANG_THAI === 'HUY_BS_NGHI') {
       return dk;
     }
     return this.repo.cancelBooking(DK_MA, reason);
