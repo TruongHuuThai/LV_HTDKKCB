@@ -26,6 +26,7 @@ import {
   Search,
   Sparkles,
   Trash2,
+  Undo2,
   UserMinus,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -37,6 +38,7 @@ import {
   type ScheduleCopyRangeOption,
   type SchedulePlanningAssignment,
   type SchedulePlanningOverwriteMode,
+  type ScheduleRestoreArchivedResponse,
   type WeeklyScheduleStatus,
 } from '@/services/api/scheduleWorkflowApi';
 import { adminApi } from '@/services/api/adminApi';
@@ -388,7 +390,7 @@ function PlanningCell({
             canDropWhenDragging ? 'text-blue-700' : 'text-rose-700',
           )}
         >
-          {canDropWhenDragging ? 'Co the tha vao o nay' : dropReason || 'Khong the tha vao o nay'}
+          {canDropWhenDragging ? 'Có thể thả vào ô này' : dropReason || 'Không thể thả vào ô này'}
         </div>
       ) : null}
     </div>
@@ -423,6 +425,9 @@ export default function AdminDoctorSchedulePlanningPage() {
 
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [archiveReason, setArchiveReason] = useState('');
+  const [restoreArchivedOpen, setRestoreArchivedOpen] = useState(false);
+  const [restoreArchivedPreview, setRestoreArchivedPreview] =
+    useState<ScheduleRestoreArchivedResponse | null>(null);
 
   const hasDateRange = !!range.dateFrom && !!range.dateTo;
   const isDateRangeValid = hasDateRange && !isAfter(parseISO(range.dateFrom), parseISO(range.dateTo));
@@ -524,6 +529,7 @@ export default function AdminDoctorSchedulePlanningPage() {
       setActiveDoctorWidth(null);
       setHoveredSlotKey(null);
       setCopyPreview(null);
+      setRestoreArchivedPreview(null);
       return;
     }
 
@@ -778,6 +784,30 @@ export default function AdminDoctorSchedulePlanningPage() {
       queryClient.invalidateQueries({ queryKey: ['plan-existing'] });
     },
     onError: (error: unknown) => toast.error(getApiErrorMessage(error, 'Không thể lưu trữ lịch.')),
+  });
+
+  const restoreArchivedMutation = useMutation({
+    mutationFn: (confirm: boolean) =>
+      adminScheduleWorkflowApi.restoreArchivedSchedules({
+        dateFrom: range.dateFrom,
+        dateTo: range.dateTo,
+        specialtyId: Number(specialtyId),
+        confirm,
+      }),
+    onSuccess: (result) => {
+      if (result.preview) {
+        setRestoreArchivedPreview(result);
+        toast.message(`Xem trước: có thể tái sử dụng ${result.eligible}/${result.totalArchived} lịch.`);
+        return;
+      }
+
+      toast.success(`Đã tái sử dụng ${result.restoredCount ?? 0} lịch đã lưu trữ.`);
+      setRestoreArchivedOpen(false);
+      setRestoreArchivedPreview(null);
+      queryClient.invalidateQueries({ queryKey: ['plan-existing'] });
+    },
+    onError: (error: unknown) =>
+      toast.error(getApiErrorMessage(error, 'Không thể tái sử dụng lịch đã lưu trữ.')),
   });
 
   const openDatePicker = (input: HTMLInputElement | null) => {
@@ -1246,6 +1276,17 @@ export default function AdminDoctorSchedulePlanningPage() {
                   <Trash2 className='mr-2 h-4 w-4' />
                   Lưu trữ lịch cũ
                 </Button>
+                <Button
+                  variant='outline'
+                  onClick={() => {
+                    setRestoreArchivedPreview(null);
+                    setRestoreArchivedOpen(true);
+                  }}
+                  disabled={!isFilterReady}
+                >
+                  <Undo2 className='mr-2 h-4 w-4' />
+                  Tái sử dụng lịch lưu trữ
+                </Button>
               </div>
             </section>
           </div>
@@ -1404,7 +1445,7 @@ export default function AdminDoctorSchedulePlanningPage() {
               </div>
               <div className='mt-1 text-xs text-slate-500'>{activeDoctorDragData.specialtyName}</div>
               <div className='mt-2 inline-flex rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-700'>
-                {activeDoctorDragData.assignedCount} ca truc
+                {activeDoctorDragData.assignedCount} ca trực
               </div>
             </div>
           ) : null}
@@ -1437,14 +1478,14 @@ export default function AdminDoctorSchedulePlanningPage() {
       </Dialog>
 
       <Dialog open={copyOpen} onOpenChange={setCopyOpen}>
-        <DialogContent>
+        <DialogContent className='bg-white'>
           <DialogHeader>
             <DialogTitle>Sao chép tuần</DialogTitle>
             <DialogDescription>Tuần nguồn {format(parseISO(weekStart), 'dd/MM/yyyy')}</DialogDescription>
           </DialogHeader>
           <div className='space-y-2'>
             <AdminSelect value={copyRange} onValueChange={(value) => setCopyRange(value as ScheduleCopyRangeOption)}>
-              <AdminSelectTrigger>
+              <AdminSelectTrigger className='bg-white'>
                 <AdminSelectValue />
               </AdminSelectTrigger>
               <AdminSelectContent>
@@ -1454,7 +1495,7 @@ export default function AdminDoctorSchedulePlanningPage() {
               </AdminSelectContent>
             </AdminSelect>
             <AdminSelect value={copyMode} onValueChange={(value) => setCopyMode(value as ScheduleCopyConflictMode)}>
-              <AdminSelectTrigger>
+              <AdminSelectTrigger className='bg-white'>
                 <AdminSelectValue />
               </AdminSelectTrigger>
               <AdminSelectContent>
@@ -1471,7 +1512,7 @@ export default function AdminDoctorSchedulePlanningPage() {
             ) : null}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className='bg-white'>
             <Button
               variant='outline'
               onClick={() => {
@@ -1492,7 +1533,7 @@ export default function AdminDoctorSchedulePlanningPage() {
       </Dialog>
 
       <Dialog open={archiveOpen} onOpenChange={setArchiveOpen}>
-        <DialogContent>
+        <DialogContent className='bg-white'>
           <DialogHeader>
             <DialogTitle>Lưu trữ lịch cũ</DialogTitle>
             <DialogDescription>Không xóa cứng dữ liệu.</DialogDescription>
@@ -1502,7 +1543,7 @@ export default function AdminDoctorSchedulePlanningPage() {
             onChange={(event) => setArchiveReason(event.target.value)}
             placeholder='Lý do lưu trữ'
           />
-          <DialogFooter>
+          <DialogFooter className='bg-white'>
             <Button variant='outline' onClick={() => setArchiveOpen(false)}>
               Hủy
             </Button>
@@ -1510,6 +1551,63 @@ export default function AdminDoctorSchedulePlanningPage() {
               Xem trước
             </Button>
             <Button disabled={!isFilterReady || archiveMutation.isPending} onClick={() => archiveMutation.mutate(true)}>
+              Xác nhận
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={restoreArchivedOpen}
+        onOpenChange={(open) => {
+          setRestoreArchivedOpen(open);
+          if (!open) setRestoreArchivedPreview(null);
+        }}
+      >
+        <DialogContent className='bg-white'>
+          <DialogHeader>
+            <DialogTitle>Tái sử dụng lịch đã lưu trữ</DialogTitle>
+            <DialogDescription>
+              Khôi phục lịch archive trong khoảng {formatDateDdMmYyyySlash(range.dateFrom)} -{' '}
+              {formatDateDdMmYyyySlash(range.dateTo)} của chuyên khoa đang chọn.
+            </DialogDescription>
+          </DialogHeader>
+
+          {restoreArchivedPreview ? (
+            <div className='rounded border bg-slate-50 p-3 text-sm'>
+              <div>Tổng lịch archive trong khoảng: {restoreArchivedPreview.totalArchived}</div>
+              <div>Có thể tái sử dụng: {restoreArchivedPreview.eligible}</div>
+              <div>Bị bỏ qua do đã có lịch hẹn: {restoreArchivedPreview.skippedWithBookings}</div>
+              <div>Bị bỏ qua do còn yêu cầu chờ duyệt: {restoreArchivedPreview.skippedWithPendingRequests}</div>
+              <div>Bị bỏ qua do xung đột phòng/bác sĩ: {restoreArchivedPreview.skippedWithConflicts}</div>
+            </div>
+          ) : (
+            <p className='text-sm text-slate-600'>
+              Nhấn &quot;Xem trước&quot; để kiểm tra số ca archive có thể tái sử dụng trước khi xác nhận.
+            </p>
+          )}
+
+          <DialogFooter className='bg-white'>
+            <Button
+              variant='outline'
+              onClick={() => {
+                setRestoreArchivedOpen(false);
+                setRestoreArchivedPreview(null);
+              }}
+            >
+              Hủy
+            </Button>
+            <Button
+              variant='outline'
+              disabled={!isFilterReady || restoreArchivedMutation.isPending}
+              onClick={() => restoreArchivedMutation.mutate(false)}
+            >
+              Xem trước
+            </Button>
+            <Button
+              disabled={!isFilterReady || restoreArchivedMutation.isPending}
+              onClick={() => restoreArchivedMutation.mutate(true)}
+            >
               Xác nhận
             </Button>
           </DialogFooter>

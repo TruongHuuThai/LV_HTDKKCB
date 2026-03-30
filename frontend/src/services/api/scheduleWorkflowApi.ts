@@ -98,6 +98,19 @@ export interface ScheduleArchiveResponse {
   archivedCount?: number;
 }
 
+export interface ScheduleRestoreArchivedResponse {
+  preview: boolean;
+  dateFrom: string;
+  dateTo: string;
+  specialtyId: number;
+  totalArchived: number;
+  eligible: number;
+  skippedWithBookings: number;
+  skippedWithPendingRequests: number;
+  skippedWithConflicts: number;
+  restoredCount?: number;
+}
+
 export interface ScheduleCopyWeekResponse {
   preview: boolean;
   sourceWeekStart: string;
@@ -457,6 +470,19 @@ export const adminScheduleWorkflowApi = {
   }): Promise<ScheduleArchiveResponse> => {
     const res = await axiosClient.post<ScheduleArchiveResponse>(
       '/admin/schedule-management/archive',
+      data,
+    );
+    return res.data;
+  },
+
+  restoreArchivedSchedules: async (data: {
+    dateFrom: string;
+    dateTo: string;
+    specialtyId: number;
+    confirm?: boolean;
+  }): Promise<ScheduleRestoreArchivedResponse> => {
+    const res = await axiosClient.post<ScheduleRestoreArchivedResponse>(
+      '/admin/schedule-management/archive/restore',
       data,
     );
     return res.data;

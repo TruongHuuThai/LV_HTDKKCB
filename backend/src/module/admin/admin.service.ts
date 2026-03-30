@@ -2646,6 +2646,194 @@ export class AdminService {
     }
   }
 
+  async restoreArchivedSchedules(
+    payload: {
+      dateFrom: string;
+      dateTo: string;
+      specialtyId: number;
+      confirm?: boolean;
+    },
+    actor = 'ADMIN',
+  ) {
+    try {
+      const dateFrom = this.parseDateOnlyOrThrow(payload.dateFrom);
+      const dateTo = this.parseDateOnlyOrThrow(payload.dateTo);
+      if (dateFrom > dateTo) {
+        throw new BadRequestException('Từ ngày phải nhỏ hơn hoặc bằng đến ngày.');
+      }
+
+      const parsedSpecialtyId = Number.parseInt(String(payload.specialtyId ?? ''), 10);
+      if (Number.isNaN(parsedSpecialtyId)) {
+        throw new BadRequestException('Vui lòng chọn chuyên khoa cần tái sử dụng lịch.');
+      }
+
+      const specialty = await this.prisma.cHUYEN_KHOA.findUnique({
+        where: { CK_MA: parsedSpecialtyId },
+        select: { CK_MA: true },
+      });
+      if (!specialty) {
+        throw new NotFoundException('Không tìm thấy chuyên khoa cần tái sử dụng lịch.');
+      }
+
+      const archivedRows = await this.prisma.lICH_BSK.findMany({
+        where: {
+          LBSK_IS_ARCHIVED: true,
+          N_NGAY: { gte: dateFrom, lte: dateTo },
+          BAC_SI: { CK_MA: parsedSpecialtyId },
+        },
+        select: {
+          BS_MA: true,
+          P_MA: true,
+          N_NGAY: true,
+          B_TEN: true,
+          DANG_KY: {
+            where: { DK_TRANG_THAI: { notIn: Array.from(BOOKING_CANCELLED_STATUSES) } },
+            select: { DK_MA: true },
+          },
+          YEU_CAU_LICH_BSK: {
+            where: { YCL_TRANG_THAI: 'pending' },
+            select: { YCL_ID: true },
+          },
+        },
+      });
+
+      const activeRows = await this.prisma.lICH_BSK.findMany({
+        where: {
+          LBSK_IS_ARCHIVED: false,
+          N_NGAY: { gte: dateFrom, lte: dateTo },
+          BAC_SI: { CK_MA: parsedSpecialtyId },
+        },
+        select: {
+          BS_MA: true,
+          P_MA: true,
+          N_NGAY: true,
+          B_TEN: true,
+        },
+      });
+
+      const roomKey = (roomId: number, date: Date, session: string) =>
+        `${roomId}::${this.toDateOnlyIso(date)}::${session}`;
+      const doctorKey = (doctorId: number, date: Date, session: string) =>
+        `${doctorId}::${this.toDateOnlyIso(date)}::${session}`;
+
+      const activeRoomKeys = new Set(activeRows.map((row) => roomKey(row.P_MA, row.N_NGAY, row.B_TEN)));
+      const activeDoctorKeys = new Set(activeRows.map((row) => doctorKey(row.BS_MA, row.N_NGAY, row.B_TEN)));
+      const plannedRoomKeys = new Set<string>();
+      const plannedDoctorKeys = new Set<string>();
+
+      let skippedWithBookings = 0;
+      let skippedWithPendingRequests = 0;
+      let skippedWithConflicts = 0;
+      const eligible = [] as Array<{ BS_MA: number; N_NGAY: Date; B_TEN: string }>;
+
+      for (const row of archivedRows) {
+        if (row.DANG_KY.length > 0) {
+          skippedWithBookings += 1;
+          continue;
+        }
+        if (row.YEU_CAU_LICH_BSK.length > 0) {
+          skippedWithPendingRequests += 1;
+          continue;
+        }
+
+        const roomSlotKey = roomKey(row.P_MA, row.N_NGAY, row.B_TEN);
+        const doctorSlotKey = doctorKey(row.BS_MA, row.N_NGAY, row.B_TEN);
+        if (
+          activeRoomKeys.has(roomSlotKey) ||
+          activeDoctorKeys.has(doctorSlotKey) ||
+          plannedRoomKeys.has(roomSlotKey) ||
+          plannedDoctorKeys.has(doctorSlotKey)
+        ) {
+          skippedWithConflicts += 1;
+          continue;
+        }
+
+        plannedRoomKeys.add(roomSlotKey);
+        plannedDoctorKeys.add(doctorSlotKey);
+        eligible.push({
+          BS_MA: row.BS_MA,
+          N_NGAY: row.N_NGAY,
+          B_TEN: row.B_TEN,
+        });
+      }
+
+      const totalArchived = archivedRows.length;
+      const responseBase = {
+        dateFrom: this.toDateOnlyIso(dateFrom),
+        dateTo: this.toDateOnlyIso(dateTo),
+        specialtyId: parsedSpecialtyId,
+        totalArchived,
+        eligible: eligible.length,
+        skippedWithBookings,
+        skippedWithPendingRequests,
+        skippedWithConflicts,
+      };
+
+      if (!payload.confirm) {
+        return {
+          preview: true,
+          ...responseBase,
+        };
+      }
+
+      if (eligible.length === 0) {
+        return {
+          preview: false,
+          ...responseBase,
+          restoredCount: 0,
+        };
+      }
+
+      const now = new Date();
+      const eligibleKeys = eligible.map((row) => ({
+        BS_MA: row.BS_MA,
+        N_NGAY: row.N_NGAY,
+        B_TEN: row.B_TEN,
+      }));
+      const updateResult = await this.prisma.lICH_BSK.updateMany({
+        where: {
+          LBSK_IS_ARCHIVED: true,
+          OR: eligibleKeys,
+        },
+        data: {
+          LBSK_IS_ARCHIVED: false,
+          LBSK_ARCHIVED_AT: null,
+          LBSK_ARCHIVED_BY: null,
+          LBSK_ARCHIVE_REASON: null,
+          LBSK_CAP_NHAT_LUC: now,
+        },
+      });
+
+      await this.prisma.aUDIT_LOG.create({
+        data: {
+          AL_TABLE: 'LICH_BSK',
+          AL_ACTION: 'RESTORE_ARCHIVED_BATCH',
+          AL_PK: {
+            dateFrom: this.toDateOnlyIso(dateFrom),
+            dateTo: this.toDateOnlyIso(dateTo),
+            specialtyId: parsedSpecialtyId,
+          },
+          AL_NEW: {
+            restoredCount: updateResult.count,
+            skippedWithBookings,
+            skippedWithPendingRequests,
+            skippedWithConflicts,
+          },
+          AL_CHANGED_BY: actor,
+          AL_CHANGED_AT: now,
+        },
+      });
+
+      return {
+        preview: false,
+        ...responseBase,
+        restoredCount: updateResult.count,
+      };
+    } catch (e) {
+      mapPrismaError(e);
+    }
+  }
+
   async copyWeekToFutureMonths(
     payload: {
       sourceWeekStart: string;

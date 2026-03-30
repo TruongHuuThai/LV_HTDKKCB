@@ -1,7 +1,7 @@
-﻿// src/services/api/adminApi.ts
+// src/services/api/adminApi.ts
 import axiosClient from './axiosClient';
 
-// Táº¡m thá»i Ä‘á»‹nh nghÄ©a types á»Ÿ Ä‘Ă¢y, cĂ³ thá»ƒ chuyá»ƒn ra file types/ riĂªng sau
+// Tạm thời định nghĩa types ở đây, có thể chuyển ra file types/ riêng sau
 export interface AdminDoctor {
     BS_MA: number;
     BS_HO_TEN: string;

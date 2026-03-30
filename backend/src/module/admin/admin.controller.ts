@@ -572,6 +572,21 @@ export class AdminController {
     return this.adminService.archiveSchedules(body, user.TK_SDT);
   }
 
+  @Post('schedule-management/archive/restore')
+  @HttpCode(HttpStatus.OK)
+  async restoreArchivedSchedules(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body()
+    body: {
+      dateFrom: string;
+      dateTo: string;
+      specialtyId: number;
+      confirm?: boolean;
+    },
+  ) {
+    return this.adminService.restoreArchivedSchedules(body, user.TK_SDT);
+  }
+
   @Post('schedule-management/copy-week')
   @HttpCode(HttpStatus.OK)
   async copyWeekToFutureMonths(
