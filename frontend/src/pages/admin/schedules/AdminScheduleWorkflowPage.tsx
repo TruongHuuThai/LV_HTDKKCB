@@ -989,10 +989,6 @@ export default function AdminScheduleWorkflowPage() {
             <CalendarClock className="mr-2 h-4 w-4" />
             {openSlotsMutation.isPending ? 'Đang mở lịch hẹn...' : 'Mở lịch hẹn'}
           </Button>
-          <Button variant="outline" onClick={openArchiveDialog}>
-            <FileClock className="mr-2 h-4 w-4" />
-            Archive lịch cũ
-          </Button>
           <Button onClick={() => finalizeMutation.mutate()} disabled={finalizeMutation.isPending}>
             <ShieldCheck className="mr-2 h-4 w-4" />
             {finalizeMutation.isPending ? 'Đang chốt...' : 'Chốt lịch tuần'}
@@ -1275,7 +1271,7 @@ export default function AdminScheduleWorkflowPage() {
                 <AdminSelectItem value="adjusted">Đã điều chỉnh</AdminSelectItem>
                 <AdminSelectItem value="finalized">Chính thức</AdminSelectItem>
                 <AdminSelectItem value="vacant_by_leave">Ch? thay th?</AdminSelectItem>
-                <AdminSelectItem value="cancelled_by_doctor_leave">?? h?y do b?c s? ngh?</AdminSelectItem>
+                <AdminSelectItem value="cancelled_by_doctor_leave">Đã hủy do bác sĩ nghỉ</AdminSelectItem>
                 <AdminSelectItem value="cancelled">Đã hủy</AdminSelectItem>
               </AdminSelectContent>
             </AdminSelect>
@@ -1284,14 +1280,14 @@ export default function AdminScheduleWorkflowPage() {
                 <AdminSelectValue placeholder="Nguồn lịch" />
               </AdminSelectTrigger>
               <AdminSelectContent>
-                <AdminSelectItem value="all">T?t c? ngu?n</AdminSelectItem>
-                <AdminSelectItem value="template">Tu?n m?u</AdminSelectItem>
-                <AdminSelectItem value="admin_manual">?i?u ch?nh tay</AdminSelectItem>
+                <AdminSelectItem value="all">Tất cả nguồn</AdminSelectItem>
+                <AdminSelectItem value="template">Tuần mẫu</AdminSelectItem>
+                <AdminSelectItem value="admin_manual">Điều chỉnh tay</AdminSelectItem>
                 <AdminSelectItem value="auto_rolling">T? sinh rolling</AdminSelectItem>
-                <AdminSelectItem value="copied_1_month">Sao ch?p 1 th?ng</AdminSelectItem>
-                <AdminSelectItem value="copied_2_months">Sao ch?p 2 th?ng</AdminSelectItem>
-                <AdminSelectItem value="copied_3_months">Sao ch?p 3 th?ng</AdminSelectItem>
-                <AdminSelectItem value="legacy_registration">D? li?u c?</AdminSelectItem>
+                <AdminSelectItem value="copied_1_month">Sao chép 1 tháng</AdminSelectItem>
+                <AdminSelectItem value="copied_2_months">Sao chép 2 tháng</AdminSelectItem>
+                <AdminSelectItem value="copied_3_months">Sao chép 3 tháng</AdminSelectItem>
+                <AdminSelectItem value="legacy_registration">Dữ liệu cũ</AdminSelectItem>
               </AdminSelectContent>
             </AdminSelect>
             <Button variant="outline" onClick={() => openManualShiftDialog()}>
@@ -1420,11 +1416,11 @@ export default function AdminScheduleWorkflowPage() {
                           disabled={item.status === 'cancelled_by_doctor_leave'}
                           title={
                             item.status === 'cancelled_by_doctor_leave'
-                              ? 'Ca ?? h?y do b?c s? ngh?, kh?ng th? thay th?.'
+                              ? 'Ca đã hủy do bác sĩ nghỉ, không thể thay thế.'
                               : undefined
                           }
                         >
-                          S?a
+                          Sửa
                         </Button>
                         <Button
                           size="sm"
@@ -1532,8 +1528,8 @@ export default function AdminScheduleWorkflowPage() {
                               )}
                             >
                               {item.leaveApprovalMode === 'cancel_with_bookings'
-                                ? 'S? h?y l?ch kh?m b?nh nh?n'
-                                : 'C? th? duy?t ngh? v? thay th?'}
+                                ? 'Sẽ hủy lịch khám bệnh nhân'
+                                : 'Có thể duyệt nghỉ và thay thế'}
                             </span>
                             <span
                               className={cn(
@@ -1541,7 +1537,7 @@ export default function AdminScheduleWorkflowPage() {
                                 item.affectedBookingCount > 0 ? 'text-rose-700' : 'text-slate-500',
                               )}
                             >
-                              ?nh h??ng: {item.affectedBookingCount} l?ch h?n
+                              Ảnh hưởng: {item.affectedBookingCount} lịch hẹn
                             </span>
                           </div>
                         ) : null}
@@ -1919,9 +1915,9 @@ export default function AdminScheduleWorkflowPage() {
       <Dialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Archive l?ch tr?c c?</DialogTitle>
+            <DialogTitle>Archive lịch trực cũ</DialogTitle>
             <DialogDescription>
-              L?u tr? l?ch tr?c c? theo kho?ng ng?y, kh?ng x?a c?ng d? li?u.
+              Lưu trữ lịch trực cũ theo khoảng ngày, không xóa cứng dữ liệu.
             </DialogDescription>
           </DialogHeader>
 
@@ -1929,7 +1925,7 @@ export default function AdminScheduleWorkflowPage() {
             <section className="rounded-xl border border-slate-200 bg-white p-4">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div>
-                  <label className="mb-1.5 block text-sm font-semibold text-slate-700">T? ng?y</label>
+                  <label className="mb-1.5 block text-sm font-semibold text-slate-700">Từ ngày</label>
                   <Input
                     type="date"
                     value={archiveForm.dateFrom}
@@ -1939,7 +1935,7 @@ export default function AdminScheduleWorkflowPage() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-sm font-semibold text-slate-700">??n ng?y</label>
+                  <label className="mb-1.5 block text-sm font-semibold text-slate-700">Đến ngày</label>
                   <Input
                     type="date"
                     value={archiveForm.dateTo}
@@ -1949,7 +1945,7 @@ export default function AdminScheduleWorkflowPage() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-sm font-semibold text-slate-700">Chuy?n khoa</label>
+                  <label className="mb-1.5 block text-sm font-semibold text-slate-700">Chuyên khoa</label>
                   <AdminSelect
                     value={archiveForm.specialtyId}
                     onValueChange={(value) =>
@@ -1957,10 +1953,10 @@ export default function AdminScheduleWorkflowPage() {
                     }
                   >
                     <AdminSelectTrigger>
-                      <AdminSelectValue placeholder="Ch?n chuy?n khoa" />
+                      <AdminSelectValue placeholder="Chọn chuyên khoa" />
                     </AdminSelectTrigger>
                     <AdminSelectContent>
-                      <AdminSelectItem value="all">T?t c?</AdminSelectItem>
+                      <AdminSelectItem value="all">Tất cả</AdminSelectItem>
                       {(options?.specialties ?? []).map((item) => (
                         <AdminSelectItem key={item.CK_MA} value={String(item.CK_MA)}>
                           {item.CK_TEN}
@@ -1970,7 +1966,7 @@ export default function AdminScheduleWorkflowPage() {
                   </AdminSelect>
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-sm font-semibold text-slate-700">Ngu?n l?ch</label>
+                  <label className="mb-1.5 block text-sm font-semibold text-slate-700">Nguồn lịch</label>
                   <AdminSelect
                     value={archiveForm.source}
                     onValueChange={(value) =>
@@ -1978,17 +1974,17 @@ export default function AdminScheduleWorkflowPage() {
                     }
                   >
                     <AdminSelectTrigger>
-                      <AdminSelectValue placeholder="Ch?n ngu?n" />
+                      <AdminSelectValue placeholder="Chọn nguồn" />
                     </AdminSelectTrigger>
                     <AdminSelectContent>
-                      <AdminSelectItem value="all">T?t c?</AdminSelectItem>
-                      <AdminSelectItem value="template">Tu?n m?u</AdminSelectItem>
+                      <AdminSelectItem value="all">Tất cả</AdminSelectItem>
+                      <AdminSelectItem value="template">Tuần mẫu</AdminSelectItem>
                       <AdminSelectItem value="auto_rolling">T? sinh rolling</AdminSelectItem>
-                      <AdminSelectItem value="copied_1_month">Sao ch?p 1 th?ng</AdminSelectItem>
-                      <AdminSelectItem value="copied_2_months">Sao ch?p 2 th?ng</AdminSelectItem>
-                      <AdminSelectItem value="copied_3_months">Sao ch?p 3 th?ng</AdminSelectItem>
-                      <AdminSelectItem value="admin_manual">?i?u ch?nh tay</AdminSelectItem>
-                      <AdminSelectItem value="legacy_registration">D? li?u c?</AdminSelectItem>
+                      <AdminSelectItem value="copied_1_month">Sao chép 1 tháng</AdminSelectItem>
+                      <AdminSelectItem value="copied_2_months">Sao chép 2 tháng</AdminSelectItem>
+                      <AdminSelectItem value="copied_3_months">Sao chép 3 tháng</AdminSelectItem>
+                      <AdminSelectItem value="admin_manual">Điều chỉnh tay</AdminSelectItem>
+                      <AdminSelectItem value="legacy_registration">Dữ liệu cũ</AdminSelectItem>
                     </AdminSelectContent>
                   </AdminSelect>
                 </div>
@@ -1999,7 +1995,7 @@ export default function AdminScheduleWorkflowPage() {
                     onChange={(e) =>
                       setArchiveForm((prev) => ({ ...prev, reason: e.target.value }))
                     }
-                    placeholder="V? d?: D?n l?ch c? ?? thay th? l?ch chu?n"
+                    placeholder="Ví dụ: Dọn lịch cũ để thay thế lịch chuẩn"
                   />
                 </div>
               </div>
@@ -2008,11 +2004,11 @@ export default function AdminScheduleWorkflowPage() {
             {archivePreview ? (
               <section className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <div>T?ng ca x?t: <span className="font-semibold">{archivePreview.total}</span></div>
-                  <div>?? ?i?u ki?n: <span className="font-semibold">{archivePreview.eligible}</span></div>
+                  <div>Tổng ca xét: <span className="font-semibold">{archivePreview.total}</span></div>
+                  <div>Đủ điều kiện: <span className="font-semibold">{archivePreview.eligible}</span></div>
                   <div>?? archive: <span className="font-semibold">{archivePreview.alreadyArchived}</span></div>
-                  <div>V??ng l?ch h?n: <span className="font-semibold">{archivePreview.skippedWithBookings}</span></div>
-                  <div>?ang c? y?u c?u: <span className="font-semibold">{archivePreview.skippedWithPendingRequests}</span></div>
+                  <div>Vướng lịch hẹn: <span className="font-semibold">{archivePreview.skippedWithBookings}</span></div>
+                  <div>Đang có yêu cầu: <span className="font-semibold">{archivePreview.skippedWithPendingRequests}</span></div>
                 </div>
               </section>
             ) : null}
@@ -2027,10 +2023,10 @@ export default function AdminScheduleWorkflowPage() {
 
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setArchiveDialogOpen(false)}>
-              ??ng
+              Đóng
             </Button>
             <Button variant="secondary" onClick={() => runArchivePreview(false)} disabled={archiveLoading}>
-              Xem tr??c
+              Xem trước
             </Button>
             <Button
               variant="destructive"
@@ -2287,8 +2283,8 @@ export default function AdminScheduleWorkflowPage() {
           <DialogHeader>
             <DialogTitle>
               {reviewDialog.targetStatus === 'approved'
-                ? reviewDialog.approvalLabel || 'Duy?t y?u c?u'
-                : 'T? ch?i y?u c?u'}
+                ? reviewDialog.approvalLabel || 'Duyệt yêu cầu'
+                : 'Từ chối yêu cầu'}
             </DialogTitle>
             <DialogDescription>{reviewDialog.requestLabel}</DialogDescription>
           </DialogHeader>
@@ -2315,8 +2311,8 @@ export default function AdminScheduleWorkflowPage() {
               {reviewExceptionMutation.isPending
                 ? '?ang x? l?...'
                 : reviewDialog.targetStatus === 'approved'
-                  ? reviewDialog.approvalLabel || 'Duy?t y?u c?u'
-                  : 'T? ch?i y?u c?u'}
+                  ? reviewDialog.approvalLabel || 'Duyệt yêu cầu'
+                  : 'Từ chối yêu cầu'}
             </Button>
           </DialogFooter>
         </DialogContent>
