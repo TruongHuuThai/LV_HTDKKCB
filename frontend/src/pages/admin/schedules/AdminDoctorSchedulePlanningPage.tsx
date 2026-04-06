@@ -1051,14 +1051,14 @@ export default function AdminDoctorSchedulePlanningPage() {
               <ArrowLeft className='mr-2 h-4 w-4' />
               Quay lại
             </Button>
-            <Button
+            {/* <Button
               variant='outline'
               onClick={() => saveDraftMutation.mutate()}
               disabled={!canCreate || saveDraftMutation.isPending}
             >
               <Save className='mr-2 h-4 w-4' />
               Lưu nháp
-            </Button>
+            </Button> */}
             <Button variant='outline' onClick={() => setPreviewOpen(true)} disabled={!hasPlanningData}>
               Xem trước
             </Button>

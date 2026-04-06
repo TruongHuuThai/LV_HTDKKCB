@@ -18,6 +18,17 @@ export class BookingRepository {
     });
   }
 
+  findPatientProfileById(BN_MA: number) {
+    return this.prisma.bENH_NHAN.findUnique({
+      where: { BN_MA },
+      select: {
+        BN_MA: true,
+        TK_SDT: true,
+        BN_DA_VO_HIEU: true,
+      },
+    });
+  }
+
   findDoctorSchedule(BS_MA: number, N_NGAY: Date, B_TEN: string) {
     return this.prisma.lICH_BSK.findFirst({
       where: {
@@ -55,7 +66,13 @@ export class BookingRepository {
     });
   }
 
-  countActiveBookingsForSlot(BS_MA: number, N_NGAY: Date, B_TEN: string, KG_MA: number) {
+  countActiveBookingsForSlot(
+    BS_MA: number,
+    N_NGAY: Date,
+    B_TEN: string,
+    KG_MA: number,
+    options?: { excludeDkMa?: number },
+  ) {
     return this.prisma.dANG_KY.count({
       where: {
         BS_MA,
@@ -63,6 +80,7 @@ export class BookingRepository {
         B_TEN,
         KG_MA,
         DK_TRANG_THAI: { notIn: ['HUY', 'HUY_BS_NGHI'] },
+        ...(options?.excludeDkMa ? { DK_MA: { not: options.excludeDkMa } } : {}),
       },
     });
   }
@@ -72,6 +90,7 @@ export class BookingRepository {
     N_NGAY: Date,
     KG_MA: number,
     CK_MA: number,
+    options?: { excludeDkMa?: number },
   ) {
     return this.prisma.dANG_KY.count({
       where: {
@@ -79,6 +98,7 @@ export class BookingRepository {
         N_NGAY,
         KG_MA,
         DK_TRANG_THAI: { notIn: ['HUY', 'HUY_BS_NGHI'] },
+        ...(options?.excludeDkMa ? { DK_MA: { not: options.excludeDkMa } } : {}),
         LICH_BSK: {
           is: {
             BAC_SI: {

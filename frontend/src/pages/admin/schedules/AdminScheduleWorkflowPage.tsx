@@ -2,16 +2,33 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
+import {
   CalendarClock,
   ChevronLeft,
   ChevronRight,
+  Copy,
+  Eraser,
   FileClock,
+  GripVertical,
   Layers3,
   Loader2,
   Plus,
   Search,
   ShieldCheck,
   Trash2,
+  UserMinus,
   WandSparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -95,7 +112,32 @@ type ManualShiftFormState = {
   note: string;
 };
 
+type TemplateBuilderSlot = {
+  key: string;
+  weekday: number;
+  session: string;
+  roomId: number;
+};
+
+type TemplateBuilderDoctorDragData = {
+  type: 'doctor';
+  doctorId: number;
+  specialtyId: number;
+  doctorName: string;
+  specialtyName: string;
+  assignedCount: number;
+};
+
+type TemplateBuilderSlotDropData = {
+  type: 'slot';
+  slotKey: string;
+  weekday: number;
+  session: string;
+  roomId: number;
+};
+
 const WEEKDAY_OPTIONS = [1, 2, 3, 4, 5, 6, 0];
+const TEMPLATE_BUILDER_WEEKDAYS = [1, 2, 3, 4, 5, 6];
 
 const EMPTY_TEMPLATE_FORM: TemplateFormState = {
   id: null,
@@ -119,6 +161,9 @@ const EMPTY_MANUAL_SHIFT_FORM: ManualShiftFormState = {
   status: 'approved',
   note: '',
 };
+
+const templateBuilderSlotKey = (weekday: number, session: string, roomId: number) =>
+  `${weekday}__${session}__${roomId}`;
 
 function getNextWeekStartIso() {
   const now = new Date();
@@ -210,6 +255,158 @@ function ErrorState({
       <p className="text-sm font-semibold text-rose-900">{title}</p>
       <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-rose-700">{description}</p>
       {action ? <div className="mt-4 flex justify-center">{action}</div> : null}
+    </div>
+  );
+}
+
+function EmptyCard({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+      <p className="text-sm font-medium text-slate-700">{title}</p>
+      <p className="mt-2 text-xs text-slate-500">{description}</p>
+    </div>
+  );
+}
+
+function TemplateBuilderDoctorCard({
+  id,
+  specialtyId,
+  name,
+  specialtyName,
+  assignedCount,
+  active,
+  disabled,
+}: {
+  id: number;
+  specialtyId: number;
+  name: string;
+  specialtyName: string;
+  assignedCount: number;
+  active: boolean;
+  disabled: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+    id: `template-builder-doctor-${id}`,
+    data: {
+      type: 'doctor',
+      doctorId: id,
+      specialtyId,
+      doctorName: name,
+      specialtyName,
+      assignedCount,
+    } satisfies TemplateBuilderDoctorDragData,
+    disabled,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={!active ? { transform: CSS.Translate.toString(transform) } : undefined}
+      {...attributes}
+      {...listeners}
+      className={cn(
+        'rounded-lg border p-3 text-sm shadow-sm transition-all',
+        disabled && 'cursor-not-allowed opacity-60',
+        !disabled && 'cursor-grab active:cursor-grabbing',
+        active ? 'border-blue-300 bg-blue-50 opacity-45 ring-2 ring-blue-200' : 'border-slate-200 bg-white',
+      )}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="font-medium text-slate-900">{name}</div>
+        <GripVertical className="h-4 w-4 text-slate-400" />
+      </div>
+      <div className="mt-1 text-xs text-slate-500">{specialtyName}</div>
+      <div className="mt-2 inline-flex rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
+        {assignedCount} slot mẫu
+      </div>
+    </div>
+  );
+}
+
+function TemplateBuilderSlotCard({
+  slot,
+  roomName,
+  doctorName,
+  hasConflict,
+  canDrop,
+  dropReason,
+  dragging,
+  disabled,
+  onRemoveDoctor,
+}: {
+  slot: TemplateBuilderSlot;
+  roomName: string;
+  doctorName: string | null;
+  hasConflict: boolean;
+  canDrop: boolean;
+  dropReason?: string;
+  dragging: boolean;
+  disabled: boolean;
+  onRemoveDoctor: (slotKeyValue: string) => void;
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: slot.key,
+    disabled,
+    data: {
+      type: 'slot',
+      slotKey: slot.key,
+      weekday: slot.weekday,
+      session: slot.session,
+      roomId: slot.roomId,
+    } satisfies TemplateBuilderSlotDropData,
+  });
+
+  const assigned = Boolean(doctorName);
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        'rounded-md border p-2 transition-all',
+        hasConflict
+          ? 'border-rose-300 bg-rose-50'
+          : assigned
+            ? 'border-emerald-300 bg-emerald-50'
+            : 'border-dashed border-slate-300 bg-slate-50',
+        dragging && canDrop && 'border-blue-300 bg-blue-50/70',
+        dragging && !canDrop && 'border-rose-300 bg-rose-50/70',
+        isOver && canDrop && 'scale-[1.01] border-blue-500 bg-blue-100 ring-2 ring-blue-500 shadow-sm',
+        isOver && !canDrop && 'border-rose-500 bg-rose-100 ring-2 ring-rose-500',
+      )}
+    >
+      <div className="text-[11px] text-slate-500">{roomName}</div>
+      <div className="mt-1 flex items-center justify-between gap-2">
+        <div className={cn('text-sm', assigned ? 'font-medium text-slate-900' : 'text-slate-500')}>
+          {doctorName || 'Kéo bác sĩ vào đây'}
+        </div>
+        {assigned ? (
+          <button
+            type="button"
+            className="rounded p-1 text-slate-500 hover:bg-white hover:text-rose-600"
+            onClick={() => onRemoveDoctor(slot.key)}
+            title="Gỡ bác sĩ khỏi slot"
+          >
+            <UserMinus className="h-3.5 w-3.5" />
+          </button>
+        ) : null}
+      </div>
+      <div
+        className={cn(
+          'mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium',
+          hasConflict
+            ? 'bg-rose-100 text-rose-700'
+            : assigned
+              ? 'bg-emerald-100 text-emerald-700'
+              : 'bg-slate-100 text-slate-600',
+        )}
+      >
+        {hasConflict ? 'Trùng' : assigned ? 'Đã có mẫu' : 'Trống'}
+      </div>
+      {dragging ? (
+        <div className={cn('mt-1 text-[10px] font-medium', canDrop ? 'text-blue-700' : 'text-rose-700')}>
+          {canDrop ? 'Có thể thả vào slot này' : dropReason || 'Không thể thả vào slot này'}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -395,6 +592,9 @@ function getLeaveApprovalHint(item: ScheduleExceptionRequestItem) {
 export default function AdminScheduleWorkflowPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const templateBuilderSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+  );
   const weekPickerRef = useRef<HTMLInputElement>(null);
   const manualShiftDatePickerRef = useRef<HTMLInputElement>(null);
   const templateStartPickerRef = useRef<HTMLInputElement>(null);
@@ -415,7 +615,19 @@ export default function AdminScheduleWorkflowPage() {
   const [generatedPageSize, setGeneratedPageSize] = useState(20);
 
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  const [templateBuilderOpen, setTemplateBuilderOpen] = useState(false);
   const [templateForm, setTemplateForm] = useState<TemplateFormState>(EMPTY_TEMPLATE_FORM);
+  const [templateBuilderDoctorSearch, setTemplateBuilderDoctorSearch] = useState('');
+  const [templateBuilderAssignments, setTemplateBuilderAssignments] = useState<
+    Record<string, number | null>
+  >({});
+  const [templateBuilderActiveDoctor, setTemplateBuilderActiveDoctor] = useState<number | null>(null);
+  const [templateBuilderActiveDoctorDragData, setTemplateBuilderActiveDoctorDragData] =
+    useState<TemplateBuilderDoctorDragData | null>(null);
+  const [templateBuilderActiveDoctorWidth, setTemplateBuilderActiveDoctorWidth] = useState<number | null>(
+    null,
+  );
+  const [templateBuilderHoveredSlotKey, setTemplateBuilderHoveredSlotKey] = useState<string | null>(null);
   const [manualShiftDialogOpen, setManualShiftDialogOpen] = useState(false);
   const [manualShiftForm, setManualShiftForm] = useState<ManualShiftFormState>(
     EMPTY_MANUAL_SHIFT_FORM,
@@ -518,6 +730,18 @@ export default function AdminScheduleWorkflowPage() {
       }),
   });
 
+  const { data: templateBuilderSuggestion } = useQuery({
+    queryKey: ['admin-template-builder-latest', templateForm.CK_MA],
+    enabled: templateBuilderOpen && Boolean(templateForm.CK_MA),
+    queryFn: () =>
+      adminScheduleWorkflowApi.getTemplates({
+        specialtyId: Number(templateForm.CK_MA),
+        status: 'active',
+        page: 1,
+        limit: 200,
+      }),
+  });
+
   const {
     data: exceptionRequests,
     isLoading: exceptionLoading,
@@ -546,6 +770,109 @@ export default function AdminScheduleWorkflowPage() {
     if (!templateForm.CK_MA) return options?.rooms ?? [];
     return (options?.rooms ?? []).filter((room) => room.CK_MA === Number(templateForm.CK_MA));
   }, [options?.rooms, templateForm.CK_MA]);
+
+  const templateBuilderDoctors = useMemo(() => {
+    const keyword = templateBuilderDoctorSearch.trim().toLowerCase();
+    if (!keyword) return filteredDoctorsForTemplate;
+    return filteredDoctorsForTemplate.filter(
+      (doctor) =>
+        doctor.BS_HO_TEN.toLowerCase().includes(keyword) || String(doctor.BS_MA).includes(keyword),
+    );
+  }, [filteredDoctorsForTemplate, templateBuilderDoctorSearch]);
+
+  const templateBuilderSessions = useMemo(() => {
+    const sessions = options?.sessions ?? [];
+    const morning = sessions.find((session) => getSessionLabel(session.B_TEN).toLowerCase().includes('sáng'));
+    const afternoon = sessions.find((session) =>
+      getSessionLabel(session.B_TEN).toLowerCase().includes('chiều'),
+    );
+    const primary = [morning, afternoon].filter(
+      (
+        session,
+      ): session is {
+        B_TEN: string;
+        B_GIO_BAT_DAU: string | null;
+        B_GIO_KET_THUC: string | null;
+      } => Boolean(session),
+    );
+    if (primary.length > 0) return primary;
+    return sessions.slice(0, 2);
+  }, [options?.sessions]);
+
+  const templateBuilderSlots = useMemo(() => {
+    const slots: TemplateBuilderSlot[] = [];
+    TEMPLATE_BUILDER_WEEKDAYS.forEach((weekday) => {
+      templateBuilderSessions.forEach((session) => {
+        filteredRoomsForTemplate.forEach((room) => {
+          slots.push({
+            key: templateBuilderSlotKey(weekday, session.B_TEN, room.P_MA),
+            weekday,
+            session: session.B_TEN,
+            roomId: room.P_MA,
+          });
+        });
+      });
+    });
+    return slots;
+  }, [filteredRoomsForTemplate, templateBuilderSessions]);
+
+  const templateBuilderSlotMap = useMemo(() => {
+    const map = new Map<string, TemplateBuilderSlot>();
+    templateBuilderSlots.forEach((slot) => map.set(slot.key, slot));
+    return map;
+  }, [templateBuilderSlots]);
+
+  const templateBuilderDoctorNameById = useMemo(
+    () =>
+      new Map(
+        filteredDoctorsForTemplate.map((doctor) => [doctor.BS_MA, doctor.BS_HO_TEN] as const),
+      ),
+    [filteredDoctorsForTemplate],
+  );
+
+  const templateBuilderRoomNameById = useMemo(
+    () => new Map(filteredRoomsForTemplate.map((room) => [room.P_MA, room.P_TEN] as const)),
+    [filteredRoomsForTemplate],
+  );
+
+  const templateBuilderAssignedCountByDoctor = useMemo(() => {
+    const map = new Map<number, number>();
+    Object.values(templateBuilderAssignments).forEach((doctorId) => {
+      if (!doctorId) return;
+      map.set(doctorId, (map.get(doctorId) ?? 0) + 1);
+    });
+    return map;
+  }, [templateBuilderAssignments]);
+
+  const templateBuilderConflicts = useMemo(() => {
+    const byDoctorAndShift = new Map<string, string[]>();
+    Object.entries(templateBuilderAssignments).forEach(([slotKey, doctorId]) => {
+      if (!doctorId) return;
+      const slot = templateBuilderSlotMap.get(slotKey);
+      if (!slot) return;
+      const key = `${slot.weekday}__${slot.session}__${doctorId}`;
+      byDoctorAndShift.set(key, [...(byDoctorAndShift.get(key) ?? []), slotKey]);
+    });
+
+    const conflicts = new Set<string>();
+    byDoctorAndShift.forEach((slotKeys) => {
+      if (slotKeys.length <= 1) return;
+      slotKeys.forEach((slotKey) => conflicts.add(slotKey));
+    });
+    return conflicts;
+  }, [templateBuilderAssignments, templateBuilderSlotMap]);
+
+  const templateBuilderSummary = useMemo(() => {
+    const total = templateBuilderSlots.length;
+    const assigned = Object.values(templateBuilderAssignments).filter(Boolean).length;
+    const conflicts = templateBuilderConflicts.size;
+    return {
+      total,
+      assigned,
+      empty: Math.max(total - assigned, 0),
+      conflicts,
+    };
+  }, [templateBuilderAssignments, templateBuilderConflicts.size, templateBuilderSlots.length]);
 
   const selectedTemplateSpecialty = useMemo(
     () => options?.specialties?.find((item) => item.CK_MA === Number(templateForm.CK_MA)) ?? null,
@@ -642,6 +969,18 @@ export default function AdminScheduleWorkflowPage() {
     return null;
   }, [templateForm]);
 
+  const templateBuilderSaveReason = useMemo(() => {
+    if (!templateForm.CK_MA) return 'Vui lòng chọn chuyên khoa để bắt đầu tạo mẫu.';
+    if (!templateForm.effectiveStartDate) return 'Vui lòng chọn ngày bắt đầu hiệu lực.';
+    if (templateBuilderSlots.length === 0)
+      return 'Không có phòng hoặc buổi phù hợp để tạo timetable mẫu.';
+    if (templateBuilderSummary.assigned === 0)
+      return 'Vui lòng kéo thả ít nhất một bác sĩ vào timetable mẫu.';
+    if (templateBuilderSummary.conflicts > 0)
+      return 'Mẫu đang có xung đột bác sĩ trùng ca. Vui lòng xử lý trước khi lưu.';
+    return null;
+  }, [templateBuilderSlots.length, templateBuilderSummary.assigned, templateBuilderSummary.conflicts, templateForm.CK_MA, templateForm.effectiveStartDate]);
+
   const saveManualShiftReason = useMemo(() => {
     if (
       !manualShiftForm.BS_MA ||
@@ -713,6 +1052,155 @@ export default function AdminScheduleWorkflowPage() {
     },
     onError: (error: any) => {
       const message = error?.response?.data?.message || 'Không thể cập nhật mẫu lịch';
+      toast.error(Array.isArray(message) ? message.join(', ') : message);
+    },
+  });
+
+  const validateTemplateBuilderDrop = (
+    slot: TemplateBuilderSlot | undefined,
+    doctorId: number,
+  ): { ok: boolean; reason?: string } => {
+    if (!slot) return { ok: false, reason: 'Không tìm thấy slot cần gán.' };
+    if (!templateForm.CK_MA) return { ok: false, reason: 'Vui lòng chọn chuyên khoa trước.' };
+    const targetDoctor = filteredDoctorsForTemplate.find((doctor) => doctor.BS_MA === doctorId);
+    if (!targetDoctor) return { ok: false, reason: 'Bác sĩ không thuộc chuyên khoa đã chọn.' };
+
+    const duplicate = Object.entries(templateBuilderAssignments).find(([slotKey, currentDoctorId]) => {
+      if (slotKey === slot.key || currentDoctorId !== doctorId) return false;
+      const assignedSlot = templateBuilderSlotMap.get(slotKey);
+      return assignedSlot?.weekday === slot.weekday && assignedSlot?.session === slot.session;
+    });
+    if (duplicate) {
+      return { ok: false, reason: 'Bác sĩ đã được gán ở phòng khác trong cùng thứ và buổi.' };
+    }
+
+    return { ok: true };
+  };
+
+  const copyTemplateBuilderDay = (sourceDay: number, targetDays: number[]) => {
+    setTemplateBuilderAssignments((prev) => {
+      const next = { ...prev };
+      const sourceSlots = templateBuilderSlots.filter((slot) => slot.weekday === sourceDay);
+      sourceSlots.forEach((sourceSlot) => {
+        const doctorId = prev[sourceSlot.key];
+        if (!doctorId) return;
+        targetDays.forEach((targetDay) => {
+          const targetKey = templateBuilderSlotKey(targetDay, sourceSlot.session, sourceSlot.roomId);
+          const targetSlot = templateBuilderSlotMap.get(targetKey);
+          const check = validateTemplateBuilderDrop(targetSlot, doctorId);
+          if (check.ok) next[targetKey] = doctorId;
+        });
+      });
+      return next;
+    });
+    toast.success(`Đã sao chép pattern từ ${getWeekdayLabel(sourceDay)}.`);
+  };
+
+  const copyTemplateBuilderWholeWeek = () => {
+    copyTemplateBuilderDay(1, [2, 3, 4, 5, 6]);
+  };
+
+  const clearTemplateBuilderByWeekday = (weekday: number) => {
+    setTemplateBuilderAssignments((prev) => {
+      const next = { ...prev };
+      Object.keys(next).forEach((slotKey) => {
+        const slot = templateBuilderSlotMap.get(slotKey);
+        if (slot?.weekday === weekday) next[slotKey] = null;
+      });
+      return next;
+    });
+  };
+
+  const clearTemplateBuilderBySession = (session: string) => {
+    setTemplateBuilderAssignments((prev) => {
+      const next = { ...prev };
+      Object.keys(next).forEach((slotKey) => {
+        const slot = templateBuilderSlotMap.get(slotKey);
+        if (slot?.session === session) next[slotKey] = null;
+      });
+      return next;
+    });
+  };
+
+  const resetTemplateBuilderAssignments = () => {
+    setTemplateBuilderAssignments({});
+    toast.success('Đã đặt lại timetable mẫu.');
+  };
+
+  const applyLatestActiveTemplate = () => {
+    const items = templateBuilderSuggestion?.items ?? [];
+    if (items.length === 0) {
+      toast.error('Chưa có mẫu gần nhất phù hợp để áp dụng.');
+      return;
+    }
+
+    const next: Record<string, number | null> = {};
+    items.forEach((item) => {
+      const slotKey = templateBuilderSlotKey(item.weekday, item.B_TEN, item.P_MA);
+      if (!templateBuilderSlotMap.has(slotKey)) return;
+      next[slotKey] = item.BS_MA;
+    });
+    setTemplateBuilderAssignments(next);
+    toast.success('Đã tải pattern từ mẫu đang hoạt động gần nhất.');
+  };
+
+  const removeDoctorFromTemplateBuilderSlot = (slotKeyValue: string) => {
+    setTemplateBuilderAssignments((prev) => ({
+      ...prev,
+      [slotKeyValue]: null,
+    }));
+  };
+
+  const templateBuilderMutation = useMutation({
+    mutationFn: async () => {
+      if (templateBuilderSaveReason) throw new Error(templateBuilderSaveReason);
+
+      const records = Object.entries(templateBuilderAssignments)
+        .filter(([, doctorId]) => Boolean(doctorId))
+        .map(([slotKey, doctorId]) => {
+          const slot = templateBuilderSlotMap.get(slotKey)!;
+          return {
+            BS_MA: Number(doctorId),
+            CK_MA: Number(templateForm.CK_MA),
+            P_MA: slot.roomId,
+            B_TEN: slot.session,
+            weekday: slot.weekday,
+            effectiveStartDate: templateForm.effectiveStartDate,
+            effectiveEndDate: templateForm.effectiveEndDate || null,
+            status: templateForm.status,
+            note: templateForm.note || undefined,
+          };
+        });
+
+      const results = await Promise.allSettled(
+        records.map((payload) => adminScheduleWorkflowApi.createTemplate(payload)),
+      );
+
+      const successCount = results.filter((item) => item.status === 'fulfilled').length;
+      const failCount = results.length - successCount;
+      if (successCount === 0) {
+        const firstRejected = results.find((item) => item.status === 'rejected');
+        throw new Error(
+          (firstRejected as PromiseRejectedResult | undefined)?.reason?.response?.data?.message ||
+            'Không thể lưu mẫu lịch.',
+        );
+      }
+      return { successCount, failCount };
+    },
+    onSuccess: ({ successCount, failCount }) => {
+      toast.success(
+        failCount > 0
+          ? `Đã lưu ${successCount} mẫu, ${failCount} mẫu chưa lưu được.`
+          : `Đã lưu ${successCount} mẫu lịch.`,
+      );
+      setTemplateBuilderOpen(false);
+      setTemplateBuilderAssignments({});
+      setTemplateBuilderDoctorSearch('');
+      invalidateScheduleWorkflow();
+    },
+    onError: (error: any) => {
+      const message =
+        error?.response?.data?.message || error?.message || 'Không thể lưu mẫu lịch.';
       toast.error(Array.isArray(message) ? message.join(', ') : message);
     },
   });
@@ -895,6 +1383,60 @@ export default function AdminScheduleWorkflowPage() {
       note: template.note || '',
     });
     setTemplateDialogOpen(true);
+  };
+
+  const onTemplateBuilderDragStart = (event: DragStartEvent) => {
+    const dragData = event.active.data.current as TemplateBuilderDoctorDragData | undefined;
+    if (!dragData || dragData.type !== 'doctor') return;
+    setTemplateBuilderActiveDoctor(dragData.doctorId);
+    setTemplateBuilderActiveDoctorDragData(dragData);
+    const node = event.active.rect.current.initial;
+    setTemplateBuilderActiveDoctorWidth(node?.width ?? null);
+  };
+
+  const onTemplateBuilderDragOver = (event: DragOverEvent) => {
+    const dropData = event.over?.data.current as TemplateBuilderSlotDropData | undefined;
+    if (!dropData || dropData.type !== 'slot') {
+      setTemplateBuilderHoveredSlotKey(null);
+      return;
+    }
+    setTemplateBuilderHoveredSlotKey(dropData.slotKey);
+  };
+
+  const onTemplateBuilderDragEnd = (event: DragEndEvent) => {
+    setTemplateBuilderHoveredSlotKey(null);
+    setTemplateBuilderActiveDoctor(null);
+    setTemplateBuilderActiveDoctorDragData(null);
+
+    const dragData = event.active.data.current as TemplateBuilderDoctorDragData | undefined;
+    const dropData = event.over?.data.current as TemplateBuilderSlotDropData | undefined;
+    if (!dragData || dragData.type !== 'doctor') return;
+    if (!dropData || dropData.type !== 'slot') return;
+
+    const targetSlot = templateBuilderSlotMap.get(dropData.slotKey);
+    const check = validateTemplateBuilderDrop(targetSlot, dragData.doctorId);
+    if (!check.ok) {
+      toast.error(check.reason || 'Không thể thả vào slot này.');
+      return;
+    }
+
+    const currentDoctorId = templateBuilderAssignments[dropData.slotKey];
+    if (currentDoctorId && currentDoctorId !== dragData.doctorId) {
+      const ok = window.confirm('Slot này đã có bác sĩ. Bạn có muốn ghi đè không?');
+      if (!ok) return;
+    }
+
+    setTemplateBuilderAssignments((prev) => ({
+      ...prev,
+      [dropData.slotKey]: dragData.doctorId,
+    }));
+    toast.success(`Đã gán ${dragData.doctorName} vào slot mẫu.`);
+  };
+
+  const onTemplateBuilderDragCancel = () => {
+    setTemplateBuilderHoveredSlotKey(null);
+    setTemplateBuilderActiveDoctor(null);
+    setTemplateBuilderActiveDoctorDragData(null);
   };
 
   const openManualShiftDialog = (schedule?: WeeklyScheduleItem) => {
@@ -1146,8 +1688,8 @@ export default function AdminScheduleWorkflowPage() {
               <Plus className="mr-2 h-4 w-4" />
               Phân bổ lịch trực bác sĩ
             </Button>
-            <Button variant="outline" onClick={() => openTemplateDialog()}>
-              Thêm mẫu lịch (cũ)
+            <Button variant="outline" onClick={() => navigate('/admin/schedules/templates/new')}>
+              Thêm lịch mẫu
             </Button>
           </div>
         </div>
@@ -1190,8 +1732,8 @@ export default function AdminScheduleWorkflowPage() {
                             <Plus className="mr-2 h-4 w-4" />
                             Phân bổ lịch trực bác sĩ
                           </Button>
-                          <Button variant="outline" onClick={() => openTemplateDialog()}>
-                            Thêm mẫu lịch (cũ)
+                          <Button variant="outline" onClick={() => navigate('/admin/schedules/templates/new')}>
+                            Thêm lịch mẫu
                           </Button>
                         </div>
                       }
@@ -1612,6 +2154,383 @@ export default function AdminScheduleWorkflowPage() {
           </Table>
         </div>
       </section>
+
+      <Dialog open={templateBuilderOpen} onOpenChange={setTemplateBuilderOpen}>
+        <DialogContent className="sm:max-w-[1200px] p-0 overflow-hidden bg-white shadow-2xl">
+          <div className="flex max-h-[88vh] flex-col">
+            <DialogHeader className="gap-2 border-b border-slate-200 bg-white px-6 py-4 text-left">
+              <DialogTitle className="text-2xl font-semibold text-slate-900">Thêm lịch mẫu</DialogTitle>
+              <DialogDescription className="max-w-3xl text-sm leading-6 text-slate-600">
+                Tạo mẫu lịch tuần chuẩn để hệ thống sinh lịch trực dài hạn.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
+              <section className="rounded-xl border border-slate-200 bg-white p-4">
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-5">
+                  <div>
+                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">Chuyên khoa</label>
+                    <AdminSelect
+                      value={templateForm.CK_MA}
+                      onValueChange={(value) => {
+                        setTemplateForm((prev) => ({ ...prev, CK_MA: value }));
+                        setTemplateBuilderAssignments({});
+                      }}
+                    >
+                      <AdminSelectTrigger>
+                        <AdminSelectValue placeholder="Chọn chuyên khoa" />
+                      </AdminSelectTrigger>
+                      <AdminSelectContent>
+                        {(options?.specialties ?? []).map((specialty) => (
+                          <AdminSelectItem key={specialty.CK_MA} value={String(specialty.CK_MA)}>
+                            {specialty.CK_TEN}
+                          </AdminSelectItem>
+                        ))}
+                      </AdminSelectContent>
+                    </AdminSelect>
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">Từ ngày</label>
+                    <div className="relative">
+                      <Input
+                        type="text"
+                        readOnly
+                        value={
+                          templateForm.effectiveStartDate
+                            ? formatDateDdMmYyyySlash(templateForm.effectiveStartDate)
+                            : ''
+                        }
+                        onClick={openTemplateStartPicker}
+                        className="cursor-pointer"
+                        placeholder="dd/MM/yyyy"
+                      />
+                      <input
+                        ref={templateStartPickerRef}
+                        type="date"
+                        value={templateForm.effectiveStartDate}
+                        onChange={(e) =>
+                          setTemplateForm((prev) => ({ ...prev, effectiveStartDate: e.target.value }))
+                        }
+                        tabIndex={-1}
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0 opacity-0"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">Đến ngày</label>
+                    <div className="relative">
+                      <Input
+                        type="text"
+                        readOnly
+                        value={
+                          templateForm.effectiveEndDate ? formatDateDdMmYyyySlash(templateForm.effectiveEndDate) : ''
+                        }
+                        onClick={openTemplateEndPicker}
+                        className="cursor-pointer"
+                        placeholder="dd/MM/yyyy"
+                      />
+                      <input
+                        ref={templateEndPickerRef}
+                        type="date"
+                        value={templateForm.effectiveEndDate}
+                        onChange={(e) =>
+                          setTemplateForm((prev) => ({ ...prev, effectiveEndDate: e.target.value }))
+                        }
+                        tabIndex={-1}
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0 opacity-0"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">Trạng thái</label>
+                    <AdminSelect
+                      value={templateForm.status}
+                      onValueChange={(value) =>
+                        setTemplateForm((prev) => ({ ...prev, status: value as 'active' | 'inactive' }))
+                      }
+                    >
+                      <AdminSelectTrigger>
+                        <AdminSelectValue placeholder="Chọn trạng thái" />
+                      </AdminSelectTrigger>
+                      <AdminSelectContent>
+                        <AdminSelectItem value="active">Đang hoạt động</AdminSelectItem>
+                        <AdminSelectItem value="inactive">Tạm dừng</AdminSelectItem>
+                      </AdminSelectContent>
+                    </AdminSelect>
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">Ghi chú</label>
+                    <Input
+                      value={templateForm.note}
+                      onChange={(e) => setTemplateForm((prev) => ({ ...prev, note: e.target.value }))}
+                      placeholder="Ghi chú cho mẫu"
+                    />
+                  </div>
+                </div>
+              </section>
+
+              {!templateForm.CK_MA ? (
+                <EmptyState
+                  title="Chọn chuyên khoa để bắt đầu tạo lịch mẫu"
+                  description="Timetable mini chỉ tải danh sách bác sĩ và phòng sau khi bạn chọn chuyên khoa."
+                />
+              ) : (
+                <DndContext
+                  sensors={templateBuilderSensors}
+                  onDragStart={onTemplateBuilderDragStart}
+                  onDragOver={onTemplateBuilderDragOver}
+                  onDragEnd={onTemplateBuilderDragEnd}
+                  onDragCancel={onTemplateBuilderDragCancel}
+                >
+                  <div className="grid gap-4 xl:grid-cols-[320px_1fr]">
+                    <div className="space-y-4">
+                      <section className="rounded-xl border bg-white p-4 shadow-sm">
+                        <div className="relative mb-3">
+                          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                          <Input
+                            className="pl-9"
+                            value={templateBuilderDoctorSearch}
+                            onChange={(event) => setTemplateBuilderDoctorSearch(event.target.value)}
+                            placeholder="Tìm bác sĩ"
+                          />
+                        </div>
+
+                        {templateBuilderDoctors.length === 0 ? (
+                          <EmptyCard
+                            title="Không có bác sĩ phù hợp"
+                            description="Hãy kiểm tra lại chuyên khoa hoặc từ khóa tìm kiếm."
+                          />
+                        ) : (
+                          <div className="max-h-[45vh] space-y-2 overflow-auto pr-1">
+                            {templateBuilderDoctors.map((doctor) => (
+                              <TemplateBuilderDoctorCard
+                                key={doctor.BS_MA}
+                                id={doctor.BS_MA}
+                                specialtyId={doctor.CK_MA}
+                                name={doctor.BS_HO_TEN}
+                                specialtyName={doctor.CHUYEN_KHOA.CK_TEN}
+                                assignedCount={templateBuilderAssignedCountByDoctor.get(doctor.BS_MA) ?? 0}
+                                active={templateBuilderActiveDoctor === doctor.BS_MA}
+                                disabled={false}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </section>
+
+                      <section className="rounded-xl border bg-white p-4 shadow-sm">
+                        <h3 className="text-sm font-semibold text-slate-900">Thao tác nhanh</h3>
+                        <div className="mt-3 grid gap-2">
+                          <Button variant="outline" onClick={() => copyTemplateBuilderDay(1, [3, 5])}>
+                            Sao chép Thứ 2 sang Thứ 4, 6
+                          </Button>
+                          <Button variant="outline" onClick={() => copyTemplateBuilderDay(2, [4, 6])}>
+                            Sao chép Thứ 3 sang Thứ 5, 7
+                          </Button>
+                          <Button variant="outline" onClick={copyTemplateBuilderWholeWeek}>
+                            <Copy className="mr-2 h-4 w-4" />
+                            Sao chép cả tuần
+                          </Button>
+                          <AdminSelect
+                            onValueChange={(value) => clearTemplateBuilderByWeekday(Number(value))}
+                          >
+                            <AdminSelectTrigger>
+                              <AdminSelectValue placeholder="Xóa theo ngày" />
+                            </AdminSelectTrigger>
+                            <AdminSelectContent>
+                              {TEMPLATE_BUILDER_WEEKDAYS.map((weekday) => (
+                                <AdminSelectItem key={weekday} value={String(weekday)}>
+                                  {getWeekdayLabel(weekday)}
+                                </AdminSelectItem>
+                              ))}
+                            </AdminSelectContent>
+                          </AdminSelect>
+                          <AdminSelect onValueChange={clearTemplateBuilderBySession}>
+                            <AdminSelectTrigger>
+                              <AdminSelectValue placeholder="Xóa theo buổi" />
+                            </AdminSelectTrigger>
+                            <AdminSelectContent>
+                              {templateBuilderSessions.map((session) => (
+                                <AdminSelectItem key={session.B_TEN} value={session.B_TEN}>
+                                  {getSessionLabel(session.B_TEN)}
+                                </AdminSelectItem>
+                              ))}
+                            </AdminSelectContent>
+                          </AdminSelect>
+                          <Button variant="outline" onClick={applyLatestActiveTemplate}>
+                            Lấy từ mẫu đang hoạt động gần nhất
+                          </Button>
+                          <Button variant="outline" onClick={resetTemplateBuilderAssignments}>
+                            <Eraser className="mr-2 h-4 w-4" />
+                            Đặt lại
+                          </Button>
+                        </div>
+                      </section>
+                    </div>
+
+                    <section className="rounded-xl border bg-white p-4 shadow-sm">
+                      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <h3 className="text-sm font-semibold text-slate-900">Mini timetable tuần mẫu</h3>
+                          <p className="text-xs text-slate-500">Kéo thả bác sĩ vào các slot phòng theo thứ và buổi</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2 text-xs">
+                          <span className="rounded border border-slate-300 bg-slate-50 px-2 py-1 text-slate-700">Trống</span>
+                          <span className="rounded border border-emerald-300 bg-emerald-50 px-2 py-1 text-emerald-700">
+                            Đã có mẫu
+                          </span>
+                          <span className="rounded border border-rose-300 bg-rose-50 px-2 py-1 text-rose-700">Trùng</span>
+                        </div>
+                      </div>
+
+                      {filteredRoomsForTemplate.length === 0 ? (
+                        <EmptyCard
+                          title="Không có phòng phù hợp"
+                          description="Vui lòng kiểm tra cấu hình phòng thuộc chuyên khoa đã chọn."
+                        />
+                      ) : templateBuilderSessions.length === 0 ? (
+                        <EmptyCard title="Không có buổi khám" description="Vui lòng cấu hình buổi khám trước khi tạo mẫu." />
+                      ) : (
+                        <div className="overflow-auto">
+                          <table className="min-w-[980px] border-separate border-spacing-0">
+                            <thead>
+                              <tr>
+                                <th className="sticky left-0 z-20 w-[140px] border border-slate-200 bg-slate-100 p-2 text-left text-xs font-semibold text-slate-700">
+                                  Buổi
+                                </th>
+                                {TEMPLATE_BUILDER_WEEKDAYS.map((weekday) => (
+                                  <th
+                                    key={weekday}
+                                    className="w-[210px] border border-slate-200 bg-slate-100 p-2 text-left text-xs font-semibold text-slate-700"
+                                  >
+                                    {getWeekdayLabel(weekday)}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {templateBuilderSessions.map((session) => (
+                                <tr key={session.B_TEN}>
+                                  <td className="sticky left-0 z-10 border border-slate-200 bg-white p-2 align-top">
+                                    <div className="text-sm font-semibold text-slate-700">
+                                      {getSessionLabel(session.B_TEN)}
+                                    </div>
+                                  </td>
+                                  {TEMPLATE_BUILDER_WEEKDAYS.map((weekday) => (
+                                    <td
+                                      key={`${session.B_TEN}-${weekday}`}
+                                      className="border border-slate-200 bg-white p-2 align-top"
+                                    >
+                                      <div className="space-y-2">
+                                        {filteredRoomsForTemplate.map((room) => {
+                                          const key = templateBuilderSlotKey(weekday, session.B_TEN, room.P_MA);
+                                          const slot = templateBuilderSlotMap.get(key);
+                                          if (!slot) return null;
+                                          const assignedDoctorId = templateBuilderAssignments[key];
+                                          const doctorName = assignedDoctorId
+                                            ? templateBuilderDoctorNameById.get(assignedDoctorId) ||
+                                              `BS #${assignedDoctorId}`
+                                            : null;
+                                          const dropCheck =
+                                            templateBuilderActiveDoctor != null
+                                              ? validateTemplateBuilderDrop(slot, templateBuilderActiveDoctor)
+                                              : { ok: true };
+
+                                          return (
+                                            <TemplateBuilderSlotCard
+                                              key={key}
+                                              slot={slot}
+                                              roomName={
+                                                templateBuilderRoomNameById.get(room.P_MA) || `Phòng ${room.P_MA}`
+                                              }
+                                              doctorName={doctorName}
+                                              hasConflict={templateBuilderConflicts.has(key)}
+                                              canDrop={dropCheck.ok}
+                                              dropReason={dropCheck.reason}
+                                              dragging={templateBuilderActiveDoctor != null}
+                                              disabled={false}
+                                              onRemoveDoctor={removeDoctorFromTemplateBuilderSlot}
+                                            />
+                                          );
+                                        })}
+                                      </div>
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </section>
+                  </div>
+
+                  <DragOverlay zIndex={1200}>
+                    {templateBuilderActiveDoctor && templateBuilderActiveDoctorDragData ? (
+                      <div
+                        className={cn(
+                          'rounded-lg border border-blue-300 bg-white p-3 text-sm shadow-xl ring-1 ring-blue-200',
+                          templateBuilderHoveredSlotKey && 'border-blue-500',
+                        )}
+                        style={templateBuilderActiveDoctorWidth ? { width: templateBuilderActiveDoctorWidth } : undefined}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="font-medium text-slate-900">
+                            {templateBuilderActiveDoctorDragData.doctorName ||
+                              `BS #${templateBuilderActiveDoctor}`}
+                          </div>
+                          <GripVertical className="h-4 w-4 text-slate-400" />
+                        </div>
+                        <div className="mt-1 text-xs text-slate-500">{templateBuilderActiveDoctorDragData.specialtyName}</div>
+                        <div className="mt-2 inline-flex rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
+                          {templateBuilderActiveDoctorDragData.assignedCount} slot mẫu
+                        </div>
+                      </div>
+                    ) : null}
+                  </DragOverlay>
+                </DndContext>
+              )}
+
+              <section className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
+                <div className="flex flex-wrap gap-2">
+                  <span className="rounded bg-white px-2 py-1">Tổng slot: {templateBuilderSummary.total}</span>
+                  <span className="rounded bg-emerald-50 px-2 py-1 text-emerald-700">
+                    Đã gán: {templateBuilderSummary.assigned}
+                  </span>
+                  <span className="rounded bg-slate-100 px-2 py-1">Trống: {templateBuilderSummary.empty}</span>
+                  <span className="rounded bg-rose-50 px-2 py-1 text-rose-700">
+                    Xung đột: {templateBuilderSummary.conflicts}
+                  </span>
+                </div>
+              </section>
+
+              {templateBuilderSaveReason ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  {templateBuilderSaveReason}
+                </div>
+              ) : null}
+            </div>
+
+            <DialogFooter className="!mx-0 !mb-0 border-t border-slate-200 bg-white px-6 py-4">
+              <Button variant="outline" onClick={() => setTemplateBuilderOpen(false)}>
+                Đóng
+              </Button>
+              <Button
+                onClick={() => templateBuilderMutation.mutate()}
+                disabled={templateBuilderMutation.isPending || Boolean(templateBuilderSaveReason)}
+              >
+                {templateBuilderMutation.isPending ? 'Đang lưu...' : 'Lưu mẫu lịch'}
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={templateDialogOpen} onOpenChange={setTemplateDialogOpen}>
         <DialogContent className="sm:max-w-4xl p-0 overflow-hidden bg-white shadow-2xl">

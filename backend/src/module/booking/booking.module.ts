@@ -9,5 +9,6 @@ import { PaymentModule } from '../payment/payment.module';
   imports: [PaymentModule],
   providers: [BookingRepository, BookingService],
   controllers: [BookingController],
+  exports: [BookingRepository, BookingService],
 })
 export class BookingModule { }

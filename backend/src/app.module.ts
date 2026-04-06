@@ -10,6 +10,7 @@ import { BookingModule } from './module/booking/booking.module';
 import { PaymentModule } from './module/payment/payment.module';
 import { AdminModule } from './module/admin/admin.module';
 import { PatientProfilesModule } from './module/patient-profiles/patient-profiles.module';
+import { AppointmentsModule } from './module/appointments/appointments.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 
@@ -27,6 +28,7 @@ import { APP_GUARD } from '@nestjs/core';
     PaymentModule,
     AdminModule,
     PatientProfilesModule,
+    AppointmentsModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
