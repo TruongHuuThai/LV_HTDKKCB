@@ -1,5 +1,35 @@
 // src/modules/booking/dto/create-booking.dto.ts
-import { IsInt, IsOptional, IsString, Matches } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUrl,
+  Matches,
+  MaxLength,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class CreatePreVisitAttachmentDto {
+  @IsString()
+  @MaxLength(255)
+  fileName: string;
+
+  @IsOptional()
+  @IsUrl({ require_tld: false })
+  fileUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  mimeType?: string;
+
+  @IsOptional()
+  @IsInt()
+  sizeBytes?: number;
+}
 
 export class CreateBookingDto {
   @IsInt()
@@ -20,4 +50,21 @@ export class CreateBookingDto {
   @IsOptional()
   @IsInt()
   LHK_MA?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  symptoms?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  preVisitNote?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5)
+  @ValidateNested({ each: true })
+  @Type(() => CreatePreVisitAttachmentDto)
+  attachments?: CreatePreVisitAttachmentDto[];
 }

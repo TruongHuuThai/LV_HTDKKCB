@@ -11,6 +11,12 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get nHA_SAN_XUAT() { return this.prismaClient.nHA_SAN_XUAT; }
   get nHOM_THUOC() { return this.prismaClient.nHOM_THUOC; }
   get tHONG_BAO() { return this.prismaClient.tHONG_BAO; }
+  get tHONG_BAO_BATCH() { return this.prismaClient.tHONG_BAO_BATCH; }
+  get tHONG_BAO_BATCH_RECIPIENT() { return this.prismaClient.tHONG_BAO_BATCH_RECIPIENT; }
+  get pRE_VISIT_ATTACHMENT() { return this.prismaClient.pRE_VISIT_ATTACHMENT; }
+  get pAYMENT_WEBHOOK_EVENT() { return this.prismaClient.pAYMENT_WEBHOOK_EVENT; }
+  get pAYMENT_RECONCILIATION_JOB() { return this.prismaClient.pAYMENT_RECONCILIATION_JOB; }
+  get pAYMENT_RECONCILIATION_ISSUE() { return this.prismaClient.pAYMENT_RECONCILIATION_ISSUE; }
   // Expose all model delegates so Repository classes can call this.prisma.xAC_THUC_OTP etc.
   get xAC_THUC_OTP() { return this.prismaClient.xAC_THUC_OTP; }
   get dANG_KY() { return this.prismaClient.dANG_KY; }

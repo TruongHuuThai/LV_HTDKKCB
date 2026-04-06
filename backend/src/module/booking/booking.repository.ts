@@ -252,6 +252,48 @@ export class BookingRepository {
     });
   }
 
+  updatePreVisitInfo(
+    DK_MA: number,
+    data: {
+      symptoms?: string | null;
+      preVisitNote?: string | null;
+      updatedBy?: string | null;
+    },
+  ) {
+    return this.prisma.dANG_KY.update({
+      where: { DK_MA },
+      data: {
+        DK_TRIEU_CHUNG: data.symptoms ?? null,
+        DK_GHI_CHU_TIEN_KHAM: data.preVisitNote ?? null,
+        DK_TIEN_KHAM_CAP_NHAT_LUC: new Date(),
+        DK_TIEN_KHAM_CAP_NHAT_BOI: data.updatedBy ?? null,
+      },
+    });
+  }
+
+  createPreVisitAttachments(
+    DK_MA: number,
+    attachments: Array<{
+      fileName: string;
+      fileUrl?: string | null;
+      mimeType?: string | null;
+      sizeBytes?: number | null;
+      createdBy?: string | null;
+    }>,
+  ) {
+    if (attachments.length === 0) return Promise.resolve({ count: 0 });
+    return this.prisma.pRE_VISIT_ATTACHMENT.createMany({
+      data: attachments.map((item) => ({
+        DK_MA,
+        PVA_TEN_FILE: item.fileName,
+        PVA_URL: item.fileUrl ?? null,
+        PVA_LOAI_MIME: item.mimeType ?? null,
+        PVA_KICH_THUOC: item.sizeBytes ?? null,
+        PVA_TAO_BOI: item.createdBy ?? null,
+      })),
+    });
+  }
+
   listDoctorSchedulesForDate(BS_MA: number, N_NGAY: Date) {
     return this.prisma.lICH_BSK.findMany({
       where: {

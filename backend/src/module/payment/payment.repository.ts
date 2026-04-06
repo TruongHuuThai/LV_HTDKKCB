@@ -1,6 +1,7 @@
 // src/module/payment/payment.repository.ts
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class PaymentRepository {
@@ -59,6 +60,49 @@ export class PaymentRepository {
                         KHUNG_GIO: true,
                     },
                 },
+            },
+        });
+    }
+
+    findWebhookEventByKey(eventKey: string) {
+        return this.prisma.pAYMENT_WEBHOOK_EVENT.findUnique({
+            where: { PWE_EVENT_KEY: eventKey },
+        });
+    }
+
+    createWebhookEvent(data: {
+        provider: string;
+        eventKey: string;
+        eventType?: string | null;
+        reference?: string | null;
+        signatureOk: boolean;
+        payload: Prisma.InputJsonValue;
+        status?: string;
+    }) {
+        return this.prisma.pAYMENT_WEBHOOK_EVENT.create({
+            data: {
+                PWE_PROVIDER: data.provider,
+                PWE_EVENT_KEY: data.eventKey,
+                PWE_EVENT_TYPE: data.eventType || null,
+                PWE_REF: data.reference || null,
+                PWE_SIGNATURE_OK: data.signatureOk,
+                PWE_TRANG_THAI: data.status || 'RECEIVED',
+                PWE_PAYLOAD: data.payload,
+            },
+        });
+    }
+
+    updateWebhookEventResult(
+        eventId: number,
+        status: 'PROCESSED' | 'FAILED' | 'IGNORED',
+        error?: string | null,
+    ) {
+        return this.prisma.pAYMENT_WEBHOOK_EVENT.update({
+            where: { PWE_MA: eventId },
+            data: {
+                PWE_TRANG_THAI: status,
+                PWE_LOI: error || null,
+                PWE_PROCESSED_AT: new Date(),
             },
         });
     }

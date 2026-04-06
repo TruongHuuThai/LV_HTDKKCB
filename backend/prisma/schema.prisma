@@ -164,12 +164,17 @@ model DANG_KY {
   DK_TRANG_THAI    String?          @default("CHO_KHAM")
   DK_STT           Int?
   DK_LY_DO_HUY     String?
+  DK_TRIEU_CHUNG   String?
+  DK_GHI_CHU_TIEN_KHAM String?
+  DK_TIEN_KHAM_CAP_NHAT_LUC DateTime? @db.Timestamp(6)
+  DK_TIEN_KHAM_CAP_NHAT_BOI String?
   DK_THOI_GIAN_TAO DateTime?        @default(now()) @db.Timestamp(6)
   BENH_NHAN        BENH_NHAN        @relation(fields: [BN_MA], references: [BN_MA], onDelete: NoAction, onUpdate: NoAction)
   KHUNG_GIO        KHUNG_GIO        @relation(fields: [KG_MA], references: [KG_MA], onDelete: NoAction, onUpdate: NoAction)
   LOAI_HINH_KHAM   LOAI_HINH_KHAM?  @relation(fields: [LHK_MA], references: [LHK_MA], onDelete: NoAction, onUpdate: NoAction)
   LICH_BSK         LICH_BSK         @relation(fields: [BS_MA, N_NGAY, B_TEN], references: [BS_MA, N_NGAY, B_TEN], onDelete: NoAction, onUpdate: NoAction, map: "fk_dk_lichbsk")
   PHIEU_KHAM_BENH  PHIEU_KHAM_BENH?
+  PRE_VISIT_ATTACHMENT PRE_VISIT_ATTACHMENT[]
   THANH_TOAN       THANH_TOAN[]
 
   @@index([BS_MA, N_NGAY, B_TEN, KG_MA], map: "idx_dk_slot")
@@ -469,14 +474,138 @@ model THANH_TOAN {
 model THONG_BAO {
   TB_MA         Int        @id @default(autoincrement())
   TK_SDT        String?
+  TB_BATCH_MA   Int?
   TB_TIEU_DE    String?
   TB_LOAI       String?
   TB_NOI_DUNG   String?
   TB_TRANG_THAI String?
   TB_THOI_GIAN  DateTime?  @default(now()) @db.Timestamp(6)
+  THONG_BAO_BATCH THONG_BAO_BATCH? @relation(fields: [TB_BATCH_MA], references: [TBB_MA], onDelete: SetNull, onUpdate: NoAction)
   TAI_KHOAN     TAI_KHOAN? @relation(fields: [TK_SDT], references: [TK_SDT], onDelete: NoAction, onUpdate: NoAction)
 
+  @@index([TB_BATCH_MA], map: "idx_tb_batch")
   @@index([TK_SDT], map: "idx_tb_tk")
+}
+
+model PRE_VISIT_ATTACHMENT {
+  PVA_MA          Int      @id @default(autoincrement())
+  DK_MA           Int
+  PVA_TEN_FILE    String
+  PVA_URL         String?
+  PVA_STORAGE_KEY String?
+  PVA_EXT         String?
+  PVA_LOAI_MIME   String?
+  PVA_KICH_THUOC  Int?
+  PVA_SCAN_STATUS String   @default("SCAN_REQUESTED")
+  PVA_SCAN_LUC    DateTime? @db.Timestamp(6)
+  PVA_REVOKED_AT  DateTime? @db.Timestamp(6)
+  PVA_REVOKED_BY  String?
+  PVA_REVOKE_REASON String?
+  PVA_TAO_LUC     DateTime @default(now()) @db.Timestamp(6)
+  PVA_TAO_BOI     String?
+  PVA_DA_XOA      Boolean  @default(false)
+  PVA_XOA_LUC     DateTime? @db.Timestamp(6)
+  PVA_XOA_BOI     String?
+  DANG_KY         DANG_KY  @relation(fields: [DK_MA], references: [DK_MA], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([DK_MA], map: "idx_pva_dk")
+  @@index([DK_MA, PVA_DA_XOA], map: "idx_pva_dk_active")
+}
+
+model THONG_BAO_BATCH {
+  TBB_MA              Int         @id @default(autoincrement())
+  TBB_LOAI            String
+  TBB_TIEU_DE         String?
+  TBB_NOI_DUNG        String
+  TBB_TIEU_CHI        Json?
+  TBB_IDEMPOTENCY_KEY String?
+  TBB_TONG_NGUOI_NHAN Int         @default(0)
+  TBB_DA_XU_LY        Int         @default(0)
+  TBB_THANH_CONG      Int         @default(0)
+  TBB_THAT_BAI        Int         @default(0)
+  TBB_TRANG_THAI      String      @default("QUEUED")
+  TBB_BAT_DAU_LUC     DateTime?   @db.Timestamp(6)
+  TBB_HOAN_TAT_LUC    DateTime?   @db.Timestamp(6)
+  TBB_BATCH_CHA_MA    Int?
+  TBB_METADATA        Json?
+  TBB_LOI_GAN_NHAT    String?
+  TBB_NGUOI_TAO       String?
+  TBB_THOI_GIAN_TAO   DateTime    @default(now()) @db.Timestamp(6)
+  THONG_BAO_BATCH_CHA THONG_BAO_BATCH? @relation("THONG_BAO_BATCH_PARENT", fields: [TBB_BATCH_CHA_MA], references: [TBB_MA], onDelete: SetNull, onUpdate: NoAction)
+  THONG_BAO_BATCH_CON THONG_BAO_BATCH[] @relation("THONG_BAO_BATCH_PARENT")
+  THONG_BAO_BATCH_RECIPIENT THONG_BAO_BATCH_RECIPIENT[]
+  THONG_BAO           THONG_BAO[]
+
+  @@index([TBB_LOAI], map: "idx_tbb_loai")
+  @@index([TBB_NGUOI_TAO], map: "idx_tbb_nguoi_tao")
+  @@index([TBB_THOI_GIAN_TAO], map: "idx_tbb_tao_luc")
+  @@index([TBB_IDEMPOTENCY_KEY], map: "idx_tbb_idempotency")
+  @@index([TBB_TRANG_THAI], map: "idx_tbb_status")
+}
+
+model THONG_BAO_BATCH_RECIPIENT {
+  TBR_MA            Int      @id @default(autoincrement())
+  TBB_MA            Int
+  TK_SDT            String
+  DK_MA             Int?
+  TBR_TRANG_THAI    String   @default("QUEUED")
+  TBR_SO_LAN_THU    Int      @default(0)
+  TBR_LOI           String?
+  TBR_LAST_SENT_AT  DateTime? @db.Timestamp(6)
+  TBR_CREATED_AT    DateTime @default(now()) @db.Timestamp(6)
+  TBR_UPDATED_AT    DateTime @default(now()) @db.Timestamp(6)
+  THONG_BAO_BATCH   THONG_BAO_BATCH @relation(fields: [TBB_MA], references: [TBB_MA], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([TBB_MA], map: "idx_tbr_batch")
+  @@index([TBB_MA, TBR_TRANG_THAI], map: "idx_tbr_batch_status")
+  @@index([TK_SDT], map: "idx_tbr_phone")
+  @@unique([TBB_MA, TK_SDT, DK_MA], map: "uq_tbr_batch_recipient")
+}
+
+model PAYMENT_WEBHOOK_EVENT {
+  PWE_MA           Int      @id @default(autoincrement())
+  PWE_PROVIDER     String
+  PWE_EVENT_KEY    String   @unique
+  PWE_EVENT_TYPE   String?
+  PWE_REF          String?
+  PWE_SIGNATURE_OK Boolean  @default(false)
+  PWE_TRANG_THAI   String   @default("RECEIVED")
+  PWE_PAYLOAD      Json?
+  PWE_LOI          String?
+  PWE_CREATED_AT   DateTime @default(now()) @db.Timestamp(6)
+  PWE_PROCESSED_AT DateTime? @db.Timestamp(6)
+
+  @@index([PWE_PROVIDER, PWE_CREATED_AT], map: "idx_pwe_provider_time")
+  @@index([PWE_TRANG_THAI], map: "idx_pwe_status")
+}
+
+model PAYMENT_RECONCILIATION_JOB {
+  PRJ_MA          Int      @id @default(autoincrement())
+  PRJ_NGAY        DateTime @db.Date
+  PRJ_TRANG_THAI  String   @default("COMPLETED")
+  PRJ_TONG_KIEM_TRA Int    @default(0)
+  PRJ_SO_MISMATCH Int      @default(0)
+  PRJ_GHI_CHU     String?
+  PRJ_TAO_LUC     DateTime @default(now()) @db.Timestamp(6)
+  PAYMENT_RECONCILIATION_ISSUE PAYMENT_RECONCILIATION_ISSUE[]
+
+  @@index([PRJ_NGAY], map: "idx_prj_date")
+}
+
+model PAYMENT_RECONCILIATION_ISSUE {
+  PRI_MA          Int      @id @default(autoincrement())
+  PRJ_MA          Int
+  TT_MA           Int?
+  DK_MA           Int?
+  PRI_LOAI        String
+  PRI_MO_TA       String
+  PRI_TRANG_THAI  String   @default("OPEN")
+  PRI_METADATA    Json?
+  PRI_TAO_LUC     DateTime @default(now()) @db.Timestamp(6)
+  PAYMENT_RECONCILIATION_JOB PAYMENT_RECONCILIATION_JOB @relation(fields: [PRJ_MA], references: [PRJ_MA], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([PRJ_MA], map: "idx_pri_job")
+  @@index([PRI_TRANG_THAI], map: "idx_pri_status")
 }
 
 model THUCHIEN {

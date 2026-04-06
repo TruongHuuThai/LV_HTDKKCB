@@ -13,6 +13,9 @@ import { CreateBookingDto } from './dto/create-booking.dto';
 import { VnpayService } from '../payment/vnpay.service';
 import { PaymentRepository } from '../payment/payment.repository';
 
+const ALLOWED_PRE_VISIT_MIME = ['application/pdf', 'image/jpeg', 'image/png'];
+const MAX_PRE_VISIT_ATTACHMENT_SIZE = 10 * 1024 * 1024;
+
 @Injectable()
 export class BookingService {
   constructor(
@@ -20,6 +23,18 @@ export class BookingService {
     private readonly vnpay: VnpayService,
     private readonly paymentRepo: PaymentRepository,
   ) {}
+
+  private validatePreVisitAttachments(dto: CreateBookingDto) {
+    const attachments = dto.attachments || [];
+    attachments.forEach((item) => {
+      if (item.mimeType && !ALLOWED_PRE_VISIT_MIME.includes(item.mimeType.toLowerCase())) {
+        throw new BadRequestException('Loai file dinh kem khong duoc ho tro');
+      }
+      if ((item.sizeBytes || 0) > MAX_PRE_VISIT_ATTACHMENT_SIZE) {
+        throw new BadRequestException('Kich thuoc file dinh kem vuot qua gioi han');
+      }
+    });
+  }
 
   private assertDateWithinBookingHorizon(date: Date) {
     const now = new Date();
@@ -67,6 +82,7 @@ export class BookingService {
     dto: CreateBookingDto,
     clientIp = '127.0.0.1',
   ) {
+    this.validatePreVisitAttachments(dto);
     const N_NGAY = parseDateOnly(dto.N_NGAY);
     this.assertDateWithinBookingHorizon(N_NGAY);
 
@@ -158,6 +174,29 @@ export class BookingService {
       orderInfo,
       clientIp,
     );
+
+    const hasPreVisit =
+      Boolean(dto.symptoms?.trim()) ||
+      Boolean(dto.preVisitNote?.trim()) ||
+      (dto.attachments?.length || 0) > 0;
+    if (hasPreVisit) {
+      await this.repo.updatePreVisitInfo(booking.DK_MA, {
+        symptoms: dto.symptoms?.trim() || null,
+        preVisitNote: dto.preVisitNote?.trim() || null,
+      });
+      if ((dto.attachments?.length || 0) > 0) {
+        await this.repo.createPreVisitAttachments(
+          booking.DK_MA,
+          (dto.attachments || []).map((item) => ({
+            fileName: item.fileName,
+            fileUrl: item.fileUrl || null,
+            mimeType: item.mimeType || null,
+            sizeBytes: item.sizeBytes ?? null,
+            createdBy: null,
+          })),
+        );
+      }
+    }
 
     return {
       booking,

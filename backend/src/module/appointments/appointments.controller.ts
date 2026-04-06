@@ -9,8 +9,11 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
+import type { Response } from 'express';
 import { ROLE } from '../auth/auth.constants';
 import {
   CurrentUser,
@@ -22,17 +25,26 @@ import { RolesGuard } from '../auth/roles.guard';
 import {
   AdminWaitlistListQueryDto,
   AdminAppointmentListQueryDto,
+  BulkNotificationDto,
+  BulkNotificationListQueryDto,
   CancelAppointmentDto,
+  CreateOrUpdatePreVisitInfoDto,
+  DeleteAttachmentDto,
+  DoctorStatsQueryDto,
   DoctorUpdateAppointmentStatusDto,
   DoctorWorklistQueryDto,
   JoinWaitlistDto,
   ManualBookingDto,
   NotificationListQueryDto,
+  OpsDashboardQueryDto,
   PatientAppointmentListQueryDto,
   PatientWaitlistListQueryDto,
   RefundListQueryDto,
+  RetryBulkBatchDto,
   RescheduleAppointmentDto,
   UpdateRefundStatusDto,
+  UploadPreVisitAttachmentDto,
+  WaitlistHoldActionDto,
   UpdateAppointmentStatusDto,
 } from './appointments.dto';
 import { AppointmentsService } from './appointments.service';
@@ -56,6 +68,11 @@ export class AdminAppointmentsController {
   @Get(':appointmentId')
   async detail(@Param('appointmentId', ParseIntPipe) appointmentId: number) {
     return this.appointments.getDetailForAdmin(appointmentId);
+  }
+
+  @Get(':appointmentId/pre-visit-info')
+  async preVisitDetail(@Param('appointmentId', ParseIntPipe) appointmentId: number) {
+    return this.appointments.getPreVisitInfoForAdmin(appointmentId);
   }
 
   @Patch(':appointmentId/status')
@@ -112,6 +129,52 @@ export class AdminRefundsController {
   }
 }
 
+@Controller('admin/notifications/bulk')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(ROLE.ADMIN)
+export class AdminBulkNotificationsController {
+  constructor(private readonly appointments: AppointmentsService) {}
+
+  @Post('preview')
+  async preview(@Body() dto: BulkNotificationDto) {
+    return this.appointments.previewBulkNotificationRecipients(dto);
+  }
+
+  @Post()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  async create(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() dto: BulkNotificationDto,
+  ) {
+    return this.appointments.createBulkNotificationBatch(user, dto);
+  }
+
+  @Get()
+  async list(@Query() query: BulkNotificationListQueryDto) {
+    return this.appointments.listBulkNotificationBatches(query);
+  }
+
+  @Get(':batchId')
+  async detail(@Param('batchId', ParseIntPipe) batchId: number) {
+    return this.appointments.getBulkNotificationBatchDetail(batchId);
+  }
+
+  @Get(':batchId/recipients')
+  async recipients(@Param('batchId', ParseIntPipe) batchId: number) {
+    return this.appointments.getBulkNotificationBatchRecipients(batchId);
+  }
+
+  @Post(':batchId/retry')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async retry(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('batchId', ParseIntPipe) batchId: number,
+    @Body() dto: RetryBulkBatchDto,
+  ) {
+    return this.appointments.retryBulkNotificationBatch(user, batchId, dto);
+  }
+}
+
 @Controller('appointments')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(ROLE.BENH_NHAN)
@@ -152,6 +215,7 @@ export class AppointmentsController {
   }
 
   @Post(':appointmentId/payment-retry')
+  @Throttle({ default: { limit: 8, ttl: 60_000 } })
   async paymentRetry(
     @CurrentUser() user: CurrentUserPayload,
     @Param('appointmentId', ParseIntPipe) appointmentId: number,
@@ -175,6 +239,51 @@ export class AppointmentsController {
     @Body() dto: CancelAppointmentDto,
   ) {
     return this.appointments.cancelAppointment(user, appointmentId, dto, 'PATIENT');
+  }
+
+  @Patch(':appointmentId/pre-visit-info')
+  async updatePreVisitInfo(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('appointmentId', ParseIntPipe) appointmentId: number,
+    @Body() dto: CreateOrUpdatePreVisitInfoDto,
+  ) {
+    return this.appointments.updatePreVisitInfoByPatient(user, appointmentId, dto);
+  }
+
+  @Get(':appointmentId/pre-visit-info')
+  async getPreVisitInfo(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('appointmentId', ParseIntPipe) appointmentId: number,
+  ) {
+    return this.appointments.getPreVisitInfoForPatient(user, appointmentId);
+  }
+
+  @Get(':appointmentId/attachments')
+  async myAttachments(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('appointmentId', ParseIntPipe) appointmentId: number,
+  ) {
+    return this.appointments.listAttachmentsForPatient(user, appointmentId);
+  }
+
+  @Post(':appointmentId/attachments')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  async uploadAttachment(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('appointmentId', ParseIntPipe) appointmentId: number,
+    @Body() dto: UploadPreVisitAttachmentDto,
+  ) {
+    return this.appointments.uploadAttachmentForPatient(user, appointmentId, dto);
+  }
+
+  @Delete(':appointmentId/attachments/:attachmentId')
+  async deleteAttachment(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('appointmentId', ParseIntPipe) appointmentId: number,
+    @Param('attachmentId', ParseIntPipe) attachmentId: number,
+    @Body() dto: DeleteAttachmentDto,
+  ) {
+    return this.appointments.deleteAttachmentForPatient(user, appointmentId, attachmentId, dto);
   }
 }
 
@@ -235,6 +344,16 @@ export class PatientWaitlistController {
   ) {
     return this.appointments.listMyWaitlist(user, query);
   }
+
+  @Post(':waitlistId/claim-hold')
+  async claimHold(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('waitlistId', ParseIntPipe) waitlistId: number,
+    @Body() dto: WaitlistHoldActionDto,
+    @Ip() ip: string,
+  ) {
+    return this.appointments.claimWaitlistHold(user, waitlistId, dto, ip);
+  }
 }
 
 @Controller('doctor/appointments')
@@ -258,5 +377,106 @@ export class DoctorAppointmentsController {
     @Body() dto: DoctorUpdateAppointmentStatusDto,
   ) {
     return this.appointments.updateStatusByDoctor(user, appointmentId, dto);
+  }
+
+  @Get(':appointmentId/pre-visit-info')
+  async preVisitInfo(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('appointmentId', ParseIntPipe) appointmentId: number,
+  ) {
+    return this.appointments.getPreVisitInfoForDoctor(user, appointmentId);
+  }
+}
+
+@Controller('doctor/stats')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(ROLE.BAC_SI)
+export class DoctorStatsController {
+  constructor(private readonly appointments: AppointmentsService) {}
+
+  @Get('summary')
+  async summary(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query() query: DoctorStatsQueryDto,
+  ) {
+    return this.appointments.getDoctorStatsSummary(user, query);
+  }
+
+  @Get('trends')
+  async trends(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query() query: DoctorStatsQueryDto,
+  ) {
+    return this.appointments.getDoctorStatsTrends(user, query);
+  }
+}
+
+@Controller('admin/ops')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(ROLE.ADMIN)
+export class AdminOpsController {
+  constructor(private readonly appointments: AppointmentsService) {}
+
+  @Get('dashboard')
+  async dashboard(@Query() query: OpsDashboardQueryDto) {
+    return this.appointments.getOpsDashboard(query);
+  }
+
+  @Get('alerts')
+  async alerts() {
+    return this.appointments.listOpsAlerts();
+  }
+
+  @Get('reconciliation/daily')
+  async dailyReconciliation(@Query('date') date?: string) {
+    return this.appointments.runDailyReconciliation(date);
+  }
+
+  @Get('reconciliation/:jobId')
+  async reconciliationDetail(@Param('jobId', ParseIntPipe) jobId: number) {
+    return this.appointments.getReconciliationJobDetail(jobId);
+  }
+}
+
+@Controller('admin/reconciliation')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(ROLE.ADMIN)
+export class AdminReconciliationController {
+  constructor(private readonly appointments: AppointmentsService) {}
+
+  @Get('daily')
+  async daily(@Query('date') date?: string) {
+    return this.appointments.runDailyReconciliation(date);
+  }
+
+  @Get(':jobId')
+  async detail(@Param('jobId', ParseIntPipe) jobId: number) {
+    return this.appointments.getReconciliationJobDetail(jobId);
+  }
+}
+
+@Controller('attachments')
+export class AttachmentAccessController {
+  constructor(private readonly appointments: AppointmentsService) {}
+
+  @Get(':attachmentId/access-url')
+  @UseGuards(JwtAuthGuard)
+  async accessUrl(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('attachmentId', ParseIntPipe) attachmentId: number,
+  ) {
+    return this.appointments.getAttachmentAccessUrl(user, attachmentId);
+  }
+
+  @Get(':attachmentId/access')
+  async access(
+    @Param('attachmentId', ParseIntPipe) attachmentId: number,
+    @Query('token') token: string,
+    @Res() res: Response,
+  ) {
+    const result = await this.appointments.streamAttachmentBySignedToken(attachmentId, token);
+    res.setHeader('Content-Type', result.mimeType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `inline; filename=\"${result.fileName}\"`);
+    res.send(result.content);
   }
 }
