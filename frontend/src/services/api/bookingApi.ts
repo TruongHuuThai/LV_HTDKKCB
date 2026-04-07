@@ -27,6 +27,8 @@ export interface CreateBookingInput {
   B_TEN: string;
   KG_MA: number;
   LHK_MA?: number;
+  symptoms?: string;
+  preVisitNote?: string;
 }
 
 export const bookingApi = {

@@ -16,6 +16,9 @@ import ProfilePage from '@/pages/ProfilePage';
 import NotFoundPage from '@/pages/NotFoundPage';
 import PatientProfileFormPage from '@/pages/patient/PatientProfileFormPage';
 import PatientProfileDetailPage from '@/pages/patient/PatientProfileDetailPage';
+import PaymentResultPage from '@/pages/patient/PaymentResultPage';
+import MyAppointmentsPage from '@/pages/patient/MyAppointmentsPage';
+import AppointmentDetailPage from '@/pages/patient/AppointmentDetailPage';
 
 // Pages – Specialty
 import SpecialtyListPage from '@/pages/specialty/SpecialtyListPage';
@@ -91,6 +94,9 @@ const router = createBrowserRouter([
                 element: <ProtectedRoute allowedRoles={['BENH_NHAN']} />,
                 children: [
                     { path: '/booking', element: <BookingPage /> },
+                    { path: '/payment-result', element: <PaymentResultPage /> },
+                    { path: '/appointments/my', element: <MyAppointmentsPage /> },
+                    { path: '/appointments/:id', element: <AppointmentDetailPage /> },
                     { path: '/profile', element: <ProfilePage /> },
                     { path: '/patient-profiles', element: <ProfilePage /> },
                     { path: '/patient-profiles/create', element: <PatientProfileFormPage /> },

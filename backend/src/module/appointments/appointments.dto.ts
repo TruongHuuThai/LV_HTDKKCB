@@ -615,3 +615,82 @@ export class OpsDashboardQueryDto {
   @IsIn(['day', 'week'])
   groupBy?: 'day' | 'week';
 }
+
+export class ReconciliationQueryDto {
+  @IsOptional()
+  @Matches(datePattern)
+  date?: string;
+
+  @IsOptional()
+  @Matches(datePattern)
+  fromDate?: string;
+
+  @IsOptional()
+  @Matches(datePattern)
+  toDate?: string;
+
+  @IsOptional()
+  @IsIn(['OPEN', 'RESOLVED'])
+  status?: 'OPEN' | 'RESOLVED';
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number;
+}
+
+export class ReportingQueryDto {
+  @IsOptional()
+  @Matches(datePattern)
+  fromDate?: string;
+
+  @IsOptional()
+  @Matches(datePattern)
+  toDate?: string;
+
+  @IsOptional()
+  @IsIn(['day', 'week', 'month'])
+  groupBy?: 'day' | 'week' | 'month';
+}
+
+export class PilotRolloutConfigDto {
+  @IsOptional()
+  @IsIn(['department', 'userGroup', 'specialty'])
+  cohortType?: 'department' | 'userGroup' | 'specialty';
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(1000)
+  cohortIds?: Array<number | string>;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  @IsString({ each: true })
+  enabledFeatures?: string[];
+
+  @IsOptional()
+  @Matches(datePattern)
+  startAt?: string;
+
+  @IsOptional()
+  @Matches(datePattern)
+  endAt?: string;
+
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  enabled?: 'true' | 'false';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
+}

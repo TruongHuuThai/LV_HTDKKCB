@@ -4,6 +4,7 @@ import { BookingModule } from '../booking/booking.module';
 import { PaymentModule } from '../payment/payment.module';
 import {
   AdminOpsController,
+  AdminReportsController,
   AdminRefundsController,
   AdminReconciliationController,
   AttachmentAccessController,
@@ -28,6 +29,7 @@ import { AppointmentsBackgroundWorkerService } from './appointments.background-w
     AdminRefundsController,
     AdminBulkNotificationsController,
     AdminOpsController,
+    AdminReportsController,
     AdminReconciliationController,
     AppointmentsController,
     DoctorAppointmentsController,

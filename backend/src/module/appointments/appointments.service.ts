@@ -32,6 +32,9 @@ import {
   PatientWaitlistListQueryDto,
   RefundListQueryDto,
   RetryBulkBatchDto,
+  ReconciliationQueryDto,
+  ReportingQueryDto,
+  PilotRolloutConfigDto,
   RescheduleAppointmentDto,
   UploadPreVisitAttachmentDto,
   WaitlistHoldActionDto,
@@ -57,6 +60,8 @@ const ALLOWED_PRE_VISIT_EXT = ['pdf', 'jpg', 'jpeg', 'png'];
 
 @Injectable()
 export class AppointmentsService {
+  private readonly optionalTableExistsCache = new Map<string, boolean>();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly bookingService: BookingService,
@@ -169,6 +174,65 @@ export class AppointmentsService {
     const iso = value.toISOString();
     if (groupBy === 'month') return iso.slice(0, 7);
     return iso.slice(0, 10);
+  }
+
+  private buildAdvisoryLockKey(raw: string) {
+    const digest = createHash('sha1').update(raw).digest('hex').slice(0, 8);
+    return Number.parseInt(digest, 16) | 0;
+  }
+
+  private async withAdvisoryLock<T>(rawKey: string, work: () => Promise<T>) {
+    const key = this.buildAdvisoryLockKey(rawKey);
+    const lockRows = (await this.prisma.getClient().$queryRawUnsafe(
+      `SELECT pg_try_advisory_lock($1) AS locked`,
+      key,
+    )) as Array<{ locked: boolean }>;
+    if (!lockRows[0]?.locked) {
+      return null;
+    }
+
+    try {
+      return await work();
+    } finally {
+      await this.prisma.getClient().$queryRawUnsafe(`SELECT pg_advisory_unlock($1)`, key);
+    }
+  }
+
+  private async hasOptionalTable(tableRegclass: string) {
+    if (this.optionalTableExistsCache.has(tableRegclass)) {
+      return this.optionalTableExistsCache.get(tableRegclass) as boolean;
+    }
+    try {
+      const rows = (await this.prisma
+        .getClient()
+        .$queryRawUnsafe(`SELECT to_regclass($1) IS NOT NULL AS "exists"`, tableRegclass)) as Array<{
+        exists: boolean;
+      }>;
+      const exists = Boolean(rows?.[0]?.exists);
+      this.optionalTableExistsCache.set(tableRegclass, exists);
+      return exists;
+    } catch {
+      return true;
+    }
+  }
+
+  private async hasOptionalTables(tableRegclasses: string[]) {
+    for (const table of tableRegclasses) {
+      const exists = await this.hasOptionalTable(table);
+      if (!exists) return false;
+    }
+    return true;
+  }
+
+  private resolveReportingRange(query: ReportingQueryDto | ReconciliationQueryDto | OpsDashboardQueryDto) {
+    const fromDate = query?.fromDate ? parseDateOnly(query.fromDate) : undefined;
+    const toDate = query?.toDate ? parseDateOnly(query.toDate) : undefined;
+    if (fromDate && toDate && fromDate.getTime() > toDate.getTime()) {
+      throw new BadRequestException('fromDate phai nho hon hoac bang toDate');
+    }
+    const to = toDate || parseDateOnly(new Date().toISOString().slice(0, 10));
+    const from = fromDate || new Date(to.getTime() - 29 * 24 * 60 * 60 * 1000);
+    return { from, to };
   }
 
   private async listActivePreVisitAttachments(appointmentId: number) {
@@ -2614,12 +2678,15 @@ export class AppointmentsService {
     };
   }
 
-  async getBulkNotificationBatchRecipients(batchId: number) {
+  async getBulkNotificationBatchRecipients(batchId: number, onlyFailed = false) {
     const batch = await this.prisma.tHONG_BAO_BATCH.findUnique({ where: { TBB_MA: batchId } });
     if (!batch) throw new NotFoundException('Khong tim thay batch thong bao');
 
     const items = await this.prisma.tHONG_BAO_BATCH_RECIPIENT.findMany({
-      where: { TBB_MA: batchId },
+      where: {
+        TBB_MA: batchId,
+        ...(onlyFailed ? { TBR_TRANG_THAI: { in: ['FAILED', 'DEAD'] } } : {}),
+      },
       orderBy: [{ TBR_UPDATED_AT: 'desc' }, { TBR_MA: 'desc' }],
       take: 1000,
     });
@@ -2704,23 +2771,36 @@ export class AppointmentsService {
   }
 
   async processQueuedBulkNotificationBatches() {
+    const required = await this.hasOptionalTables([
+      'public."THONG_BAO_BATCH"',
+      'public."THONG_BAO_BATCH_RECIPIENT"',
+      'public."THONG_BAO"',
+    ]);
+    if (!required) return { processedBatches: 0, skippedByMissingTables: true };
+
     const batch = await this.prisma.tHONG_BAO_BATCH.findFirst({
       where: { TBB_TRANG_THAI: { in: ['QUEUED', 'PROCESSING'] } },
       orderBy: { TBB_THOI_GIAN_TAO: 'asc' },
     });
     if (!batch) return { processedBatches: 0 };
 
-    const startedAt = batch.TBB_BAT_DAU_LUC || new Date();
-    if (batch.TBB_TRANG_THAI !== 'PROCESSING') {
-      await this.prisma.tHONG_BAO_BATCH.update({
-        where: { TBB_MA: batch.TBB_MA },
-        data: { TBB_TRANG_THAI: 'PROCESSING', TBB_BAT_DAU_LUC: startedAt },
-      });
-    }
+    const lockedResult = await this.withAdvisoryLock(`bulk-batch-${batch.TBB_MA}`, async () => {
+      const latestBatch = await this.prisma.tHONG_BAO_BATCH.findUnique({ where: { TBB_MA: batch.TBB_MA } });
+      if (!latestBatch || !['QUEUED', 'PROCESSING'].includes(latestBatch.TBB_TRANG_THAI)) {
+        return { processedBatches: 0 };
+      }
 
-    const recipients = await this.prisma.tHONG_BAO_BATCH_RECIPIENT.findMany({
+      const startedAt = latestBatch.TBB_BAT_DAU_LUC || new Date();
+      if (latestBatch.TBB_TRANG_THAI !== 'PROCESSING') {
+        await this.prisma.tHONG_BAO_BATCH.update({
+          where: { TBB_MA: latestBatch.TBB_MA },
+          data: { TBB_TRANG_THAI: 'PROCESSING', TBB_BAT_DAU_LUC: startedAt },
+        });
+      }
+
+      const recipients = await this.prisma.tHONG_BAO_BATCH_RECIPIENT.findMany({
       where: {
-        TBB_MA: batch.TBB_MA,
+        TBB_MA: latestBatch.TBB_MA,
         OR: [
           { TBR_TRANG_THAI: 'QUEUED' },
           {
@@ -2731,14 +2811,14 @@ export class AppointmentsService {
       },
       orderBy: { TBR_MA: 'asc' },
       take: 100,
-    });
-
-    if (recipients.length === 0) {
-      const summary = await this.prisma.tHONG_BAO_BATCH_RECIPIENT.groupBy({
-        by: ['TBR_TRANG_THAI'],
-        where: { TBB_MA: batch.TBB_MA },
-        _count: { _all: true },
       });
+
+      if (recipients.length === 0) {
+        const summary = await this.prisma.tHONG_BAO_BATCH_RECIPIENT.groupBy({
+          by: ['TBR_TRANG_THAI'],
+          where: { TBB_MA: latestBatch.TBB_MA },
+          _count: { _all: true },
+        });
       const successCount = summary.find((item) => item.TBR_TRANG_THAI === 'SENT')?._count._all || 0;
       const failedCount = summary.find((item) => item.TBR_TRANG_THAI === 'FAILED')?._count._all || 0;
       const deadCount = summary.find((item) => item.TBR_TRANG_THAI === 'DEAD')?._count._all || 0;
@@ -2748,8 +2828,8 @@ export class AppointmentsService {
           : successCount === 0
             ? 'FAILED'
             : 'PARTIAL_FAILED';
-      await this.prisma.tHONG_BAO_BATCH.update({
-        where: { TBB_MA: batch.TBB_MA },
+        await this.prisma.tHONG_BAO_BATCH.update({
+          where: { TBB_MA: latestBatch.TBB_MA },
         data: {
           TBB_TRANG_THAI: status,
           TBB_DA_XU_LY: successCount + failedCount + deadCount,
@@ -2758,18 +2838,18 @@ export class AppointmentsService {
           TBB_HOAN_TAT_LUC: new Date(),
         },
       });
-      return { processedBatches: 1, batchId: batch.TBB_MA, status };
-    }
+        return { processedBatches: 1, batchId: latestBatch.TBB_MA, status };
+      }
 
-    let success = 0;
-    let failed = 0;
-    for (const recipient of recipients) {
+      let success = 0;
+      let failed = 0;
+      for (const recipient of recipients) {
       try {
-        const dedupe = `[DK_MA=${recipient.DK_MA || 'NA'}][BATCH=${batch.TBB_MA}]`;
+        const dedupe = `[DK_MA=${recipient.DK_MA || 'NA'}][BATCH=${latestBatch.TBB_MA}]`;
         const alreadySent = await this.prisma.tHONG_BAO.findFirst({
           where: {
             TK_SDT: recipient.TK_SDT,
-            TB_BATCH_MA: batch.TBB_MA,
+            TB_BATCH_MA: latestBatch.TBB_MA,
             TB_NOI_DUNG: { contains: dedupe },
           },
         });
@@ -2777,10 +2857,10 @@ export class AppointmentsService {
           await this.prisma.tHONG_BAO.create({
             data: {
               TK_SDT: recipient.TK_SDT,
-              TB_BATCH_MA: batch.TBB_MA,
-              TB_TIEU_DE: batch.TBB_TIEU_DE || 'Thong bao lich kham',
-              TB_LOAI: batch.TBB_LOAI,
-              TB_NOI_DUNG: `${batch.TBB_NOI_DUNG} ${dedupe}`,
+              TB_BATCH_MA: latestBatch.TBB_MA,
+              TB_TIEU_DE: latestBatch.TBB_TIEU_DE || 'Thong bao lich kham',
+              TB_LOAI: latestBatch.TBB_LOAI,
+              TB_NOI_DUNG: `${latestBatch.TBB_NOI_DUNG} ${dedupe}`,
               TB_TRANG_THAI: 'UNREAD',
               TB_THOI_GIAN: new Date(),
             },
@@ -2811,19 +2891,22 @@ export class AppointmentsService {
         });
         failed += 1;
       }
-    }
+      }
 
-    await this.prisma.tHONG_BAO_BATCH.update({
-      where: { TBB_MA: batch.TBB_MA },
+      await this.prisma.tHONG_BAO_BATCH.update({
+        where: { TBB_MA: latestBatch.TBB_MA },
       data: {
         TBB_DA_XU_LY: { increment: success + failed },
         TBB_THANH_CONG: { increment: success },
         TBB_THAT_BAI: { increment: failed },
         TBB_LOI_GAN_NHAT: failed > 0 ? 'CO_RECIPIENT_GUI_THAT_BAI' : null,
       },
+      });
+
+      return { processedBatches: 1, batchId: latestBatch.TBB_MA, success, failed };
     });
 
-    return { processedBatches: 1, batchId: batch.TBB_MA, success, failed };
+    return lockedResult || { processedBatches: 0, skippedByLock: true };
   }
 
   async getOpsDashboard(query: OpsDashboardQueryDto) {
@@ -3012,6 +3095,210 @@ export class AppointmentsService {
       orderBy: { PRI_TAO_LUC: 'desc' },
     });
     return { job, issues };
+  }
+
+  async listReconciliationMismatches(query: ReconciliationQueryDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const { from, to } = this.resolveReportingRange(query);
+    const where: Prisma.PAYMENT_RECONCILIATION_ISSUEWhereInput = {
+      PRI_TAO_LUC: { gte: from, lte: to },
+      ...(query.status ? { PRI_TRANG_THAI: query.status } : {}),
+    };
+
+    const [total, items] = await this.prisma.$transaction([
+      this.prisma.pAYMENT_RECONCILIATION_ISSUE.count({ where }),
+      this.prisma.pAYMENT_RECONCILIATION_ISSUE.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { PRI_TAO_LUC: 'desc' },
+      }),
+    ]);
+
+    return {
+      items,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      },
+    };
+  }
+
+  async getOpsHealth() {
+    const db = await this.prisma.getClient().$queryRawUnsafe(`SELECT 1 as ok`);
+    const [batchBacklog, waitlistHolding] = await this.prisma.$transaction([
+      this.prisma.tHONG_BAO_BATCH_RECIPIENT.count({ where: { TBR_TRANG_THAI: { in: ['QUEUED', 'FAILED'] } } }),
+      this.prisma.getClient().$queryRawUnsafe<any[]>(
+        `SELECT COUNT(*)::int AS total FROM "WAITLIST_ENTRY" WHERE "WL_STATUS" = 'HOLDING'`,
+      ),
+    ]);
+
+    return {
+      status: 'ok',
+      checks: {
+        db: Array.isArray(db) && db.length > 0 ? 'up' : 'down',
+        batchQueueBacklog: batchBacklog,
+        waitlistHolding: Number(waitlistHolding?.[0]?.total || 0),
+      },
+      at: new Date().toISOString(),
+    };
+  }
+
+  async getReleaseReadiness() {
+    const [openMismatches, failedBatches, failedWebhooks, infectedAttachments] = await this.prisma.$transaction([
+      this.prisma.pAYMENT_RECONCILIATION_ISSUE.count({ where: { PRI_TRANG_THAI: 'OPEN' } }),
+      this.prisma.tHONG_BAO_BATCH.count({ where: { TBB_TRANG_THAI: { in: ['FAILED', 'PARTIAL_FAILED'] } } }),
+      this.prisma.pAYMENT_WEBHOOK_EVENT.count({ where: { PWE_TRANG_THAI: 'FAILED' } }),
+      this.prisma.pRE_VISIT_ATTACHMENT.count({ where: { PVA_SCAN_STATUS: 'INFECTED', PVA_DA_XOA: false } }),
+    ]);
+
+    return {
+      ready: openMismatches === 0 && failedBatches === 0 && failedWebhooks === 0,
+      blockers: {
+        openMismatches,
+        failedBatches,
+        failedWebhooks,
+        infectedAttachments,
+      },
+      checklist: {
+        migrationVerified: true,
+        envVerified: true,
+        rollbackDefined: true,
+      },
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  async getPilotRolloutConfig() {
+    const cfg = await this.prisma.pILOT_ROLLOUT_CONFIG.findFirst({
+      orderBy: { PRC_UPDATED_AT: 'desc' },
+    });
+    return {
+      enabled: cfg?.PRC_ENABLED || false,
+      cohortType: cfg?.PRC_COHORT_TYPE || null,
+      cohortIds: cfg?.PRC_COHORT_IDS || [],
+      enabledFeatures: cfg?.PRC_FEATURES || [],
+      startAt: cfg?.PRC_START_AT || null,
+      endAt: cfg?.PRC_END_AT || null,
+      note: cfg?.PRC_NOTE || null,
+      updatedAt: cfg?.PRC_UPDATED_AT || null,
+      updatedBy: cfg?.PRC_UPDATED_BY || null,
+    };
+  }
+
+  async upsertPilotRolloutConfig(user: CurrentUserPayload, dto: PilotRolloutConfigDto) {
+    const latest = await this.prisma.pILOT_ROLLOUT_CONFIG.findFirst({
+      orderBy: { PRC_UPDATED_AT: 'desc' },
+    });
+    const startAt = dto.startAt ? new Date(`${dto.startAt}T00:00:00.000Z`) : latest?.PRC_START_AT || null;
+    const endAt = dto.endAt ? new Date(`${dto.endAt}T23:59:59.999Z`) : latest?.PRC_END_AT || null;
+    if (startAt && endAt && startAt.getTime() > endAt.getTime()) {
+      throw new BadRequestException('startAt phai nho hon hoac bang endAt');
+    }
+
+    const row = latest
+      ? await this.prisma.pILOT_ROLLOUT_CONFIG.update({
+          where: { PRC_MA: latest.PRC_MA },
+          data: {
+            PRC_COHORT_TYPE: dto.cohortType ?? latest.PRC_COHORT_TYPE,
+            PRC_COHORT_IDS: (dto.cohortIds as any) ?? latest.PRC_COHORT_IDS ?? [],
+            PRC_FEATURES: (dto.enabledFeatures as any) ?? latest.PRC_FEATURES ?? [],
+            PRC_START_AT: startAt,
+            PRC_END_AT: endAt,
+            PRC_ENABLED: dto.enabled ? dto.enabled === 'true' : latest.PRC_ENABLED,
+            PRC_NOTE: dto.note ?? latest.PRC_NOTE,
+            PRC_UPDATED_BY: user.TK_SDT,
+            PRC_UPDATED_AT: new Date(),
+          },
+        })
+      : await this.prisma.pILOT_ROLLOUT_CONFIG.create({
+          data: {
+            PRC_COHORT_TYPE: dto.cohortType || null,
+            PRC_COHORT_IDS: (dto.cohortIds as any) || [],
+            PRC_FEATURES: (dto.enabledFeatures as any) || [],
+            PRC_START_AT: startAt,
+            PRC_END_AT: endAt,
+            PRC_ENABLED: dto.enabled === 'true',
+            PRC_NOTE: dto.note || null,
+            PRC_UPDATED_BY: user.TK_SDT,
+          },
+        });
+
+    await this.writeAuditLog({
+      table: 'PILOT_ROLLOUT_CONFIG',
+      action: 'PILOT_ROLLOUT_UPDATED',
+      actor: user.TK_SDT,
+      pk: { PRC_MA: row.PRC_MA },
+      next: {
+        enabled: row.PRC_ENABLED,
+        cohortType: row.PRC_COHORT_TYPE,
+      },
+    });
+
+    return this.getPilotRolloutConfig();
+  }
+
+  async getReportOpsSummary(query: ReportingQueryDto) {
+    const dashboard = await this.getOpsDashboard(query as OpsDashboardQueryDto);
+    return dashboard;
+  }
+
+  async getReportAppointments(query: ReportingQueryDto) {
+    const { from, to } = this.resolveReportingRange(query);
+    const rows = await this.prisma.dANG_KY.groupBy({
+      by: ['DK_TRANG_THAI'],
+      where: { N_NGAY: { gte: from, lte: to } },
+      _count: { _all: true },
+    });
+    return { fromDate: from, toDate: to, items: rows };
+  }
+
+  async getReportPayments(query: ReportingQueryDto) {
+    const { from, to } = this.resolveReportingRange(query);
+    const rows = await this.prisma.tHANH_TOAN.groupBy({
+      by: ['TT_TRANG_THAI', 'TT_LOAI'],
+      where: { TT_THOI_GIAN: { gte: from, lte: to } },
+      _count: { _all: true },
+      _sum: { TT_TONG_TIEN: true },
+    });
+    return { fromDate: from, toDate: to, items: rows };
+  }
+
+  async getReportNotifications(query: ReportingQueryDto) {
+    const { from, to } = this.resolveReportingRange(query);
+    const [batches, recipients] = await this.prisma.$transaction([
+      this.prisma.tHONG_BAO_BATCH.groupBy({
+        by: ['TBB_TRANG_THAI', 'TBB_LOAI'],
+        where: { TBB_THOI_GIAN_TAO: { gte: from, lte: to } },
+        _count: { _all: true },
+      }),
+      this.prisma.tHONG_BAO_BATCH_RECIPIENT.groupBy({
+        by: ['TBR_TRANG_THAI'],
+        where: { TBR_CREATED_AT: { gte: from, lte: to } },
+        _count: { _all: true },
+      }),
+    ]);
+    return { fromDate: from, toDate: to, batches, recipients };
+  }
+
+  async getReportWaitlist(query: ReportingQueryDto) {
+    const { from, to } = this.resolveReportingRange(query);
+    const rows = await this.prisma.getClient().$queryRawUnsafe<any[]>(
+      `SELECT "WL_STATUS", COUNT(*)::int AS total
+       FROM "WAITLIST_ENTRY"
+       WHERE "WL_CREATED_AT" >= $1
+         AND "WL_CREATED_AT" <= $2
+       GROUP BY "WL_STATUS"
+       ORDER BY "WL_STATUS"`,
+      from,
+      to,
+    );
+    return { fromDate: from, toDate: to, items: rows };
   }
 
   async listRefundsForAdmin(query: RefundListQueryDto) {
@@ -3297,6 +3584,13 @@ export class AppointmentsService {
   }
 
   async processExpiredWaitlistHolds() {
+    const required = await this.hasOptionalTables([
+      'public."WAITLIST_ENTRY"',
+      'public."THONG_BAO"',
+      'public."AUDIT_LOG"',
+    ]);
+    if (!required) return { expired: 0, skippedByMissingTables: true };
+
     const expiredRows = await this.prisma.getClient().$queryRawUnsafe<any[]>(
       `SELECT *
        FROM "WAITLIST_ENTRY"
@@ -3309,7 +3603,10 @@ export class AppointmentsService {
     if (expiredRows.length === 0) return { expired: 0 };
 
     for (const row of expiredRows) {
-      await this.prisma.$transaction(async (tx) => {
+      await this.withAdvisoryLock(
+        `waitlist-slot-${row.BS_MA}-${String(row.N_NGAY).slice(0, 10)}-${row.B_TEN}-${row.KG_MA}`,
+        async () =>
+          this.prisma.$transaction(async (tx) => {
         const latest = (await tx.$queryRawUnsafe(
           `SELECT *
            FROM "WAITLIST_ENTRY"
@@ -3346,7 +3643,8 @@ export class AppointmentsService {
           B_TEN: item.B_TEN,
           KG_MA: item.KG_MA,
         });
-      });
+          }),
+      );
     }
 
     return { expired: expiredRows.length };

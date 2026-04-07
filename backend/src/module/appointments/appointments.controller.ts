@@ -37,8 +37,11 @@ import {
   ManualBookingDto,
   NotificationListQueryDto,
   OpsDashboardQueryDto,
+  PilotRolloutConfigDto,
   PatientAppointmentListQueryDto,
   PatientWaitlistListQueryDto,
+  ReconciliationQueryDto,
+  ReportingQueryDto,
   RefundListQueryDto,
   RetryBulkBatchDto,
   RescheduleAppointmentDto,
@@ -162,6 +165,11 @@ export class AdminBulkNotificationsController {
   @Get(':batchId/recipients')
   async recipients(@Param('batchId', ParseIntPipe) batchId: number) {
     return this.appointments.getBulkNotificationBatchRecipients(batchId);
+  }
+
+  @Get(':batchId/failed-recipients')
+  async failedRecipients(@Param('batchId', ParseIntPipe) batchId: number) {
+    return this.appointments.getBulkNotificationBatchRecipients(batchId, true);
   }
 
   @Post(':batchId/retry')
@@ -422,19 +430,42 @@ export class AdminOpsController {
     return this.appointments.getOpsDashboard(query);
   }
 
+  @Get('release-readiness')
+  async releaseReadiness() {
+    return this.appointments.getReleaseReadiness();
+  }
+
+  @Get('health')
+  async health() {
+    return this.appointments.getOpsHealth();
+  }
+
   @Get('alerts')
   async alerts() {
     return this.appointments.listOpsAlerts();
   }
 
   @Get('reconciliation/daily')
-  async dailyReconciliation(@Query('date') date?: string) {
-    return this.appointments.runDailyReconciliation(date);
+  async dailyReconciliation(@Query() query: ReconciliationQueryDto) {
+    return this.appointments.runDailyReconciliation(query.date);
   }
 
   @Get('reconciliation/:jobId')
   async reconciliationDetail(@Param('jobId', ParseIntPipe) jobId: number) {
     return this.appointments.getReconciliationJobDetail(jobId);
+  }
+
+  @Get('pilot-rollout')
+  async getPilotRollout() {
+    return this.appointments.getPilotRolloutConfig();
+  }
+
+  @Patch('pilot-rollout')
+  async setPilotRollout(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() dto: PilotRolloutConfigDto,
+  ) {
+    return this.appointments.upsertPilotRolloutConfig(user, dto);
   }
 }
 
@@ -445,13 +476,18 @@ export class AdminReconciliationController {
   constructor(private readonly appointments: AppointmentsService) {}
 
   @Get('daily')
-  async daily(@Query('date') date?: string) {
-    return this.appointments.runDailyReconciliation(date);
+  async daily(@Query() query: ReconciliationQueryDto) {
+    return this.appointments.runDailyReconciliation(query.date);
   }
 
   @Get(':jobId')
   async detail(@Param('jobId', ParseIntPipe) jobId: number) {
     return this.appointments.getReconciliationJobDetail(jobId);
+  }
+
+  @Get('mismatches')
+  async mismatches(@Query() query: ReconciliationQueryDto) {
+    return this.appointments.listReconciliationMismatches(query);
   }
 }
 
@@ -478,5 +514,37 @@ export class AttachmentAccessController {
     res.setHeader('Content-Type', result.mimeType || 'application/octet-stream');
     res.setHeader('Content-Disposition', `inline; filename=\"${result.fileName}\"`);
     res.send(result.content);
+  }
+}
+
+@Controller('admin/reports')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(ROLE.ADMIN)
+export class AdminReportsController {
+  constructor(private readonly appointments: AppointmentsService) {}
+
+  @Get('ops-summary')
+  async opsSummary(@Query() query: ReportingQueryDto) {
+    return this.appointments.getReportOpsSummary(query);
+  }
+
+  @Get('appointments')
+  async appointmentsReport(@Query() query: ReportingQueryDto) {
+    return this.appointments.getReportAppointments(query);
+  }
+
+  @Get('payments')
+  async payments(@Query() query: ReportingQueryDto) {
+    return this.appointments.getReportPayments(query);
+  }
+
+  @Get('notifications')
+  async notifications(@Query() query: ReportingQueryDto) {
+    return this.appointments.getReportNotifications(query);
+  }
+
+  @Get('waitlist')
+  async waitlist(@Query() query: ReportingQueryDto) {
+    return this.appointments.getReportWaitlist(query);
   }
 }

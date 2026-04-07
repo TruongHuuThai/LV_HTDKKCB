@@ -608,6 +608,19 @@ model PAYMENT_RECONCILIATION_ISSUE {
   @@index([PRI_TRANG_THAI], map: "idx_pri_status")
 }
 
+model PILOT_ROLLOUT_CONFIG {
+  PRC_MA            Int      @id @default(autoincrement())
+  PRC_COHORT_TYPE   String?
+  PRC_COHORT_IDS    Json?
+  PRC_FEATURES      Json?
+  PRC_START_AT      DateTime? @db.Timestamp(6)
+  PRC_END_AT        DateTime? @db.Timestamp(6)
+  PRC_ENABLED       Boolean   @default(false)
+  PRC_NOTE          String?
+  PRC_UPDATED_BY    String?
+  PRC_UPDATED_AT    DateTime  @default(now()) @db.Timestamp(6)
+}
+
 model THUCHIEN {
   PCD_MA                 Int
   DVCLS_MA               Int
