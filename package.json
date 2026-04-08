@@ -1,7 +1,8 @@
 {
   "scripts": {
     "kill:3000": "powershell -ExecutionPolicy Bypass -File ./scripts/kill-port.ps1 -Port 3000",
-    "backend:restart": "powershell -ExecutionPolicy Bypass -File ./scripts/restart-backend.ps1"
+    "backend:restart": "powershell -ExecutionPolicy Bypass -File ./scripts/restart-backend.ps1",
+    "check:schedule-contract": "node ./scripts/check-schedule-contract-sync.js"
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5.19"

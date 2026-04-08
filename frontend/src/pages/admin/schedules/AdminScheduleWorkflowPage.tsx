@@ -41,6 +41,7 @@ import {
   type ScheduleTemplateItem,
   type WeeklyScheduleItem,
 } from '@/services/api/scheduleWorkflowApi';
+import { SHIFT_STATUS, WEEK_STATUS } from '@/contracts/scheduleStatusContract';
 import {
   formatDateDdMmYyyy,
   formatDateDdMmYyyySlash,
@@ -1456,7 +1457,7 @@ export default function AdminScheduleWorkflowPage() {
       P_MA: String(schedule.P_MA),
       N_NGAY: toDateOnlyIso(schedule.N_NGAY),
       B_TEN: schedule.B_TEN,
-      status: schedule.status === 'finalized' ? 'official' : 'approved',
+      status: schedule.status === SHIFT_STATUS.finalized ? 'official' : 'approved',
       note: schedule.note || '',
     });
     setManualShiftDialogOpen(true);
@@ -1636,7 +1637,9 @@ export default function AdminScheduleWorkflowPage() {
               ? '...'
               : weekOverviewError
                 ? 'Lỗi tải'
-                : getWeekWorkflowStatusLabel(weekOverview?.workflowStatus ?? 'generated')
+                : getWeekWorkflowStatusLabel(
+                    weekOverview?.workflowStatus ?? WEEK_STATUS.generated,
+                  )
           }
           tone="blue"
         />
@@ -1843,10 +1846,12 @@ export default function AdminScheduleWorkflowPage() {
           <span
             className={cn(
               'inline-flex rounded-full border px-3 py-1 font-medium',
-              getWeekWorkflowStatusBadgeClass(weekOverview?.workflowStatus ?? 'generated'),
+              getWeekWorkflowStatusBadgeClass(
+                weekOverview?.workflowStatus ?? WEEK_STATUS.generated,
+              ),
             )}
           >
-            {getWeekWorkflowStatusLabel(weekOverview?.workflowStatus ?? 'generated')}
+            {getWeekWorkflowStatusLabel(weekOverview?.workflowStatus ?? WEEK_STATUS.generated)}
           </span>
           <span className="text-gray-500">
             Tuần {formatDateDdMmYyyy(weekOverview?.weekStartDate)} - {formatDateDdMmYyyy(weekOverview?.weekEndDate)}
@@ -1955,9 +1960,9 @@ export default function AdminScheduleWorkflowPage() {
                           size="sm"
                           variant="outline"
                           onClick={() => openManualShiftDialog(item)}
-                          disabled={item.status === 'cancelled_by_doctor_leave'}
+                          disabled={item.status === SHIFT_STATUS.cancelled_by_doctor_leave}
                           title={
-                            item.status === 'cancelled_by_doctor_leave'
+                            item.status === SHIFT_STATUS.cancelled_by_doctor_leave
                               ? 'Ca đã hủy do bác sĩ nghỉ, không thể thay thế.'
                               : undefined
                           }

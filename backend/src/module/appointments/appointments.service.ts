@@ -51,6 +51,7 @@ import { evaluateCancelPolicy } from './cancel-policy.util';
 import { mapAppointmentStatusToGroup } from './appointment-status-group.util';
 import { AttachmentStorageService } from './attachment-storage.service';
 import { AttachmentScanService } from './attachment-scan.service';
+import { SHIFT_STATUS, WEEK_STATUS } from '../schedules/schedule-status';
 
 const ACTIVE_BOOKING_STATUS = ['CHO_KHAM', 'DA_CHECKIN'];
 const REFUND_STATUSES = ['REFUND_PENDING', 'REFUNDED', 'REFUND_FAILED', 'REFUND_REJECTED'];
@@ -1157,7 +1158,7 @@ export class AppointmentsService {
         N_NGAY: date,
         B_TEN: dto.shift,
         LBSK_IS_ARCHIVED: false,
-        LBSK_TRANG_THAI: 'finalized',
+        LBSK_TRANG_THAI: SHIFT_STATUS.finalized,
       },
       include: { BAC_SI: true },
     });
@@ -1791,9 +1792,9 @@ export class AppointmentsService {
           N_NGAY: nextDate,
           B_TEN: nextShift,
           LBSK_IS_ARCHIVED: false,
-          LBSK_TRANG_THAI: 'finalized',
+          LBSK_TRANG_THAI: SHIFT_STATUS.finalized,
           DOT_LICH_TUAN: {
-            is: { DLT_TRANG_THAI: 'slot_opened' },
+            is: { DLT_TRANG_THAI: WEEK_STATUS.slot_opened },
           },
         },
         include: { BAC_SI: true },
@@ -3651,6 +3652,14 @@ export class AppointmentsService {
   }
 
   async generateReminderNotifications() {
+    const required = await this.hasOptionalTables([
+      'public."DANG_KY"',
+      'public."KHUNG_GIO"',
+      'public."BENH_NHAN"',
+      'public."THONG_BAO"',
+    ]);
+    if (!required) return { created: 0, skippedByMissingTables: true };
+
     const reminderMinutes = Number.parseInt(
       this.config.get<string>('APPOINTMENT_REMINDER_MINUTES', '180'),
       10,
@@ -3660,34 +3669,38 @@ export class AppointmentsService {
     const windowStart = new Date(now.getTime() + minutes * 60 * 1000 - 5 * 60 * 1000);
     const windowEnd = new Date(now.getTime() + minutes * 60 * 1000 + 5 * 60 * 1000);
 
-    const appointments = await this.prisma.dANG_KY.findMany({
-      where: {
-        DK_TRANG_THAI: { in: ['CHO_KHAM', 'DA_CHECKIN'] },
-      },
-      include: {
-        KHUNG_GIO: true,
-        BENH_NHAN: true,
-        LICH_BSK: {
-          include: {
-            BAC_SI: true,
-          },
-        },
-      },
-      take: 500,
-      orderBy: { N_NGAY: 'asc' },
-    });
+    const appointments = await this.prisma
+      .getClient()
+      .$queryRawUnsafe<
+        Array<{
+          DK_MA: number;
+          BS_MA: number | null;
+          N_NGAY: Date;
+          KG_BAT_DAU: Date | null;
+          TK_SDT: string | null;
+        }>
+      >(
+        `SELECT dk."DK_MA", dk."BS_MA", dk."N_NGAY", kg."KG_BAT_DAU", bn."TK_SDT"
+         FROM "DANG_KY" dk
+         LEFT JOIN "KHUNG_GIO" kg ON kg."KG_MA" = dk."KG_MA"
+         LEFT JOIN "BENH_NHAN" bn ON bn."BN_MA" = dk."BN_MA"
+         WHERE dk."DK_TRANG_THAI" IN ('CHO_KHAM', 'DA_CHECKIN')
+         ORDER BY dk."N_NGAY" ASC
+         LIMIT 500`,
+      )
+      .catch(() => []);
 
     let created = 0;
     for (const item of appointments) {
-      if (!item.KHUNG_GIO?.KG_BAT_DAU) continue;
-      const startAt = combineDateAndTime(item.N_NGAY, item.KHUNG_GIO.KG_BAT_DAU);
+      if (!item.KG_BAT_DAU) continue;
+      const startAt = combineDateAndTime(item.N_NGAY, item.KG_BAT_DAU);
       if (startAt < windowStart || startAt > windowEnd) continue;
-      if (!item.BENH_NHAN?.TK_SDT) continue;
+      if (!item.TK_SDT) continue;
 
       const dedupe = `[REMINDER_DK_MA=${item.DK_MA}]`;
       const exists = await this.prisma.tHONG_BAO.findFirst({
         where: {
-          TK_SDT: item.BENH_NHAN.TK_SDT,
+          TK_SDT: item.TK_SDT,
           TB_LOAI: 'reminder',
           TB_NOI_DUNG: { contains: dedupe },
         },
@@ -3696,10 +3709,10 @@ export class AppointmentsService {
 
       await this.prisma.tHONG_BAO.create({
         data: {
-          TK_SDT: item.BENH_NHAN.TK_SDT,
+          TK_SDT: item.TK_SDT,
           TB_TIEU_DE: 'Nhac lich kham sap toi',
           TB_LOAI: 'reminder',
-          TB_NOI_DUNG: `Ban co lich kham voi bac si ${item.LICH_BSK?.BAC_SI?.BS_HO_TEN || item.BS_MA} vao ${startAt.toISOString()}. ${dedupe}`,
+          TB_NOI_DUNG: `Ban co lich kham voi bac si ${item.BS_MA || 'duoc phan cong'} vao ${startAt.toISOString()}. ${dedupe}`,
           TB_TRANG_THAI: 'UNREAD',
           TB_THOI_GIAN: new Date(),
         },
@@ -3711,18 +3724,33 @@ export class AppointmentsService {
   }
 
   async generateDoctorUnavailableNotifications() {
-    const affected = await this.prisma.dANG_KY.findMany({
-      where: { DK_TRANG_THAI: 'HUY_BS_NGHI' },
-      include: {
-        BENH_NHAN: true,
-      },
-      take: 500,
-      orderBy: { DK_MA: 'desc' },
-    });
+    const required = await this.hasOptionalTables([
+      'public."DANG_KY"',
+      'public."BENH_NHAN"',
+      'public."THONG_BAO"',
+    ]);
+    if (!required) return { created: 0, skippedByMissingTables: true };
+
+    const affected = await this.prisma
+      .getClient()
+      .$queryRawUnsafe<
+        Array<{
+          DK_MA: number;
+          TK_SDT: string | null;
+        }>
+      >(
+        `SELECT dk."DK_MA", bn."TK_SDT"
+         FROM "DANG_KY" dk
+         LEFT JOIN "BENH_NHAN" bn ON bn."BN_MA" = dk."BN_MA"
+         WHERE dk."DK_TRANG_THAI" = 'HUY_BS_NGHI'
+         ORDER BY dk."DK_MA" DESC
+         LIMIT 500`,
+      )
+      .catch(() => []);
 
     let created = 0;
     for (const item of affected) {
-      const phone = item.BENH_NHAN?.TK_SDT;
+      const phone = item.TK_SDT;
       if (!phone) continue;
       const dedupe = `[DOCTOR_UNAVAILABLE_DK_MA=${item.DK_MA}]`;
       const exists = await this.prisma.tHONG_BAO.findFirst({

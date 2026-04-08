@@ -1,10 +1,57 @@
 // src/modules/booking/booking.repository.ts
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import {
+  isWeekOpenForBooking,
+  SCHEDULE_STATUS_CONTRACT_VERSION,
+  SHIFT_STATUS,
+  WEEK_STATUS,
+} from '../schedules/schedule-status';
+import {
+  BOOKING_AVAILABILITY_REASON,
+  type BookingAvailabilityDebugDoctor,
+  type BookingAvailabilityDebugResponse,
+  type BookingAvailabilityReasonCode,
+} from './booking-availability.contract';
+import {
+  evaluateShiftAvailability,
+  summarizeDoctorReasons,
+} from './booking-availability.util';
 
 @Injectable()
 export class BookingRepository {
   constructor(private readonly prisma: PrismaService) { }
+
+  private toLocalDayRange(date: Date) {
+    // Use local day bounds to avoid timezone drift between UI date-only input and DB DateTime storage.
+    const start = new Date(date);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+    return { start, end };
+  }
+
+  private toLocalWeekMonday(date: Date) {
+    const base = new Date(date);
+    base.setHours(0, 0, 0, 0);
+    const day = base.getDay(); // 0=Sun, 1=Mon...
+    const diffToMonday = day === 0 ? -6 : 1 - day;
+    base.setDate(base.getDate() + diffToMonday);
+    return base;
+  }
+
+  private async isWeekSlotOpened(date: Date) {
+    const monday = this.toLocalWeekMonday(date);
+    const end = new Date(monday);
+    end.setDate(end.getDate() + 1);
+    const batch = await this.prisma.dOT_LICH_TUAN.findFirst({
+      where: {
+        DLT_TUAN_BAT_DAU: { gte: monday, lt: end },
+      },
+      select: { DLT_TRANG_THAI: true },
+    });
+    return isWeekOpenForBooking(batch?.DLT_TRANG_THAI);
+  }
 
   // ✅ map TK_SDT -> BN_MA (không tin client)
   findOwnedPatientProfile(TK_SDT: string, BN_MA: number) {
@@ -29,19 +76,25 @@ export class BookingRepository {
     });
   }
 
-  findDoctorSchedule(BS_MA: number, N_NGAY: Date, B_TEN: string) {
+  async findDoctorSchedule(BS_MA: number, N_NGAY: Date, B_TEN: string) {
+    const { start, end } = this.toLocalDayRange(N_NGAY);
+    const slotOpenedByWeek = await this.isWeekSlotOpened(N_NGAY);
     return this.prisma.lICH_BSK.findFirst({
       where: {
         BS_MA,
-        N_NGAY,
+        N_NGAY: { gte: start, lt: end },
         B_TEN,
         LBSK_IS_ARCHIVED: false,
-        LBSK_TRANG_THAI: 'finalized',
-        DOT_LICH_TUAN: {
-          is: {
-            DLT_TRANG_THAI: 'slot_opened',
-          },
-        },
+        LBSK_TRANG_THAI: SHIFT_STATUS.finalized,
+        ...(slotOpenedByWeek
+          ? {}
+          : {
+              DOT_LICH_TUAN: {
+                is: {
+                  DLT_TRANG_THAI: WEEK_STATUS.slot_opened,
+                },
+              },
+            }),
       },
       include: { PHONG: true, BAC_SI: true, BUOI: true, DOT_LICH_TUAN: true },
     });
@@ -55,10 +108,11 @@ export class BookingRepository {
   }
 
   listBookedSlots(BS_MA: number, N_NGAY: Date, B_TEN: string) {
+    const { start, end } = this.toLocalDayRange(N_NGAY);
     return this.prisma.dANG_KY.findMany({
       where: {
         BS_MA,
-        N_NGAY,
+        N_NGAY: { gte: start, lt: end },
         B_TEN,
         DK_TRANG_THAI: { notIn: ['HUY', 'HUY_BS_NGHI'] },
       },
@@ -73,10 +127,11 @@ export class BookingRepository {
     KG_MA: number,
     options?: { excludeDkMa?: number },
   ) {
+    const { start, end } = this.toLocalDayRange(N_NGAY);
     return this.prisma.dANG_KY.count({
       where: {
         BS_MA,
-        N_NGAY,
+        N_NGAY: { gte: start, lt: end },
         B_TEN,
         KG_MA,
         DK_TRANG_THAI: { notIn: ['HUY', 'HUY_BS_NGHI'] },
@@ -92,10 +147,11 @@ export class BookingRepository {
     CK_MA: number,
     options?: { excludeDkMa?: number },
   ) {
+    const { start, end } = this.toLocalDayRange(N_NGAY);
     return this.prisma.dANG_KY.count({
       where: {
         BN_MA,
-        N_NGAY,
+        N_NGAY: { gte: start, lt: end },
         KG_MA,
         DK_TRANG_THAI: { notIn: ['HUY', 'HUY_BS_NGHI'] },
         ...(options?.excludeDkMa ? { DK_MA: { not: options.excludeDkMa } } : {}),
@@ -111,10 +167,11 @@ export class BookingRepository {
   }
 
   getMaxSttForSlot(BS_MA: number, N_NGAY: Date, B_TEN: string, KG_MA: number) {
+    const { start, end } = this.toLocalDayRange(N_NGAY);
     return this.prisma.dANG_KY.aggregate({
       where: {
         BS_MA,
-        N_NGAY,
+        N_NGAY: { gte: start, lt: end },
         B_TEN,
         KG_MA,
         DK_TRANG_THAI: { notIn: ['HUY', 'HUY_BS_NGHI'] },
@@ -199,56 +256,193 @@ export class BookingRepository {
     return this.prisma.kHUNG_GIO.findUnique({ where: { KG_MA } });
   }
 
-  findAvailableDoctors(date?: Date, specialtyId?: number) {
+  private countReasonCodes(reasons: BookingAvailabilityReasonCode[]) {
+    const map = new Map<BookingAvailabilityReasonCode, number>();
+    reasons.forEach((reason) => {
+      map.set(reason, (map.get(reason) ?? 0) + 1);
+    });
+    return Array.from(map.entries()).map(([reason, count]) => ({ reason, count }));
+  }
+
+  async debugAvailability(date: Date, specialtyId?: number): Promise<BookingAvailabilityDebugResponse> {
+    const dayRange = this.toLocalDayRange(date);
+    const now = new Date();
+
+    const candidateDoctors = await this.prisma.bAC_SI.findMany({
+      where: {
+        ...(specialtyId ? { CK_MA: specialtyId } : {}),
+      },
+      select: {
+        BS_MA: true,
+        BS_HO_TEN: true,
+        CK_MA: true,
+        BS_DA_XOA: true,
+        CHUYEN_KHOA: { select: { CK_TEN: true } },
+      },
+      orderBy: { BS_MA: 'asc' },
+    });
+
+    const activeCandidates = candidateDoctors.filter((doctor) => doctor.BS_DA_XOA !== true);
+    const activeDoctorIds = activeCandidates.map((item) => item.BS_MA);
+
+    const schedules = activeDoctorIds.length
+      ? await this.prisma.lICH_BSK.findMany({
+          where: {
+            BS_MA: { in: activeDoctorIds },
+            N_NGAY: { gte: dayRange.start, lt: dayRange.end },
+          },
+          include: {
+            BUOI: { include: { KHUNG_GIO: { orderBy: { KG_BAT_DAU: 'asc' } } } },
+            DOT_LICH_TUAN: { select: { DLT_TRANG_THAI: true } },
+          },
+        })
+      : [];
+
+    const bookings = activeDoctorIds.length
+      ? await this.prisma.dANG_KY.findMany({
+          where: {
+            BS_MA: { in: activeDoctorIds },
+            N_NGAY: { gte: dayRange.start, lt: dayRange.end },
+            DK_TRANG_THAI: { notIn: ['HUY', 'HUY_BS_NGHI'] },
+          },
+          select: { BS_MA: true, B_TEN: true, KG_MA: true },
+        })
+      : [];
+
+    const bookingCountByKey = new Map<string, number>();
+    bookings.forEach((booking) => {
+      const key = `${booking.BS_MA}::${booking.B_TEN}::${booking.KG_MA}`;
+      bookingCountByKey.set(key, (bookingCountByKey.get(key) ?? 0) + 1);
+    });
+
+    const schedulesByDoctor = new Map<number, (typeof schedules)[number][]>();
+    schedules.forEach((item) => {
+      const list = schedulesByDoctor.get(item.BS_MA) ?? [];
+      list.push(item);
+      schedulesByDoctor.set(item.BS_MA, list);
+    });
+
+    const doctors: BookingAvailabilityDebugDoctor[] = candidateDoctors.map((doctor) => {
+      if (doctor.BS_DA_XOA === true) {
+        return {
+          doctorId: doctor.BS_MA,
+          doctorName: doctor.BS_HO_TEN,
+          specialtyId: doctor.CK_MA,
+          specialtyName: doctor.CHUYEN_KHOA?.CK_TEN ?? null,
+          available: false,
+          reasons: [BOOKING_AVAILABILITY_REASON.DOCTOR_DELETED],
+          shifts: [],
+        };
+      }
+
+      const doctorSchedules = schedulesByDoctor.get(doctor.BS_MA) ?? [];
+      const shifts = doctorSchedules.map((shift) => {
+        let bookableSlots = 0;
+        const totalSlots = shift.BUOI?.KHUNG_GIO?.length ?? 0;
+        (shift.BUOI?.KHUNG_GIO ?? []).forEach((slot) => {
+          const key = `${shift.BS_MA}::${shift.B_TEN}::${slot.KG_MA}`;
+          const booked = bookingCountByKey.get(key) ?? 0;
+          const capacity = slot.KG_SO_BN_TOI_DA ?? 5;
+          const slotStart = new Date(date);
+          slotStart.setHours(
+            slot.KG_BAT_DAU.getHours(),
+            slot.KG_BAT_DAU.getMinutes(),
+            slot.KG_BAT_DAU.getSeconds(),
+            0,
+          );
+          if (booked < capacity && slotStart.getTime() > now.getTime()) {
+            bookableSlots += 1;
+          }
+        });
+        const evaluated = evaluateShiftAvailability({
+          shiftStatus: shift.LBSK_TRANG_THAI,
+          weekStatus: shift.DOT_LICH_TUAN?.DLT_TRANG_THAI ?? null,
+          isArchived: shift.LBSK_IS_ARCHIVED,
+          bookableSlots,
+        });
+
+        return {
+          session: shift.B_TEN,
+          shiftStatus: shift.LBSK_TRANG_THAI ?? null,
+          weekStatus: shift.DOT_LICH_TUAN?.DLT_TRANG_THAI ?? null,
+          isArchived: Boolean(shift.LBSK_IS_ARCHIVED),
+          totalSlots,
+          bookableSlots,
+          reasons: evaluated.reasons,
+        };
+      });
+
+      const available = shifts.some((shift) => shift.reasons.length === 0);
+      return {
+        doctorId: doctor.BS_MA,
+        doctorName: doctor.BS_HO_TEN,
+        specialtyId: doctor.CK_MA,
+        specialtyName: doctor.CHUYEN_KHOA?.CK_TEN ?? null,
+        available,
+        reasons: available
+          ? []
+          : summarizeDoctorReasons({
+              shiftsCount: shifts.length,
+              shiftReasons: shifts.map((shift) => shift.reasons),
+            }),
+        shifts,
+      };
+    });
+
+    const availableDoctors = doctors.filter((doctor) => doctor.available);
+    const unavailableDoctors = doctors.filter((doctor) => !doctor.available);
+    const unavailableReasons = unavailableDoctors.flatMap((doctor) => doctor.reasons);
+    const summaryReasons = unavailableReasons.length
+      ? Array.from(new Set(unavailableReasons))
+      : specialtyId && doctors.length === 0
+        ? [BOOKING_AVAILABILITY_REASON.NO_DOCTOR_IN_SPECIALTY]
+        : [];
+
+    const inputDate = `${dayRange.start.getFullYear()}-${String(dayRange.start.getMonth() + 1).padStart(2, '0')}-${String(
+      dayRange.start.getDate(),
+    ).padStart(2, '0')}`;
+
+    return {
+      contractVersion: SCHEDULE_STATUS_CONTRACT_VERSION,
+      input: { date: inputDate, specialtyId: specialtyId ?? null },
+      summary: {
+        candidateDoctors: doctors.length,
+        availableDoctors: availableDoctors.length,
+        reasonCounts: this.countReasonCodes(unavailableReasons),
+        reasons: summaryReasons,
+      },
+      doctors,
+    };
+  }
+
+  async findAvailableDoctors(date?: Date, specialtyId?: number) {
+    if (!date) {
+      return this.prisma.bAC_SI.findMany({
+        where: {
+          BS_DA_XOA: false,
+          ...(specialtyId ? { CK_MA: specialtyId } : {}),
+        },
+        include: {
+          CHUYEN_KHOA: true,
+        },
+      });
+    }
+
+    const debug = await this.debugAvailability(date, specialtyId);
+    const availableIds = new Set(
+      debug.doctors.filter((item) => item.available).map((item) => item.doctorId),
+    );
+    if (availableIds.size === 0) return [];
+
     return this.prisma.bAC_SI.findMany({
       where: {
         BS_DA_XOA: false,
-        ...(specialtyId ? { CK_MA: specialtyId } : {}),
-        ...(date
-          ? {
-              LICH_BSK: {
-                some: {
-                  N_NGAY: date,
-                  LBSK_IS_ARCHIVED: false,
-                  LBSK_TRANG_THAI: 'finalized',
-                  DOT_LICH_TUAN: {
-                    is: {
-                      DLT_TRANG_THAI: 'slot_opened',
-                    },
-                  },
-                },
-              },
-            }
-          : {}),
+        BS_MA: { in: Array.from(availableIds) },
       },
       include: {
         CHUYEN_KHOA: true,
-        ...(date
-          ? {
-              LICH_BSK: {
-                where: {
-                  N_NGAY: date,
-                  LBSK_IS_ARCHIVED: false,
-                  LBSK_TRANG_THAI: 'finalized',
-                },
-                select: {
-                  LBSK_TRANG_THAI: true,
-                  DOT_LICH_TUAN: { select: { DLT_TRANG_THAI: true } },
-                },
-              },
-            }
-          : {}),
-      }
-    }).then((doctors: any[]) => {
-      if (!date) return doctors;
-      return doctors.filter((doctor) =>
-        (doctor.LICH_BSK || []).some((schedule: any) => {
-          return (
-            schedule.LBSK_TRANG_THAI === 'finalized' &&
-            schedule.DOT_LICH_TUAN?.DLT_TRANG_THAI === 'slot_opened'
-          );
-        }),
-      );
+      },
+      orderBy: { BS_MA: 'asc' },
     });
   }
 
@@ -294,18 +488,24 @@ export class BookingRepository {
     });
   }
 
-  listDoctorSchedulesForDate(BS_MA: number, N_NGAY: Date) {
+  async listDoctorSchedulesForDate(BS_MA: number, N_NGAY: Date) {
+    const { start, end } = this.toLocalDayRange(N_NGAY);
+    const slotOpenedByWeek = await this.isWeekSlotOpened(N_NGAY);
     return this.prisma.lICH_BSK.findMany({
       where: {
         BS_MA,
-        N_NGAY,
+        N_NGAY: { gte: start, lt: end },
         LBSK_IS_ARCHIVED: false,
-        LBSK_TRANG_THAI: 'finalized',
-        DOT_LICH_TUAN: {
-          is: {
-            DLT_TRANG_THAI: 'slot_opened',
-          },
-        },
+        LBSK_TRANG_THAI: SHIFT_STATUS.finalized,
+        ...(slotOpenedByWeek
+          ? {}
+          : {
+              DOT_LICH_TUAN: {
+                is: {
+                  DLT_TRANG_THAI: WEEK_STATUS.slot_opened,
+                },
+              },
+            }),
       },
       include: {
         BUOI: { include: { KHUNG_GIO: { orderBy: { KG_BAT_DAU: 'asc' } } } },
@@ -316,10 +516,11 @@ export class BookingRepository {
   }
 
   listBookedSlotsForDate(BS_MA: number, N_NGAY: Date) {
+    const { start, end } = this.toLocalDayRange(N_NGAY);
     return this.prisma.dANG_KY.findMany({
       where: {
         BS_MA,
-        N_NGAY,
+        N_NGAY: { gte: start, lt: end },
         DK_TRANG_THAI: { notIn: ['HUY', 'HUY_BS_NGHI'] },
       },
       select: { KG_MA: true, B_TEN: true },

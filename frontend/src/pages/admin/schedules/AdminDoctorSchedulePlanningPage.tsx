@@ -39,8 +39,10 @@ import {
   type SchedulePlanningAssignment,
   type SchedulePlanningOverwriteMode,
   type ScheduleRestoreArchivedResponse,
+  type WeekWorkflowStatus,
   type WeeklyScheduleStatus,
 } from '@/services/api/scheduleWorkflowApi';
+import { SHIFT_STATUS, WEEK_STATUS } from '@/contracts/scheduleStatusContract';
 import { adminApi } from '@/services/api/adminApi';
 import { getApiErrorMessage } from '@/lib/apiError';
 import { formatDateDdMmYyyySlash, getSessionLabel } from '@/lib/scheduleDisplay';
@@ -70,6 +72,7 @@ type Slot = {
   roomId: number;
   doctorId: number | null;
   status: WeeklyScheduleStatus | null;
+  weekStatus: WeekWorkflowStatus | null;
 };
 
 type DoctorDragData = {
@@ -89,6 +92,7 @@ type SlotDropData = {
   roomId: number;
   specialtyId: number | null;
   status: WeeklyScheduleStatus | null;
+  weekStatus: WeekWorkflowStatus | null;
 };
 
 type DropCheckResult = { ok: boolean; reason?: string };
@@ -136,8 +140,10 @@ const rangeDates = (dateFrom: string, dateTo: string) => {
 
 const slotKey = (date: string, session: string, roomId: number) => `${date}__${session}__${roomId}`;
 
-const isBookedStatus = (status: WeeklyScheduleStatus | null) =>
-  status === 'confirmed' || status === 'finalized' || status === 'adjusted' || status === 'change_requested';
+const isBookedStatus = (
+  status: WeeklyScheduleStatus | null,
+  weekStatus: WeekWorkflowStatus | null,
+) => weekStatus === WEEK_STATUS.slot_opened && status === SHIFT_STATUS.finalized;
 
 const weekdayLabel = (dateIso: string) => {
   const day = new Date(`${dateIso}T00:00:00`).getDay();
@@ -219,8 +225,10 @@ function resolveSlotVisualState({
   conflict: boolean;
   baselineDoctorId: number | null;
 }): SlotVisualState {
-  const replacementNeeded = slot.status === 'vacant_by_leave' || slot.status === 'cancelled_by_doctor_leave';
-  const booked = isBookedStatus(slot.status);
+  const replacementNeeded =
+    slot.status === SHIFT_STATUS.vacant_by_leave ||
+    slot.status === SHIFT_STATUS.cancelled_by_doctor_leave;
+  const booked = isBookedStatus(slot.status, slot.weekStatus);
   const isAssigned = slot.doctorId !== null;
   const isExistingAssignment =
     isAssigned && baselineDoctorId !== null && baselineDoctorId === slot.doctorId;
@@ -323,7 +331,7 @@ function PlanningCell({
   dropReason?: string;
   dragging: boolean;
 }) {
-  const blockedByLeave = slot.status === 'cancelled_by_doctor_leave';
+  const blockedByLeave = slot.status === SHIFT_STATUS.cancelled_by_doctor_leave;
   const assigned = slot.doctorId !== null;
   const visualState = resolveSlotVisualState({ slot, conflict, baselineDoctorId });
   const visualMeta = SLOT_VISUAL_META[visualState];
@@ -339,6 +347,7 @@ function PlanningCell({
       roomId: slot.roomId,
       specialtyId,
       status: slot.status,
+      weekStatus: slot.weekStatus,
     } satisfies SlotDropData,
   });
 
@@ -552,6 +561,7 @@ export default function AdminDoctorSchedulePlanningPage() {
             roomId: room.P_MA,
             doctorId: null,
             status: null,
+            weekStatus: null,
           };
         }
       }
@@ -564,6 +574,7 @@ export default function AdminDoctorSchedulePlanningPage() {
         ...next[k],
         doctorId: item.BS_MA,
         status: item.status,
+        weekStatus: item.weekStatus ?? null,
       };
     }
 
@@ -676,7 +687,7 @@ export default function AdminDoctorSchedulePlanningPage() {
       return { ok: false, reason: 'Bảng phân công đang khóa.' };
     }
 
-    if (targetSlot.status === 'cancelled_by_doctor_leave') {
+    if (targetSlot.status === SHIFT_STATUS.cancelled_by_doctor_leave) {
       return { ok: false, reason: 'Ca này không cho phép thay thế do bác sĩ nghỉ.' };
     }
 
@@ -688,7 +699,11 @@ export default function AdminDoctorSchedulePlanningPage() {
       return { ok: false, reason: 'Chế độ "Chỉ ô trống" không cho ghi đè ô đã có bác sĩ.' };
     }
 
-    if (isBookedStatus(targetSlot.status) && targetSlot.doctorId && targetSlot.doctorId !== doctorId) {
+    if (
+      isBookedStatus(targetSlot.status, targetSlot.weekStatus) &&
+      targetSlot.doctorId &&
+      targetSlot.doctorId !== doctorId
+    ) {
       return { ok: false, reason: 'Ca này đã có lịch bệnh nhân, không thể đổi bác sĩ trực tiếp.' };
     }
 
@@ -739,6 +754,38 @@ export default function AdminDoctorSchedulePlanningPage() {
       queryClient.invalidateQueries({ queryKey: ['plan-existing'] });
     },
     onError: (error: unknown) => toast.error(getApiErrorMessage(error, 'Không thể tạo lịch.')),
+  });
+
+  const openSlotsMutation = useMutation({
+    mutationFn: () =>
+      adminScheduleWorkflowApi.openSlots(weekStart, {
+        forceRegenerate: false,
+      }),
+    onSuccess: () => {
+      toast.success('Đã mở slot tuần cho bệnh nhân đặt lịch.');
+      queryClient.invalidateQueries({ queryKey: ['plan-existing'] });
+    },
+    onError: (error: unknown) =>
+      toast.error(
+        getApiErrorMessage(
+          error,
+          'Không thể mở slot tuần. Nếu tuần chưa chốt, hãy dùng nút "Chốt + mở slot tuần".',
+        ),
+      ),
+  });
+
+  const finalizeAndOpenSlotsMutation = useMutation({
+    mutationFn: () =>
+      adminScheduleWorkflowApi.finalizeWeek(weekStart, {
+        generateSlots: true,
+        forceRegenerate: false,
+      }),
+    onSuccess: () => {
+      toast.success('Đã chốt lịch tuần và mở slot cho bệnh nhân đặt lịch.');
+      queryClient.invalidateQueries({ queryKey: ['plan-existing'] });
+    },
+    onError: (error: unknown) =>
+      toast.error(getApiErrorMessage(error, 'Không thể chốt và mở slot tuần.')),
   });
 
   const copyWeekMutation = useMutation({
@@ -898,14 +945,18 @@ export default function AdminDoctorSchedulePlanningPage() {
           (slot) =>
             (new Date(`${slot.date}T00:00:00`).getDay() || 7) === sourceDay &&
             slot.doctorId &&
-            slot.status !== 'cancelled_by_doctor_leave',
+            slot.status !== SHIFT_STATUS.cancelled_by_doctor_leave,
         )
         .forEach((slot) => {
           targetDays.forEach((targetDay) => {
             const targetDate = dateByDay.get(targetDay);
             if (!targetDate) return;
             const targetKey = slotKey(targetDate, slot.session, slot.roomId);
-            if (!next[targetKey] || next[targetKey].status === 'cancelled_by_doctor_leave') return;
+            if (
+              !next[targetKey] ||
+              next[targetKey].status === SHIFT_STATUS.cancelled_by_doctor_leave
+            )
+              return;
             next[targetKey] = { ...next[targetKey], doctorId: slot.doctorId };
           });
         });
@@ -920,7 +971,7 @@ export default function AdminDoctorSchedulePlanningPage() {
     setSlots((prev) => {
       const next = { ...prev };
       Object.values(next).forEach((slot) => {
-        if (slot.date === date && slot.status !== 'cancelled_by_doctor_leave') {
+        if (slot.date === date && slot.status !== SHIFT_STATUS.cancelled_by_doctor_leave) {
           slot.doctorId = null;
         }
       });
@@ -931,7 +982,7 @@ export default function AdminDoctorSchedulePlanningPage() {
   const removeDoctorFromSlot = (slotKeyValue: string) => {
     setSlots((prev) => {
       const current = prev[slotKeyValue];
-      if (!current || current.status === 'cancelled_by_doctor_leave') return prev;
+      if (!current || current.status === SHIFT_STATUS.cancelled_by_doctor_leave) return prev;
       return {
         ...prev,
         [slotKeyValue]: {
@@ -956,7 +1007,10 @@ export default function AdminDoctorSchedulePlanningPage() {
       });
 
       Object.values(next)
-        .filter((slot) => !slot.doctorId && slot.status !== 'cancelled_by_doctor_leave')
+        .filter(
+          (slot) =>
+            !slot.doctorId && slot.status !== SHIFT_STATUS.cancelled_by_doctor_leave,
+        )
         .forEach((slot) => {
           for (let i = 0; i < doctors.length; i += 1) {
             const doctor = doctors[(cursor + i) % doctors.length];
@@ -1061,6 +1115,22 @@ export default function AdminDoctorSchedulePlanningPage() {
             </Button> */}
             <Button variant='outline' onClick={() => setPreviewOpen(true)} disabled={!hasPlanningData}>
               Xem trước
+            </Button>
+            <Button
+              variant='outline'
+              onClick={() => openSlotsMutation.mutate()}
+              disabled={!isFilterReady || openSlotsMutation.isPending}
+            >
+              {openSlotsMutation.isPending ? 'Đang mở slot...' : 'Mở slot tuần'}
+            </Button>
+            <Button
+              variant='outline'
+              onClick={() => finalizeAndOpenSlotsMutation.mutate()}
+              disabled={!isFilterReady || finalizeAndOpenSlotsMutation.isPending}
+            >
+              {finalizeAndOpenSlotsMutation.isPending
+                ? 'Đang chốt + mở slot...'
+                : 'Chốt + mở slot tuần'}
             </Button>
             <Button onClick={() => createScheduleMutation.mutate()} disabled={!canCreate || createScheduleMutation.isPending}>
               Tạo lịch trực

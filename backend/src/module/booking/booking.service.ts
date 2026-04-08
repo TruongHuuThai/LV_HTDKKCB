@@ -36,6 +36,18 @@ export class BookingService {
     });
   }
 
+  private parseDateOnlyOrThrow(raw?: string | null) {
+    const value = String(raw ?? '').trim();
+    if (!value) {
+      throw new BadRequestException('Ngay kham khong duoc de trong');
+    }
+    const date = parseDateOnly(value);
+    if (Number.isNaN(date.getTime())) {
+      throw new BadRequestException('Ngay kham khong hop le');
+    }
+    return date;
+  }
+
   private assertDateWithinBookingHorizon(date: Date) {
     const now = new Date();
     const todayUtc = new Date(
@@ -83,7 +95,7 @@ export class BookingService {
     clientIp = '127.0.0.1',
   ) {
     this.validatePreVisitAttachments(dto);
-    const N_NGAY = parseDateOnly(dto.N_NGAY);
+    const N_NGAY = this.parseDateOnlyOrThrow(dto.N_NGAY);
     this.assertDateWithinBookingHorizon(N_NGAY);
 
     const kg = await this.repo.findTimeSlot(dto.KG_MA);
@@ -100,10 +112,11 @@ export class BookingService {
     if (!lich) {
       throw new NotFoundException('Bac si khong co lich ngay/buoi nay');
     }
+    const scheduleDate = lich.N_NGAY ?? N_NGAY;
 
     const currentCount = await this.repo.countActiveBookingsForSlot(
       dto.BS_MA,
-      N_NGAY,
+      scheduleDate,
       dto.B_TEN,
       dto.KG_MA,
     );
@@ -116,7 +129,7 @@ export class BookingService {
     if (specialtyId) {
       const patientSameSlotCount = await this.repo.countPatientBookingsInSpecialtySlot(
         BN_MA,
-        N_NGAY,
+        scheduleDate,
         dto.KG_MA,
         specialtyId,
       );
@@ -135,7 +148,7 @@ export class BookingService {
     try {
       const maxStt = await this.repo.getMaxSttForSlot(
         dto.BS_MA,
-        N_NGAY,
+        scheduleDate,
         dto.B_TEN,
         dto.KG_MA,
       );
@@ -143,7 +156,7 @@ export class BookingService {
       booking = await this.repo.createBooking({
         BN_MA,
         BS_MA: dto.BS_MA,
-        N_NGAY,
+        N_NGAY: scheduleDate,
         B_TEN: dto.B_TEN,
         KG_MA: dto.KG_MA,
         LHK_MA: dto.LHK_MA,
@@ -206,7 +219,7 @@ export class BookingService {
   }
 
   async getAvailability(BS_MA: number, yyyy_mm_dd: string, B_TEN: string) {
-    const N_NGAY = parseDateOnly(yyyy_mm_dd);
+    const N_NGAY = this.parseDateOnlyOrThrow(yyyy_mm_dd);
     this.assertDateWithinBookingHorizon(N_NGAY);
 
     const lich = await this.repo.findDoctorSchedule(BS_MA, N_NGAY, B_TEN);
@@ -236,7 +249,7 @@ export class BookingService {
   }
 
   async getAvailableDoctors(YYYY_MM_DD?: string, CK_MA?: number) {
-    const N_NGAY = YYYY_MM_DD ? parseDateOnly(YYYY_MM_DD) : undefined;
+    const N_NGAY = YYYY_MM_DD ? this.parseDateOnlyOrThrow(YYYY_MM_DD) : undefined;
     if (N_NGAY) {
       this.assertDateWithinBookingHorizon(N_NGAY);
     }
@@ -251,8 +264,14 @@ export class BookingService {
     }));
   }
 
+  async getAvailabilityDebug(YYYY_MM_DD: string, CK_MA?: number) {
+    const N_NGAY = this.parseDateOnlyOrThrow(YYYY_MM_DD);
+    this.assertDateWithinBookingHorizon(N_NGAY);
+    return this.repo.debugAvailability(N_NGAY, CK_MA);
+  }
+
   async getDoctorSlotsForDay(BS_MA: number, yyyy_mm_dd: string) {
-    const N_NGAY = parseDateOnly(yyyy_mm_dd);
+    const N_NGAY = this.parseDateOnlyOrThrow(yyyy_mm_dd);
     this.assertDateWithinBookingHorizon(N_NGAY);
     const sches = await this.repo.listDoctorSchedulesForDate(BS_MA, N_NGAY);
     if (!sches || sches.length === 0) {

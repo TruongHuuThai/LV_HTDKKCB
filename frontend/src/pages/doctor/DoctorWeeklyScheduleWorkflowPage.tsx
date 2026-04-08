@@ -9,6 +9,7 @@ import {
   type ScheduleExceptionRequestItem,
   type WeeklyScheduleItem,
 } from '@/services/api/scheduleWorkflowApi';
+import { SHIFT_STATUS, WEEK_STATUS } from '@/contracts/scheduleStatusContract';
 import { doctorScheduleApi } from '@/services/api/doctorScheduleApi';
 import {
   formatDateDdMmYyyy,
@@ -175,7 +176,7 @@ export default function DoctorWeeklyScheduleWorkflowPage() {
   const weeklyItems = weeklySchedules?.items ?? [];
   const exceptionItems = exceptionRequests?.items ?? [];
   const finalizedItems = useMemo(
-    () => weeklyItems.filter((item) => item.status === 'finalized'),
+    () => weeklyItems.filter((item) => item.status === SHIFT_STATUS.finalized),
     [weeklyItems],
   );
 
@@ -363,10 +364,12 @@ export default function DoctorWeeklyScheduleWorkflowPage() {
             <span
               className={cn(
                 'inline-flex rounded-full border px-3 py-1 text-sm font-medium',
-                getWeekWorkflowStatusBadgeClass(weekOverview?.workflowStatus ?? 'generated'),
+                getWeekWorkflowStatusBadgeClass(
+                  weekOverview?.workflowStatus ?? WEEK_STATUS.generated,
+                ),
               )}
             >
-              {getWeekWorkflowStatusLabel(weekOverview?.workflowStatus ?? 'generated')}
+              {getWeekWorkflowStatusLabel(weekOverview?.workflowStatus ?? WEEK_STATUS.generated)}
             </span>
             <span className="text-sm text-blue-800">
               {weekOverview?.canRequestChanges
@@ -441,13 +444,14 @@ export default function DoctorWeeklyScheduleWorkflowPage() {
                 weeklyItems.map((item) => {
                   const canConfirmShift =
                     weekOverview?.canConfirm &&
-                    (item.status === 'generated' || item.status === 'adjusted');
+                    (item.status === SHIFT_STATUS.generated ||
+                      item.status === SHIFT_STATUS.adjusted);
                   const canRequestChange =
                     weekOverview?.canRequestChanges &&
-                    item.status !== 'finalized' &&
-                    item.status !== 'cancelled' &&
-                    item.status !== 'cancelled_by_doctor_leave' &&
-                    item.status !== 'vacant_by_leave';
+                    item.status !== SHIFT_STATUS.finalized &&
+                    item.status !== SHIFT_STATUS.cancelled &&
+                    item.status !== SHIFT_STATUS.cancelled_by_doctor_leave &&
+                    item.status !== SHIFT_STATUS.vacant_by_leave;
 
                   return (
                     <TableRow key={`${item.N_NGAY}-${item.B_TEN}`}>
@@ -789,7 +793,7 @@ export default function DoctorWeeklyScheduleWorkflowPage() {
             </div>
           </div>
 
-          {exceptionForm.target?.weekStatus === 'slot_opened' ? (
+          {exceptionForm.target?.weekStatus === WEEK_STATUS.slot_opened ? (
             <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
               Tuần này đã mở slot, có thể đã có lịch khám. Hãy cân nhắc trước khi gửi yêu cầu.
             </p>

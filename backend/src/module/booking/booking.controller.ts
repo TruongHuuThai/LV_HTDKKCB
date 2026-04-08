@@ -54,6 +54,17 @@ export class BookingController {
   }
 
   // @ts-ignore
+  @Get('debug-availability')
+  @Roles(ROLE.BENH_NHAN, ROLE.ADMIN)
+  async debugAvailability(
+    @Query('date') date: string,
+    @Query('specialtyId') specialtyId?: string,
+  ): Promise<any> {
+    const specId = specialtyId ? parseInt(specialtyId, 10) : undefined;
+    return this.booking.getAvailabilityDebug(date, specId);
+  }
+
+  // @ts-ignore
   @Get('doctors/:bsMa/slots')
   @Roles(ROLE.BENH_NHAN, ROLE.ADMIN)
   async getDoctorSlots(

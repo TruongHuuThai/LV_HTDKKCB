@@ -1,16 +1,9 @@
 import axiosClient from './axiosClient';
+import type { ShiftStatus, WeekStatus } from '@/contracts/scheduleStatusContract';
 
 export type TemplateStatus = 'active' | 'inactive';
-export type WeekWorkflowStatus = 'generated' | 'finalized' | 'slot_opened';
-export type WeeklyScheduleStatus =
-  | 'generated'
-  | 'confirmed'
-  | 'change_requested'
-  | 'adjusted'
-  | 'finalized'
-  | 'cancelled'
-  | 'vacant_by_leave'
-  | 'cancelled_by_doctor_leave';
+export type WeekWorkflowStatus = WeekStatus;
+export type WeeklyScheduleStatus = ShiftStatus;
 export type WeeklyScheduleSource =
   | 'legacy_registration'
   | 'template'
@@ -41,6 +34,7 @@ export interface SchedulePlanningExistingItem {
   N_NGAY: string;
   B_TEN: string;
   status: WeeklyScheduleStatus;
+  weekStatus?: WeekWorkflowStatus;
   source: WeeklyScheduleSource;
   doctor: {
     BS_MA: number;

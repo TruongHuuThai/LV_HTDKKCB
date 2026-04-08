@@ -27,6 +27,14 @@ import { UpdateMedicineBrandInfoDto } from './dto/update-medicine-brand-info.dto
 import { CreateRoomDto } from './dto/create-room.dto';
 import { UpdateRoomDto } from './dto/update-room.dto';
 import { SERVICE_TYPE_SET } from './constants/service-type.constants';
+import {
+  SHIFT_STATUS,
+  WEEK_STATUS,
+  type ShiftStatus as ScheduleInstanceStatus,
+  type WeekStatus as ScheduleWeekStatus,
+  normalizeShiftStatus as normalizeScheduleInstanceStatusShared,
+  normalizeWeekStatus as normalizeScheduleWeekStatusShared,
+} from '../schedules/schedule-status';
 
 type ScheduleApprovalStatus = 'pending' | 'approved' | 'rejected';
 type OfficialShiftDisplayStatus = 'approved' | 'official';
@@ -37,16 +45,6 @@ type ScheduleDisplayStatus =
   | 'official'
   | 'rejected';
 type ScheduleTemplateStatus = 'active' | 'inactive';
-type ScheduleInstanceStatus =
-  | 'generated'
-  | 'confirmed'
-  | 'change_requested'
-  | 'adjusted'
-  | 'finalized'
-  | 'cancelled'
-  | 'vacant_by_leave'
-  | 'cancelled_by_doctor_leave';
-type ScheduleWeekStatus = 'generated' | 'finalized' | 'slot_opened';
 type ScheduleSource =
   | 'legacy_registration'
   | 'template'
@@ -169,7 +167,12 @@ export class AdminService {
       const recentActivitiesRaw = await this.prisma.dANG_KY.findMany({
         take: 5,
         orderBy: { DK_THOI_GIAN_TAO: 'desc' },
-        include: { BENH_NHAN: { select: { BN_HO_CHU_LOT: true, BN_TEN: true } } },
+        select: {
+          DK_MA: true,
+          DK_TRANG_THAI: true,
+          DK_THOI_GIAN_TAO: true,
+          BENH_NHAN: { select: { BN_HO_CHU_LOT: true, BN_TEN: true } },
+        },
       });
 
       const recentActivities = recentActivitiesRaw.map((activity) => {
@@ -384,9 +387,13 @@ export class AdminService {
           // CĂ³ thá»ƒ thĂªm Ä‘iá»u kiá»‡n KHUNG_GIO náº¿u cáº§n
         }
       },
-      include: {
-        KHUNG_GIO: true
-      }
+      select: {
+        KHUNG_GIO: {
+          select: {
+            KG_BAT_DAU: true,
+          },
+        },
+      },
     });
 
     appointments.forEach(app => {
@@ -2106,6 +2113,11 @@ export class AdminService {
           ...(specialtyId ? { BAC_SI: { CK_MA: specialtyId } } : {}),
         },
         include: {
+          DOT_LICH_TUAN: {
+            select: {
+              DLT_TRANG_THAI: true,
+            },
+          },
           BAC_SI: {
             select: {
               BS_MA: true,
@@ -2133,6 +2145,7 @@ export class AdminService {
           N_NGAY: this.toDateOnlyIso(row.N_NGAY),
           B_TEN: row.B_TEN,
           status: this.normalizeScheduleInstanceStatus(row.LBSK_TRANG_THAI),
+          weekStatus: this.normalizeScheduleWeekStatus(row.DOT_LICH_TUAN?.DLT_TRANG_THAI),
           source: this.normalizeScheduleSource(row.LBSK_NGUON),
           doctor: row.BAC_SI,
           room: row.PHONG,
@@ -2938,7 +2951,7 @@ export class AdminService {
         weekBatches
           .filter((batch) => {
             const status = this.normalizeScheduleWeekStatus(batch.DLT_TRANG_THAI);
-            return status === 'finalized' || status === 'slot_opened';
+            return status === WEEK_STATUS.finalized || status === WEEK_STATUS.slot_opened;
           })
           .map((batch) => this.toDateOnlyIso(batch.DLT_TUAN_BAT_DAU)),
       );
@@ -3003,9 +3016,9 @@ export class AdminService {
         }
         const status = this.normalizeScheduleInstanceStatus(row.LBSK_TRANG_THAI);
         if (
-          status === 'finalized' ||
-          status === 'vacant_by_leave' ||
-          status === 'cancelled_by_doctor_leave'
+          status === SHIFT_STATUS.finalized ||
+          status === SHIFT_STATUS.vacant_by_leave ||
+          status === SHIFT_STATUS.cancelled_by_doctor_leave
         ) {
           return false;
         }
@@ -7248,11 +7261,15 @@ export class AdminService {
     if (row.YEU_CAU_LICH_BSK.length > 0) return false;
     if (isArchived) return true;
     if (source !== 'template' && source !== 'auto_rolling') return false;
-    if (status === 'vacant_by_leave' || status === 'cancelled_by_doctor_leave') return false;
+    if (
+      status === SHIFT_STATUS.vacant_by_leave ||
+      status === SHIFT_STATUS.cancelled_by_doctor_leave
+    )
+      return false;
     return (
-      status === 'generated' ||
-      status === 'confirmed' ||
-      status === 'cancelled'
+      status === SHIFT_STATUS.generated ||
+      status === SHIFT_STATUS.confirmed ||
+      status === SHIFT_STATUS.cancelled
     );
   }
 
@@ -7846,24 +7863,11 @@ export class AdminService {
   }
 
   private normalizeScheduleInstanceStatus(value?: string | null): ScheduleInstanceStatus {
-    const normalized = String(value ?? '').trim().toLowerCase();
-    if (normalized === 'confirmed') return 'confirmed';
-    if (normalized === 'change_requested') return 'change_requested';
-    if (normalized === 'adjusted') return 'adjusted';
-    if (normalized === 'finalized') return 'finalized';
-    if (normalized === 'vacant_by_leave') return 'vacant_by_leave';
-    if (normalized === 'cancelled_by_doctor_leave') return 'cancelled_by_doctor_leave';
-    if (normalized === 'cancelled') return 'cancelled';
-    if (normalized === 'approved' || normalized === 'official') return 'confirmed';
-    if (normalized === 'rejected') return 'cancelled';
-    return 'generated';
+    return normalizeScheduleInstanceStatusShared(value);
   }
 
   private normalizeScheduleWeekStatus(value?: string | null): ScheduleWeekStatus {
-    const normalized = String(value ?? '').trim().toLowerCase();
-    if (normalized === 'finalized') return 'finalized';
-    if (normalized === 'slot_opened') return 'slot_opened';
-    return 'generated';
+    return normalizeScheduleWeekStatusShared(value);
   }
 
   private normalizeScheduleSource(value?: string | null): ScheduleSource {
@@ -7895,19 +7899,29 @@ export class AdminService {
   private mapScheduleInstanceToApprovalStatus(
     status: ScheduleInstanceStatus,
   ): ScheduleApprovalStatus {
-    if (status === 'cancelled' || status === 'cancelled_by_doctor_leave')
+    if (
+      status === SHIFT_STATUS.cancelled ||
+      status === SHIFT_STATUS.cancelled_by_doctor_leave
+    )
       return 'rejected';
-    if (status === 'generated' || status === 'change_requested' || status === 'vacant_by_leave')
+    if (
+      status === SHIFT_STATUS.generated ||
+      status === SHIFT_STATUS.change_requested ||
+      status === SHIFT_STATUS.vacant_by_leave
+    )
       return 'pending';
     return 'approved';
   }
 
   private isScheduleStatusCancelled(status: ScheduleInstanceStatus) {
-    return status === 'cancelled' || status === 'cancelled_by_doctor_leave';
+    return (
+      status === SHIFT_STATUS.cancelled ||
+      status === SHIFT_STATUS.cancelled_by_doctor_leave
+    );
   }
 
   private isScheduleStatusInactive(status: ScheduleInstanceStatus) {
-    return this.isScheduleStatusCancelled(status) || status === 'vacant_by_leave';
+    return this.isScheduleStatusCancelled(status) || status === SHIFT_STATUS.vacant_by_leave;
   }
 
   private isBookingActiveStatus(status?: string | null) {

@@ -1,4 +1,8 @@
 import axiosClient from './axiosClient';
+import type {
+  BookingAvailabilityReasonCode,
+  ScheduleStatusContractVersion,
+} from '@/contracts/scheduleStatusContract';
 
 export interface BookingDoctor {
   BS_MA: number;
@@ -31,6 +35,38 @@ export interface CreateBookingInput {
   preVisitNote?: string;
 }
 
+export interface BookingAvailabilityDebugShift {
+  session: string;
+  shiftStatus: string | null;
+  weekStatus: string | null;
+  isArchived: boolean;
+  totalSlots: number;
+  bookableSlots: number;
+  reasons: BookingAvailabilityReasonCode[];
+}
+
+export interface BookingAvailabilityDebugDoctor {
+  doctorId: number;
+  doctorName: string;
+  specialtyId: number;
+  specialtyName: string | null;
+  available: boolean;
+  reasons: BookingAvailabilityReasonCode[];
+  shifts: BookingAvailabilityDebugShift[];
+}
+
+export interface BookingAvailabilityDebugResponse {
+  contractVersion: ScheduleStatusContractVersion;
+  input: { date: string; specialtyId: number | null };
+  summary: {
+    candidateDoctors: number;
+    availableDoctors: number;
+    reasonCounts: Array<{ reason: BookingAvailabilityReasonCode; count: number }>;
+    reasons: BookingAvailabilityReasonCode[];
+  };
+  doctors: BookingAvailabilityDebugDoctor[];
+}
+
 export const bookingApi = {
   getAvailableDoctors: async (params?: {
     date?: string;
@@ -48,6 +84,14 @@ export const bookingApi = {
       {
         params: { date },
       },
+    );
+    return res.data;
+  },
+
+  getAvailabilityDebug: async (params: { date: string; specialtyId?: number }) => {
+    const res = await axiosClient.get<BookingAvailabilityDebugResponse>(
+      '/booking/debug-availability',
+      { params },
     );
     return res.data;
   },
