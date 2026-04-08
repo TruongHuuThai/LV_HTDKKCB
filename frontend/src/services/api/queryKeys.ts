@@ -1,6 +1,7 @@
 export const queryKeys = {
   booking: {
-    doctors: (specialtyId: string, date: string) => ['booking-doctors', specialtyId, date] as const,
+    doctors: (specialtyId: string, date: string, q: string) =>
+      ['booking-doctors', specialtyId, date, q] as const,
     slots: (doctorId: number | null, date: string) => ['booking-slots', doctorId, date] as const,
   },
   patientProfiles: {

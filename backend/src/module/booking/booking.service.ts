@@ -248,12 +248,12 @@ export class BookingService {
     };
   }
 
-  async getAvailableDoctors(YYYY_MM_DD?: string, CK_MA?: number) {
+  async getAvailableDoctors(YYYY_MM_DD?: string, CK_MA?: number, q?: string) {
     const N_NGAY = YYYY_MM_DD ? this.parseDateOnlyOrThrow(YYYY_MM_DD) : undefined;
     if (N_NGAY) {
       this.assertDateWithinBookingHorizon(N_NGAY);
     }
-    const docs = await this.repo.findAvailableDoctors(N_NGAY, CK_MA);
+    const docs = await this.repo.findAvailableDoctors(N_NGAY, CK_MA, q);
     return docs.map((d) => ({
       BS_MA: d.BS_MA,
       BS_HO_TEN: d.BS_HO_TEN,
@@ -264,10 +264,10 @@ export class BookingService {
     }));
   }
 
-  async getAvailabilityDebug(YYYY_MM_DD: string, CK_MA?: number) {
+  async getAvailabilityDebug(YYYY_MM_DD: string, CK_MA?: number, q?: string) {
     const N_NGAY = this.parseDateOnlyOrThrow(YYYY_MM_DD);
     this.assertDateWithinBookingHorizon(N_NGAY);
-    return this.repo.debugAvailability(N_NGAY, CK_MA);
+    return this.repo.debugAvailability(N_NGAY, CK_MA, q);
   }
 
   async getDoctorSlotsForDay(BS_MA: number, yyyy_mm_dd: string) {

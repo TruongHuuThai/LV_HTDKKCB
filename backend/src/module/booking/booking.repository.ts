@@ -1,6 +1,7 @@
 // src/modules/booking/booking.repository.ts
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { combineDateAndTime } from './booking.utils';
 import {
   isWeekOpenForBooking,
   SCHEDULE_STATUS_CONTRACT_VERSION,
@@ -22,28 +23,29 @@ import {
 export class BookingRepository {
   constructor(private readonly prisma: PrismaService) { }
 
-  private toLocalDayRange(date: Date) {
-    // Use local day bounds to avoid timezone drift between UI date-only input and DB DateTime storage.
-    const start = new Date(date);
-    start.setHours(0, 0, 0, 0);
+  private toUtcDayRange(date: Date) {
+    const start = new Date(
+      Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+    );
     const end = new Date(start);
-    end.setDate(end.getDate() + 1);
+    end.setUTCDate(end.getUTCDate() + 1);
     return { start, end };
   }
 
-  private toLocalWeekMonday(date: Date) {
-    const base = new Date(date);
-    base.setHours(0, 0, 0, 0);
-    const day = base.getDay(); // 0=Sun, 1=Mon...
+  private toUtcWeekMonday(date: Date) {
+    const base = new Date(
+      Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+    );
+    const day = base.getUTCDay(); // 0=Sun, 1=Mon...
     const diffToMonday = day === 0 ? -6 : 1 - day;
-    base.setDate(base.getDate() + diffToMonday);
+    base.setUTCDate(base.getUTCDate() + diffToMonday);
     return base;
   }
 
   private async isWeekSlotOpened(date: Date) {
-    const monday = this.toLocalWeekMonday(date);
+    const monday = this.toUtcWeekMonday(date);
     const end = new Date(monday);
-    end.setDate(end.getDate() + 1);
+    end.setUTCDate(end.getUTCDate() + 1);
     const batch = await this.prisma.dOT_LICH_TUAN.findFirst({
       where: {
         DLT_TUAN_BAT_DAU: { gte: monday, lt: end },
@@ -77,7 +79,7 @@ export class BookingRepository {
   }
 
   async findDoctorSchedule(BS_MA: number, N_NGAY: Date, B_TEN: string) {
-    const { start, end } = this.toLocalDayRange(N_NGAY);
+    const { start, end } = this.toUtcDayRange(N_NGAY);
     const slotOpenedByWeek = await this.isWeekSlotOpened(N_NGAY);
     return this.prisma.lICH_BSK.findFirst({
       where: {
@@ -108,7 +110,7 @@ export class BookingRepository {
   }
 
   listBookedSlots(BS_MA: number, N_NGAY: Date, B_TEN: string) {
-    const { start, end } = this.toLocalDayRange(N_NGAY);
+    const { start, end } = this.toUtcDayRange(N_NGAY);
     return this.prisma.dANG_KY.findMany({
       where: {
         BS_MA,
@@ -127,7 +129,7 @@ export class BookingRepository {
     KG_MA: number,
     options?: { excludeDkMa?: number },
   ) {
-    const { start, end } = this.toLocalDayRange(N_NGAY);
+    const { start, end } = this.toUtcDayRange(N_NGAY);
     return this.prisma.dANG_KY.count({
       where: {
         BS_MA,
@@ -147,7 +149,7 @@ export class BookingRepository {
     CK_MA: number,
     options?: { excludeDkMa?: number },
   ) {
-    const { start, end } = this.toLocalDayRange(N_NGAY);
+    const { start, end } = this.toUtcDayRange(N_NGAY);
     return this.prisma.dANG_KY.count({
       where: {
         BN_MA,
@@ -167,7 +169,7 @@ export class BookingRepository {
   }
 
   getMaxSttForSlot(BS_MA: number, N_NGAY: Date, B_TEN: string, KG_MA: number) {
-    const { start, end } = this.toLocalDayRange(N_NGAY);
+    const { start, end } = this.toUtcDayRange(N_NGAY);
     return this.prisma.dANG_KY.aggregate({
       where: {
         BS_MA,
@@ -264,13 +266,26 @@ export class BookingRepository {
     return Array.from(map.entries()).map(([reason, count]) => ({ reason, count }));
   }
 
-  async debugAvailability(date: Date, specialtyId?: number): Promise<BookingAvailabilityDebugResponse> {
-    const dayRange = this.toLocalDayRange(date);
+  async debugAvailability(
+    date: Date,
+    specialtyId?: number,
+    q?: string,
+  ): Promise<BookingAvailabilityDebugResponse> {
+    const dayRange = this.toUtcDayRange(date);
     const now = new Date();
+    const keyword = String(q ?? '').trim();
 
     const candidateDoctors = await this.prisma.bAC_SI.findMany({
       where: {
         ...(specialtyId ? { CK_MA: specialtyId } : {}),
+        ...(keyword
+          ? {
+              BS_HO_TEN: {
+                contains: keyword,
+                mode: 'insensitive',
+              },
+            }
+          : {}),
       },
       select: {
         BS_MA: true,
@@ -343,13 +358,7 @@ export class BookingRepository {
           const key = `${shift.BS_MA}::${shift.B_TEN}::${slot.KG_MA}`;
           const booked = bookingCountByKey.get(key) ?? 0;
           const capacity = slot.KG_SO_BN_TOI_DA ?? 5;
-          const slotStart = new Date(date);
-          slotStart.setHours(
-            slot.KG_BAT_DAU.getHours(),
-            slot.KG_BAT_DAU.getMinutes(),
-            slot.KG_BAT_DAU.getSeconds(),
-            0,
-          );
+          const slotStart = combineDateAndTime(date, slot.KG_BAT_DAU);
           if (booked < capacity && slotStart.getTime() > now.getTime()) {
             bookableSlots += 1;
           }
@@ -398,9 +407,9 @@ export class BookingRepository {
         ? [BOOKING_AVAILABILITY_REASON.NO_DOCTOR_IN_SPECIALTY]
         : [];
 
-    const inputDate = `${dayRange.start.getFullYear()}-${String(dayRange.start.getMonth() + 1).padStart(2, '0')}-${String(
-      dayRange.start.getDate(),
-    ).padStart(2, '0')}`;
+    const inputDate = `${dayRange.start.getUTCFullYear()}-${String(
+      dayRange.start.getUTCMonth() + 1,
+    ).padStart(2, '0')}-${String(dayRange.start.getUTCDate()).padStart(2, '0')}`;
 
     return {
       contractVersion: SCHEDULE_STATUS_CONTRACT_VERSION,
@@ -415,12 +424,21 @@ export class BookingRepository {
     };
   }
 
-  async findAvailableDoctors(date?: Date, specialtyId?: number) {
+  async findAvailableDoctors(date?: Date, specialtyId?: number, q?: string) {
+    const keyword = String(q ?? '').trim();
     if (!date) {
       return this.prisma.bAC_SI.findMany({
         where: {
           BS_DA_XOA: false,
           ...(specialtyId ? { CK_MA: specialtyId } : {}),
+          ...(keyword
+            ? {
+                BS_HO_TEN: {
+                  contains: keyword,
+                  mode: 'insensitive',
+                },
+              }
+            : {}),
         },
         include: {
           CHUYEN_KHOA: true,
@@ -428,7 +446,7 @@ export class BookingRepository {
       });
     }
 
-    const debug = await this.debugAvailability(date, specialtyId);
+    const debug = await this.debugAvailability(date, specialtyId, keyword);
     const availableIds = new Set(
       debug.doctors.filter((item) => item.available).map((item) => item.doctorId),
     );
@@ -489,7 +507,7 @@ export class BookingRepository {
   }
 
   async listDoctorSchedulesForDate(BS_MA: number, N_NGAY: Date) {
-    const { start, end } = this.toLocalDayRange(N_NGAY);
+    const { start, end } = this.toUtcDayRange(N_NGAY);
     const slotOpenedByWeek = await this.isWeekSlotOpened(N_NGAY);
     return this.prisma.lICH_BSK.findMany({
       where: {
@@ -516,7 +534,7 @@ export class BookingRepository {
   }
 
   listBookedSlotsForDate(BS_MA: number, N_NGAY: Date) {
-    const { start, end } = this.toLocalDayRange(N_NGAY);
+    const { start, end } = this.toUtcDayRange(N_NGAY);
     return this.prisma.dANG_KY.findMany({
       where: {
         BS_MA,

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+Ôªøimport { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -55,14 +55,14 @@ export default function AppointmentDetailPage() {
   const appointment = detailQuery.data?.appointment as Record<string, any> | undefined;
   const paymentStatus = paymentStatusQuery.data?.payment?.normalizedStatus || 'unpaid';
 
-  const [cancelReason, setCancelReason] = useState('B?nh nh‚n ch? ?ng h?y');
+  const [cancelReason, setCancelReason] = useState('B?nh nh√¢n ch? ƒë?ng h?y');
   const [rescheduleReason, setRescheduleReason] = useState('');
   const [rescheduleDate, setRescheduleDate] = useState(getTodayIso());
   const [selectedDoctorId, setSelectedDoctorId] = useState<number | null>(null);
   const [selectedSlotKey, setSelectedSlotKey] = useState<string | null>(null);
 
   const doctorsQuery = useQuery({
-    queryKey: queryKeys.booking.doctors('all', rescheduleDate),
+    queryKey: queryKeys.booking.doctors('all', rescheduleDate, ''),
     queryFn: () => bookingApi.getAvailableDoctors({ date: rescheduleDate }),
     enabled: Boolean(rescheduleDate && appointmentId),
   });
@@ -103,25 +103,25 @@ export default function AppointmentDetailPage() {
           window.location.assign(result.payment_url as string);
           return;
         }
-        toast.success('–? t?o yÍu c?u thanh to·n l?i.');
+        toast.success('ƒê? t?o y√™u c?u thanh to√°n l?i.');
       },
       onError: (error) => {
         logFrontendError('appointment-detail-retry-payment', error, { appointmentId });
-        toast.error(getPatientFlowErrorMessage(error, 'KhÙng th? thanh to·n l?i.'));
+        toast.error(getPatientFlowErrorMessage(error, 'Kh√¥ng th? thanh to√°n l?i.'));
       },
     });
   };
 
   const handleCancel = () => {
     cancelMutation.mutate(
-      { appointmentId, payload: { reason: cancelReason || 'B?nh nh‚n ch? ?ng h?y', source: 'WEB' } },
+      { appointmentId, payload: { reason: cancelReason || 'B?nh nh√¢n ch? ƒë?ng h?y', source: 'WEB' } },
       {
         onSuccess: (result) => {
-          toast.success(result.message || '–? h?y l?ch h?n.');
+          toast.success(result.message || 'ƒê? h?y l?ch h?n.');
         },
         onError: (error) => {
           logFrontendError('appointment-detail-cancel', error, { appointmentId });
-          toast.error(getPatientFlowErrorMessage(error, 'KhÙng th? h?y l?ch h?n n‡y.'));
+          toast.error(getPatientFlowErrorMessage(error, 'Kh√¥ng th? h?y l?ch h?n n√†y.'));
         },
       },
     );
@@ -129,7 +129,7 @@ export default function AppointmentDetailPage() {
 
   const handleReschedule = () => {
     if (!selectedSlot) {
-      toast.error('Vui l?ng ch?n slot m?i tr˝?c khi ?i l?ch.');
+      toast.error('Vui l?ng ch?n slot m?i tr∆∞?c khi ƒë?i l?ch.');
       return;
     }
     rescheduleMutation.mutate(
@@ -145,11 +145,11 @@ export default function AppointmentDetailPage() {
       },
       {
         onSuccess: (result) => {
-          toast.success(result.message || '–?i l?ch th‡nh cÙng.');
+          toast.success(result.message || 'ƒê?i l?ch th√†nh c√¥ng.');
         },
         onError: (error) => {
           logFrontendError('appointment-detail-reschedule', error, { appointmentId });
-          toast.error(getPatientFlowErrorMessage(error, 'KhÙng th? ?i l?ch h?n n‡y.'));
+          toast.error(getPatientFlowErrorMessage(error, 'Kh√¥ng th? ƒë?i l?ch h?n n√†y.'));
         },
       },
     );
@@ -159,14 +159,14 @@ export default function AppointmentDetailPage() {
     return (
       <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
         <Card>
-          <CardContent className="py-10 text-center">M? l?ch h?n khÙng h?p l?.</CardContent>
+          <CardContent className="py-10 text-center">M? l?ch h?n kh√¥ng h?p l?.</CardContent>
         </Card>
       </div>
     );
   }
 
   if (detailQuery.isLoading) {
-    return <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8 text-slate-600">–ang t?i chi ti?t l?ch h?n...</div>;
+    return <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8 text-slate-600">ƒêang t?i chi ti?t l?ch h?n...</div>;
   }
 
   if (detailQuery.isError || !appointment) {
@@ -174,10 +174,10 @@ export default function AppointmentDetailPage() {
       <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
         <Card className="border-red-200 bg-red-50">
           <CardContent className="space-y-3 py-8 text-red-700">
-            <p>{getPatientFlowErrorMessage(detailQuery.error, 'KhÙng th? t?i chi ti?t l?ch h?n.')}</p>
+            <p>{getPatientFlowErrorMessage(detailQuery.error, 'Kh√¥ng th? t?i chi ti?t l?ch h?n.')}</p>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => detailQuery.refetch()}>Th? l?i</Button>
-              <Button asChild variant="outline"><Link to="/appointments/my">Quay v? danh s·ch</Link></Button>
+              <Button asChild variant="outline"><Link to="/appointments/my">Quay v? danh s√°ch</Link></Button>
             </div>
           </CardContent>
         </Card>
@@ -194,34 +194,34 @@ export default function AppointmentDetailPage() {
           <CardHeader>
             <CardTitle>Chi ti?t l?ch h?n #{appointment.DK_MA}</CardTitle>
             <CardDescription>
-              Theo d?i tr?ng th·i l?ch, thanh to·n v‡ c·c m?c thay ?i quan tr?ng.
+              Theo d?i tr?ng th√°i l?ch, thanh to√°n v√† c√°c m?c thay ƒë?i quan tr?ng.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
             <div className="grid gap-3 sm:grid-cols-2">
-              <InfoRow label="B·c s?" value={appointment.LICH_BSK?.BAC_SI?.BS_HO_TEN || 'Ch˝a cÛ d? li?u'} />
-              <InfoRow label="ChuyÍn khoa" value={appointment.LICH_BSK?.BAC_SI?.CHUYEN_KHOA?.CK_TEN || 'Ch˝a cÛ d? li?u'} />
-              <InfoRow label="Ng‡y kh·m" value={String(appointment.N_NGAY || '').slice(0, 10)} />
-              <InfoRow label="Bu?i" value={appointment.B_TEN || 'Ch˝a cÛ d? li?u'} />
-              <InfoRow label="Gi? kh·m" value={`${String(appointment.KHUNG_GIO?.KG_BAT_DAU || '').slice(11, 16)} - ${String(appointment.KHUNG_GIO?.KG_KET_THUC || '').slice(11, 16)}`} />
-              <InfoRow label="Ph?ng" value={appointment.LICH_BSK?.PHONG?.P_TEN || 'Ch˝a cÛ d? li?u'} />
+              <InfoRow label="B√°c s?" value={appointment.LICH_BSK?.BAC_SI?.BS_HO_TEN || 'Ch∆∞a c√≥ d? li?u'} />
+              <InfoRow label="Chuy√™n khoa" value={appointment.LICH_BSK?.BAC_SI?.CHUYEN_KHOA?.CK_TEN || 'Ch∆∞a c√≥ d? li?u'} />
+              <InfoRow label="Ng√†y kh√°m" value={String(appointment.N_NGAY || '').slice(0, 10)} />
+              <InfoRow label="Bu?i" value={appointment.B_TEN || 'Ch∆∞a c√≥ d? li?u'} />
+              <InfoRow label="Gi? kh√°m" value={`${String(appointment.KHUNG_GIO?.KG_BAT_DAU || '').slice(11, 16)} - ${String(appointment.KHUNG_GIO?.KG_KET_THUC || '').slice(11, 16)}`} />
+              <InfoRow label="Ph?ng" value={appointment.LICH_BSK?.PHONG?.P_TEN || 'Ch∆∞a c√≥ d? li?u'} />
             </div>
 
             <div className="rounded-2xl border border-slate-200 p-4">
-              <p className="mb-2 font-medium text-slate-900">ThÙng tin ti?n kh·m</p>
-              <p className="text-slate-700"><strong>Tri?u ch?ng:</strong> {detailQuery.data?.preVisit?.symptoms || 'Ch˝a c?p nh?t'}</p>
-              <p className="mt-1 text-slate-700"><strong>Ghi ch˙:</strong> {detailQuery.data?.preVisit?.note || 'Ch˝a c?p nh?t'}</p>
+              <p className="mb-2 font-medium text-slate-900">Th√¥ng tin ti?n kh√°m</p>
+              <p className="text-slate-700"><strong>Tri?u ch?ng:</strong> {detailQuery.data?.preVisit?.symptoms || 'Ch∆∞a c?p nh?t'}</p>
+              <p className="mt-1 text-slate-700"><strong>Ghi ch√∫:</strong> {detailQuery.data?.preVisit?.note || 'Ch∆∞a c?p nh?t'}</p>
             </div>
 
             <div className="rounded-2xl border border-slate-200 p-4">
-              <p className="mb-2 font-medium text-slate-900">Timeline thÙng b·o g?n nh?t</p>
+              <p className="mb-2 font-medium text-slate-900">Timeline th√¥ng b√°o g?n nh?t</p>
               {(detailQuery.data?.notifications || []).length === 0 ? (
-                <p className="text-slate-500">Ch˝a cÛ thÙng b·o g?n ‚y.</p>
+                <p className="text-slate-500">Ch∆∞a c√≥ th√¥ng b√°o g?n ƒë√¢y.</p>
               ) : (
                 <ul className="space-y-2">
                   {(detailQuery.data?.notifications || []).map((item: any) => (
                     <li key={item.TB_MA || `${item.TB_THOI_GIAN}-${item.TB_LOAI}`} className="rounded-lg bg-slate-50 p-3">
-                      <p className="font-medium text-slate-900">{item.TB_TIEU_DE || 'ThÙng b·o'}</p>
+                      <p className="font-medium text-slate-900">{item.TB_TIEU_DE || 'Th√¥ng b√°o'}</p>
                       <p className="text-slate-600">{item.TB_NOI_DUNG}</p>
                       <p className="mt-1 text-xs text-slate-500">{item.TB_THOI_GIAN}</p>
                     </li>
@@ -235,7 +235,7 @@ export default function AppointmentDetailPage() {
         <div className="space-y-6">
           <Card className="border-slate-200">
             <CardHeader>
-              <CardTitle>Tr?ng th·i</CardTitle>
+              <CardTitle>Tr?ng th√°i</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               <div className="flex flex-wrap gap-2">
@@ -249,14 +249,14 @@ export default function AppointmentDetailPage() {
 
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
                 {cancelPolicyQuery.data?.canCancel
-                  ? `B?n cÛ th? h?y l?ch tr˝?c ${cancelPolicyQuery.data?.cancelDeadlineAt || 'h?n policy'}.`
-                  : `KhÙng th? h?y l?ch l˙c n‡y${cancelPolicyQuery.data?.reasonIfBlocked ? ` (${cancelPolicyQuery.data.reasonIfBlocked})` : ''}.`}
+                  ? `B?n c√≥ th? h?y l?ch tr∆∞?c ${cancelPolicyQuery.data?.cancelDeadlineAt || 'h?n policy'}.`
+                  : `Kh√¥ng th? h?y l?ch l√∫c n√†y${cancelPolicyQuery.data?.reasonIfBlocked ? ` (${cancelPolicyQuery.data.reasonIfBlocked})` : ''}.`}
               </div>
 
               <div className="flex flex-col gap-2">
                 {isRetryPaymentAllowed(paymentStatus) ? (
                   <Button onClick={handleRetryPayment} disabled={retryMutation.isPending}>
-                    {retryMutation.isPending ? '–ang t?o thanh to·n l?i...' : 'Thanh to·n l?i'}
+                    {retryMutation.isPending ? 'ƒêang t?o thanh to√°n l?i...' : 'Thanh to√°n l?i'}
                   </Button>
                 ) : null}
 
@@ -268,7 +268,7 @@ export default function AppointmentDetailPage() {
                       placeholder="L? do h?y l?ch"
                     />
                     <Button variant="outline" onClick={handleCancel} disabled={cancelMutation.isPending}>
-                      {cancelMutation.isPending ? '–ang h?y l?ch...' : 'H?y l?ch'}
+                      {cancelMutation.isPending ? 'ƒêang h?y l?ch...' : 'H?y l?ch'}
                     </Button>
                   </>
                 ) : null}
@@ -278,9 +278,9 @@ export default function AppointmentDetailPage() {
 
           <Card className={`border-slate-200 ${action === 'reschedule' ? 'ring-2 ring-blue-200' : ''}`}>
             <CardHeader>
-              <CardTitle>–?i l?ch kh·m</CardTitle>
+              <CardTitle>ƒê?i l?ch kh√°m</CardTitle>
               <CardDescription>
-                Ch?n b·c s?, ng‡y v‡ slot m?i. H? th?ng s? ki?m tra tÌnh h?p l? tr˝?c khi c?p nh?t.
+                Ch?n b√°c s?, ng√†y v√† slot m?i. H? th?ng s? ki?m tra t√≠nh h?p l? tr∆∞?c khi c?p nh?t.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -293,7 +293,7 @@ export default function AppointmentDetailPage() {
                 }}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Ch?n b·c s?" />
+                  <SelectValue placeholder="Ch?n b√°c s?" />
                 </SelectTrigger>
                 <SelectContent>
                   {(doctorsQuery.data || []).map((doctor) => (
@@ -315,21 +315,21 @@ export default function AppointmentDetailPage() {
                 <SelectContent>
                   {availableSlots.map((slot) => (
                     <SelectItem key={slot.key} value={slot.key}>
-                      {slot.B_TEN} ∑ {slot.KG_BAT_DAU.slice(11, 16)} - {slot.KG_KET_THUC.slice(11, 16)}
+                      {slot.B_TEN} ¬∑ {slot.KG_BAT_DAU.slice(11, 16)} - {slot.KG_KET_THUC.slice(11, 16)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
 
               <Textarea
-                placeholder="L? do ?i l?ch (khÙng b?t bu?c)"
+                placeholder="L? do ƒë?i l?ch (kh√¥ng b?t bu?c)"
                 value={rescheduleReason}
                 onChange={(event) => setRescheduleReason(event.target.value)}
                 rows={3}
               />
 
               <Button onClick={handleReschedule} disabled={rescheduleMutation.isPending || !selectedSlot}>
-                {rescheduleMutation.isPending ? '–ang ?i l?ch...' : 'X·c nh?n ?i l?ch'}
+                {rescheduleMutation.isPending ? 'ƒêang ƒë?i l?ch...' : 'X√°c nh?n ƒë?i l?ch'}
               </Button>
             </CardContent>
           </Card>
@@ -343,7 +343,8 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
       <p className="text-xs text-slate-500">{label}</p>
-      <p className="font-medium text-slate-900">{value || 'ó'}</p>
+      <p className="font-medium text-slate-900">{value || '‚Äî'}</p>
     </div>
   );
 }
+

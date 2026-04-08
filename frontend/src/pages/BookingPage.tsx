@@ -70,6 +70,7 @@ export default function BookingPage() {
 
   const [specialtyId, setSpecialtyId] = useState<string>('all');
   const [doctorSearch, setDoctorSearch] = useState('');
+  const [debouncedDoctorSearch, setDebouncedDoctorSearch] = useState('');
   const [selectedDoctorId, setSelectedDoctorId] = useState<number | null>(null);
   const [selectedDate, setSelectedDate] = useState(todayIso());
   const [selectedSlotKey, setSelectedSlotKey] = useState<string | null>(null);
@@ -95,33 +96,48 @@ export default function BookingPage() {
     }
   }, [activeProfiles, selectedProfileId, setSelectedProfile, user?.TK_SDT]);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedDoctorSearch(doctorSearch.trim());
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [doctorSearch]);
+
   const doctorsQuery = useQuery({
-    queryKey: queryKeys.booking.doctors(specialtyId, selectedDate),
+    queryKey: queryKeys.booking.doctors(specialtyId, selectedDate, debouncedDoctorSearch),
     queryFn: () =>
       bookingApi.getAvailableDoctors({
-        date: selectedDate || undefined,
+        date: selectedDate.trim() ? selectedDate : undefined,
         specialtyId: specialtyId === 'all' ? undefined : Number(specialtyId),
+        q: debouncedDoctorSearch || undefined,
       }),
-    enabled: Boolean(user?.TK_SDT && selectedProfile && selectedDate),
+    enabled: Boolean(user?.TK_SDT && selectedProfile),
   });
 
   const filteredDoctors = useMemo(() => {
-    const keyword = normalizeVietnameseText(doctorSearch);
+    const keyword = normalizeVietnameseText(debouncedDoctorSearch);
     if (!keyword) return doctorsQuery.data ?? [];
     return (doctorsQuery.data ?? []).filter((doctor) =>
       normalizeVietnameseText(doctor.BS_HO_TEN).includes(keyword),
     );
-  }, [doctorSearch, doctorsQuery.data]);
+  }, [debouncedDoctorSearch, doctorsQuery.data]);
 
   const availabilityDebugQuery = useQuery({
-    queryKey: ['booking-debug-availability', specialtyId, selectedDate],
+    queryKey: ['booking-debug-availability', specialtyId, selectedDate, debouncedDoctorSearch],
     queryFn: () =>
       bookingApi.getAvailabilityDebug({
         date: selectedDate,
         specialtyId: specialtyId === 'all' ? undefined : Number(specialtyId),
+        q: debouncedDoctorSearch || undefined,
       }),
     enabled:
-      Boolean(user?.TK_SDT && selectedProfile && selectedDate && doctorsQuery.isSuccess) &&
+      Boolean(
+        user?.TK_SDT &&
+          selectedProfile &&
+          selectedDate.trim() &&
+          doctorsQuery.isSuccess,
+      ) &&
+      !debouncedDoctorSearch &&
       (doctorsQuery.data?.length ?? 0) === 0,
     retry: 1,
   });
@@ -404,7 +420,9 @@ export default function BookingPage() {
                   <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center">
                     <p className="text-lg font-semibold text-slate-900">Không có bác sĩ phù hợp</p>
                     <p className="mt-2 text-sm text-slate-600">
-                      {bookingEmptyReasonMessage || 'Hãy đổi ngày hoặc bộ lọc chuyên khoa để thử lại.'}
+                      {debouncedDoctorSearch
+                        ? `Không tìm thấy bác sĩ theo từ khóa "${debouncedDoctorSearch}".`
+                        : bookingEmptyReasonMessage || 'Hãy đổi ngày hoặc bộ lọc chuyên khoa để thử lại.'}
                     </p>
                     {isStatusContractMismatch ? (
                       <p className="mt-2 text-xs text-amber-700">
@@ -490,7 +508,11 @@ export default function BookingPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {selectedDoctor ? (
-                  slotsQuery.isLoading ? (
+                  !selectedDate.trim() ? (
+                    <div className="rounded-2xl bg-slate-50 px-4 py-8 text-center text-slate-500">
+                      Vui lòng chọn ngày khám để xem khung giờ khả dụng.
+                    </div>
+                  ) : slotsQuery.isLoading ? (
                     <div className="rounded-2xl bg-slate-50 px-4 py-8 text-center text-slate-500">Đang tải slot...</div>
                   ) : slotsQuery.isError ? (
                     <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-8 text-center">

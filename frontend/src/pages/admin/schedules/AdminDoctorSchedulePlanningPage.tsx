@@ -73,6 +73,9 @@ type Slot = {
   doctorId: number | null;
   status: WeeklyScheduleStatus | null;
   weekStatus: WeekWorkflowStatus | null;
+  bookingCount: number;
+  slotCount: number;
+  slotCapacity: number;
 };
 
 type DoctorDragData = {
@@ -392,6 +395,13 @@ function PlanningCell({
       >
         {visualMeta.label}
       </div>
+      {assigned ? (
+        <div className='mt-1 text-[10px] text-slate-600'>
+          Đã đặt: <span className='font-semibold'>{slot.bookingCount}</span>
+          {slot.slotCapacity > 0 ? `/${slot.slotCapacity}` : ''}
+          {slot.slotCount > 0 ? ` (${slot.slotCount} khung giờ)` : ''}
+        </div>
+      ) : null}
       {dragging && !blockedByLeave ? (
         <div
           className={cn(
@@ -562,6 +572,9 @@ export default function AdminDoctorSchedulePlanningPage() {
             doctorId: null,
             status: null,
             weekStatus: null,
+            bookingCount: 0,
+            slotCount: 0,
+            slotCapacity: 0,
           };
         }
       }
@@ -575,6 +588,9 @@ export default function AdminDoctorSchedulePlanningPage() {
         doctorId: item.BS_MA,
         status: item.status,
         weekStatus: item.weekStatus ?? null,
+        bookingCount: item.bookingCount ?? 0,
+        slotCount: item.slotCount ?? 0,
+        slotCapacity: item.slotCapacity ?? 0,
       };
     }
 

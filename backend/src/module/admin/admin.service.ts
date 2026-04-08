@@ -2113,6 +2113,26 @@ export class AdminService {
           ...(specialtyId ? { BAC_SI: { CK_MA: specialtyId } } : {}),
         },
         include: {
+          BUOI: {
+            select: {
+              KHUNG_GIO: {
+                select: {
+                  KG_MA: true,
+                  KG_SO_BN_TOI_DA: true,
+                },
+              },
+            },
+          },
+          DANG_KY: {
+            where: {
+              DK_TRANG_THAI: {
+                notIn: Array.from(BOOKING_CANCELLED_STATUSES),
+              },
+            },
+            select: {
+              DK_MA: true,
+            },
+          },
           DOT_LICH_TUAN: {
             select: {
               DLT_TRANG_THAI: true,
@@ -2140,6 +2160,12 @@ export class AdminService {
 
       return {
         items: rows.map((row) => ({
+          slotCount: row.BUOI?.KHUNG_GIO?.length ?? 0,
+          slotCapacity: (row.BUOI?.KHUNG_GIO ?? []).reduce(
+            (sum, slot) => sum + (slot.KG_SO_BN_TOI_DA ?? 5),
+            0,
+          ),
+          bookingCount: row.DANG_KY?.length ?? 0,
           BS_MA: row.BS_MA,
           P_MA: row.P_MA,
           N_NGAY: this.toDateOnlyIso(row.N_NGAY),

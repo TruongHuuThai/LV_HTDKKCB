@@ -48,9 +48,10 @@ export class BookingController {
   async getDoctors(
     @Query('date') date?: string,
     @Query('specialtyId') specialtyId?: string,
+    @Query('q') q?: string,
   ): Promise<any> {
     const specId = specialtyId ? parseInt(specialtyId, 10) : undefined;
-    return this.booking.getAvailableDoctors(date, specId);
+    return this.booking.getAvailableDoctors(date, specId, q);
   }
 
   // @ts-ignore
@@ -59,9 +60,10 @@ export class BookingController {
   async debugAvailability(
     @Query('date') date: string,
     @Query('specialtyId') specialtyId?: string,
+    @Query('q') q?: string,
   ): Promise<any> {
     const specId = specialtyId ? parseInt(specialtyId, 10) : undefined;
-    return this.booking.getAvailabilityDebug(date, specId);
+    return this.booking.getAvailabilityDebug(date, specId, q);
   }
 
   // @ts-ignore

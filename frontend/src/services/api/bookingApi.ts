@@ -71,6 +71,7 @@ export const bookingApi = {
   getAvailableDoctors: async (params?: {
     date?: string;
     specialtyId?: number;
+    q?: string;
   }) => {
     const res = await axiosClient.get<BookingDoctor[]>('/booking/doctors', {
       params,
@@ -88,7 +89,7 @@ export const bookingApi = {
     return res.data;
   },
 
-  getAvailabilityDebug: async (params: { date: string; specialtyId?: number }) => {
+  getAvailabilityDebug: async (params: { date: string; specialtyId?: number; q?: string }) => {
     const res = await axiosClient.get<BookingAvailabilityDebugResponse>(
       '/booking/debug-availability',
       { params },

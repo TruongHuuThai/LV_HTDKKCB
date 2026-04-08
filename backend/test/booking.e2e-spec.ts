@@ -57,7 +57,11 @@ describe('BookingController (e2e)', () => {
       .get('/booking/doctors?date=2026-04-09&specialtyId=21')
       .expect(200);
 
-    expect(bookingService.getAvailableDoctors).toHaveBeenCalledWith('2026-04-09', 21);
+    expect(bookingService.getAvailableDoctors).toHaveBeenCalledWith(
+      '2026-04-09',
+      21,
+      undefined,
+    );
   });
 
   it('GET /booking/debug-availability returns reason summary contract', async () => {
@@ -77,7 +81,11 @@ describe('BookingController (e2e)', () => {
       .get('/booking/debug-availability?date=2026-04-09&specialtyId=21')
       .expect(200);
 
-    expect(bookingService.getAvailabilityDebug).toHaveBeenCalledWith('2026-04-09', 21);
+    expect(bookingService.getAvailabilityDebug).toHaveBeenCalledWith(
+      '2026-04-09',
+      21,
+      undefined,
+    );
     expect(res.body.summary.reasons).toEqual([BOOKING_AVAILABILITY_REASON.NO_SHIFT_ON_DATE]);
     expect(res.body.contractVersion).toBe(SCHEDULE_STATUS_CONTRACT_VERSION);
   });

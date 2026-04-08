@@ -29,6 +29,9 @@ export interface SchedulePlanningAssignment {
 }
 
 export interface SchedulePlanningExistingItem {
+  slotCount: number;
+  slotCapacity: number;
+  bookingCount: number;
   BS_MA: number;
   P_MA: number;
   N_NGAY: string;
