@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   CalendarDays,
   CheckCircle2,
+  ChevronLeft,
   ChevronRight,
   Circle,
   Clock3,
@@ -13,13 +14,13 @@ import {
   LoaderCircle,
   Search,
   ShieldCheck,
+  Sparkles,
   Stethoscope,
   UserRound,
   Wallet,
   XCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import PatientProfileSummaryCard from '@/components/patient/PatientProfileSummaryCard';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -62,8 +63,8 @@ type StepStatus = 'done' | 'current' | 'upcoming';
 type ClinicalSelectorKey = 'date' | 'specialty' | 'doctor' | 'slot';
 
 const FLOW_SEQUENCE: FlowStep[] = [
-  'entry',
   'profile',
+  'entry',
   'clinical',
   'insurance',
   'review',
@@ -73,8 +74,8 @@ const FLOW_SEQUENCE: FlowStep[] = [
 ];
 
 const STEP_LABELS: Record<FlowStep, string> = {
-  entry: 'Cách đặt',
   profile: 'Hồ sơ',
+  entry: 'Cách đặt',
   clinical: 'Lịch khám',
   insurance: 'Bảo hiểm',
   review: 'Xem lại',
@@ -84,7 +85,7 @@ const STEP_LABELS: Record<FlowStep, string> = {
 };
 
 const STEP_GROUPS: Array<{ key: StepGroupKey; label: string; description: string }> = [
-  { key: 'setup', label: 'Khởi tạo', description: 'Chọn cách đặt và hồ sơ bệnh nhân' },
+  { key: 'setup', label: 'Khởi tạo', description: 'Chọn hồ sơ và cách đặt lịch phù hợp' },
   { key: 'schedule', label: 'Lịch khám', description: 'Ngày khám, bác sĩ và khung giờ' },
   { key: 'insurance', label: 'Thông tin', description: 'Bảo hiểm và xác nhận thông tin' },
   { key: 'payment', label: 'Thanh toán', description: 'Tạo thanh toán và hoàn tất' },
@@ -177,6 +178,22 @@ function sectionTitleForSelector(key: ClinicalSelectorKey) {
   return 'Chọn khung giờ';
 }
 
+function getPatientSafeErrorMessage(error: unknown, fallback: string) {
+  const raw = getPatientFlowErrorMessage(error, fallback);
+  const normalized = raw.toLowerCase();
+  if (
+    normalized.includes('internal server error') ||
+    normalized.includes('exception') ||
+    normalized.includes('sql') ||
+    normalized.includes('stack') ||
+    normalized.includes('trace') ||
+    normalized.includes('undefined')
+  ) {
+    return fallback;
+  }
+  return raw;
+}
+
 export default function BookingPage() {
   const user = useAuthStore((state) => state.user);
   const selectedProfileId = usePatientProfilesStore(
@@ -185,7 +202,7 @@ export default function BookingPage() {
   const setSelectedProfile = usePatientProfilesStore((state) => state.setSelectedProfile);
   const { data: specialties } = useSpecialties();
 
-  const [step, setStep] = useState<FlowStep>('entry');
+  const [step, setStep] = useState<FlowStep>('profile');
   const [entryMode, setEntryMode] = useState<EntryMode | null>(null);
 
   const [specialtyId, setSpecialtyId] = useState<string>('');
@@ -351,7 +368,7 @@ export default function BookingPage() {
         selectedSlotKey,
         entryMode,
       });
-      toast.error(getPatientFlowErrorMessage(error, 'Không thể tạo lịch khám lúc này. Vui lòng thử lại.'));
+      toast.error(getPatientSafeErrorMessage(error, 'Không thể tạo lịch khám lúc này. Vui lòng thử lại.'));
     },
   });
 
@@ -365,7 +382,7 @@ export default function BookingPage() {
       }
     },
     onError: (error) => {
-      toast.error(getPatientFlowErrorMessage(error, 'Không thể tạo lại link thanh toán.'));
+      toast.error(getPatientSafeErrorMessage(error, 'Không thể tạo lại link thanh toán.'));
     },
   });
 
@@ -375,8 +392,8 @@ export default function BookingPage() {
   const currentStepLabel = STEP_LABELS[step];
   const currentGroup = getStepGroup(step);
 
-  const canContinueEntry = Boolean(entryMode);
   const canContinueProfile = Boolean(selectedProfile);
+  const canContinueEntry = Boolean(selectedProfile && entryMode);
   const canContinueClinical = Boolean(selectedDate && specialtyId && selectedDoctor && selectedSlot);
   const canContinueInsurance =
     hasBHYT !== null &&
@@ -391,13 +408,13 @@ export default function BookingPage() {
   const availableProviders = privateProvidersQuery.data ?? [];
 
   const doctorError = doctorsQuery.isError
-    ? getPatientFlowErrorMessage(doctorsQuery.error, 'Không tải được danh sách bác sĩ. Vui lòng thử lại.')
+    ? getPatientSafeErrorMessage(doctorsQuery.error, 'Không tải được danh sách bác sĩ. Vui lòng thử lại.')
     : null;
   const slotsError = slotsQuery.isError
-    ? getPatientFlowErrorMessage(slotsQuery.error, 'Không tải được danh sách khung giờ. Vui lòng thử lại.')
+    ? getPatientSafeErrorMessage(slotsQuery.error, 'Không tải được danh sách khung giờ. Vui lòng thử lại.')
     : null;
 
-  const resetBookingDetails = () => {
+  const resetFlowFromBookingMethodChange = () => {
     setSpecialtyId('');
     setSelectedDoctorId(null);
     setSelectedSlotKey(null);
@@ -414,21 +431,24 @@ export default function BookingPage() {
     setCreatedPaymentUrl(null);
   };
 
+  const resetFlowFromProfileChange = () => {
+    setEntryMode(null);
+    setSelectedDate(todayIso());
+    resetFlowFromBookingMethodChange();
+  };
+
   const handleSelectEntryMode = (mode: EntryMode) => {
+    if (entryMode === mode) return;
     setEntryMode(mode);
-    resetBookingDetails();
+    resetFlowFromBookingMethodChange();
   };
 
   const handleProfileSelect = (profileId: number) => {
     if (!user?.TK_SDT) return;
+    const isChanged = selectedProfile?.BN_MA !== profileId;
+    if (!isChanged) return;
     setSelectedProfile(user.TK_SDT, profileId);
-    setSpecialtyId('');
-    setSelectedDoctorId(null);
-    setSelectedSlotKey(null);
-    setHasBHYT(null);
-    setBhytType('');
-    setHasPrivateInsurance(null);
-    setPrivateInsuranceProvider('');
+    resetFlowFromProfileChange();
   };
 
   const handleChangeDate = (value: string) => {
@@ -451,8 +471,8 @@ export default function BookingPage() {
   };
 
   const goBack = () => {
-    if (step === 'profile') return setStep('entry');
-    if (step === 'clinical') return setStep('profile');
+    if (step === 'entry') return setStep('profile');
+    if (step === 'clinical') return setStep('entry');
     if (step === 'insurance') return setStep('clinical');
     if (step === 'review') return setStep('insurance');
     if (step === 'paymentMethod') return setStep('review');
@@ -489,8 +509,8 @@ export default function BookingPage() {
 
   const summaryGuidance = useMemo(() => {
     const guidance: string[] = [];
-    if (!entryMode) guidance.push('Chọn cách đặt lịch phù hợp với nhu cầu của bạn.');
-    if (!selectedProfile) guidance.push('Chọn hồ sơ bệnh nhân để tiếp tục.');
+    if (!selectedProfile) return ['Chọn hồ sơ bệnh nhân để tiếp tục.'];
+    if (!entryMode) return ['Chọn cách đặt lịch phù hợp với nhu cầu của bạn.'];
     if (!selectedDoctor) guidance.push('Chọn bác sĩ khám phù hợp.');
     if (!selectedSlot) guidance.push('Chọn khung giờ còn trống.');
     if (hasBHYT === null || hasPrivateInsurance === null) {
@@ -498,6 +518,17 @@ export default function BookingPage() {
     }
     return guidance.slice(0, 3);
   }, [entryMode, hasBHYT, hasPrivateInsurance, selectedDoctor, selectedProfile, selectedSlot]);
+
+  const summaryNextAction = useMemo(() => {
+    if (step === 'profile') return selectedProfile ? 'Tiếp tục sang bước chọn cách đặt lịch.' : 'Chọn hồ sơ bệnh nhân để bắt đầu.';
+    if (step === 'entry') return selectedProfile ? 'Chọn cách đặt lịch cho hồ sơ đã chọn.' : 'Quay lại chọn hồ sơ bệnh nhân trước.';
+    if (step === 'clinical') return canContinueClinical ? 'Kiểm tra lại lịch đã chọn rồi tiếp tục.' : 'Hoàn tất chọn ngày, bác sĩ và khung giờ.';
+    if (step === 'insurance') return canContinueInsurance ? 'Bạn đã xong phần thông tin, có thể tiếp tục.' : 'Trả lời 2 câu hỏi bảo hiểm để tiếp tục.';
+    if (step === 'review') return 'Xác nhận lại thông tin trước khi thanh toán.';
+    if (step === 'paymentMethod') return 'Chọn phương thức thanh toán khả dụng để tạo giao dịch.';
+    if (step === 'paymentInfo') return 'Hoàn tất thanh toán rồi kiểm tra trạng thái.';
+    return 'Xem kết quả và quản lý lịch hẹn của bạn.';
+  }, [canContinueClinical, canContinueInsurance, selectedProfile, step]);
 
   if (!user) {
     return (
@@ -527,17 +558,22 @@ export default function BookingPage() {
 
   return (
     <div className="mx-auto max-w-[1360px] px-4 py-6 font-sans sm:px-6 lg:px-8">
-      <section className="mb-6 rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-900 via-blue-900 to-cyan-700 p-6 text-white">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100">Đặt khám trực tuyến</p>
-        <h1 className="mt-3 text-2xl font-semibold sm:text-3xl">Đặt lịch khám dễ hiểu, ít bước, rõ ràng</h1>
-        <p className="mt-2 max-w-3xl text-sm text-cyan-50/90">
-          Chọn cách đặt phù hợp, chọn lịch còn trống và hoàn tất thanh toán trong một luồng thống nhất.
-        </p>
+      <section className="mb-4 rounded-3xl border border-slate-200 bg-gradient-to-r from-slate-900 via-blue-900 to-cyan-700 px-5 py-4 text-white sm:px-6">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-100">Đặt khám trực tuyến</p>
+        <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-semibold sm:text-2xl">Đặt lịch khám nhanh, rõ ràng, ít thao tác</h1>
+            <p className="mt-1 text-sm text-cyan-50/90">Bạn luôn thấy rõ đang ở bước nào và cần làm gì tiếp theo.</p>
+          </div>
+          <span className="inline-flex items-center rounded-full border border-cyan-200/40 bg-cyan-100/10 px-3 py-1 text-xs font-medium text-cyan-100">
+            {STEP_GROUPS.find((item) => item.key === currentGroup)?.label}
+          </span>
+        </div>
       </section>
 
       <BookingGroupStepper currentStep={step} />
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[220px_minmax(0,1fr)_320px]">
+      <div className="mt-4 grid gap-6 xl:grid-cols-[200px_minmax(0,1fr)_340px]">
         <ProgressSidebar currentStep={step} />
 
         <main className="space-y-4">
@@ -550,7 +586,7 @@ export default function BookingPage() {
                 {currentStepLabel} ({currentStepIndex + 1}/{FLOW_SEQUENCE.length})
               </p>
             </div>
-            {step !== 'entry' ? (
+            {step !== 'profile' ? (
               <Button variant="outline" onClick={goBack} className="gap-2">
                 <ArrowLeft className="h-4 w-4" /> Quay lại
               </Button>
@@ -560,9 +596,11 @@ export default function BookingPage() {
           {step === 'entry' ? (
             <Card className="border-slate-200">
               <CardHeader>
-                <CardTitle>Chọn cách đặt lịch</CardTitle>
+                <CardTitle>Bước 2. Chọn cách bắt đầu đặt lịch</CardTitle>
                 <CardDescription>
-                  Hãy chọn cách bắt đầu thuận tiện nhất. Bạn vẫn có thể thay đổi ở bước sau.
+                  {selectedProfile
+                    ? `Đang đặt cho ${getPatientProfileFullName(selectedProfile)}. Hãy chọn cách bắt đầu thuận tiện nhất.`
+                    : 'Hãy quay lại chọn hồ sơ bệnh nhân trước khi chọn cách đặt.'}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
@@ -592,9 +630,15 @@ export default function BookingPage() {
                 </div>
                 <BookingActionBar
                   nextLabel="Tiếp tục"
-                  onNext={() => setStep('profile')}
+                  onNext={() => setStep('clinical')}
                   nextDisabled={!canContinueEntry}
-                  helperText={!entryMode ? 'Vui lòng chọn một cách đặt để tiếp tục.' : undefined}
+                  helperText={
+                    !selectedProfile
+                      ? 'Bạn cần chọn hồ sơ bệnh nhân trước.'
+                      : !entryMode
+                      ? 'Vui lòng chọn một cách đặt để tiếp tục.'
+                      : undefined
+                  }
                 />
               </CardContent>
             </Card>
@@ -603,15 +647,15 @@ export default function BookingPage() {
           {step === 'profile' ? (
             <Card className="border-slate-200">
               <CardHeader>
-                <CardTitle>Chọn hồ sơ bệnh nhân</CardTitle>
-                <CardDescription>Hồ sơ đã chọn sẽ được dùng để tạo lịch hẹn và thanh toán.</CardDescription>
+                <CardTitle>Bước 1. Chọn hồ sơ bệnh nhân</CardTitle>
+                <CardDescription>Hồ sơ đã chọn sẽ được dùng cho toàn bộ luồng đặt lịch và thanh toán.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
                 {profilesQuery.isLoading ? (
                   <StateCard message="Đang tải hồ sơ bệnh nhân..." />
                 ) : profilesQuery.isError ? (
-                  <InlineError
-                    message={getPatientFlowErrorMessage(
+                    <InlineError
+                    message={getPatientSafeErrorMessage(
                       profilesQuery.error,
                       'Không tải được danh sách hồ sơ. Vui lòng thử lại.',
                     )}
@@ -671,11 +715,10 @@ export default function BookingPage() {
                 )}
 
                 <BookingActionBar
-                  onBack={goBack}
-                  nextLabel="Tiếp tục chọn lịch"
-                  onNext={() => setStep('clinical')}
+                  nextLabel="Tiếp tục"
+                  onNext={() => setStep('entry')}
                   nextDisabled={!canContinueProfile}
-                  helperText={!canContinueProfile ? 'Bạn cần chọn hồ sơ trước khi đi tiếp.' : undefined}
+                  helperText={!canContinueProfile ? 'Chọn một hồ sơ để tiếp tục.' : undefined}
                 />
               </CardContent>
             </Card>
@@ -696,36 +739,31 @@ export default function BookingPage() {
                     subtitle={selectorKey === 'slot' ? 'Chỉ hiển thị khung giờ còn trống.' : undefined}
                   >
                     {selectorKey === 'date' ? (
-                      <div className="grid gap-3 md:grid-cols-[minmax(0,280px)_1fr] md:items-center">
-                        <div className="space-y-2">
-                          <Label htmlFor="booking-date">Ngày khám</Label>
-                          <Input
-                            id="booking-date"
-                            type="date"
-                            min={todayIso()}
-                            max={maxBookingDateIso()}
-                            value={selectedDate}
-                            onChange={(event) => handleChangeDate(event.target.value)}
-                          />
-                        </div>
-                        <p className="text-sm text-slate-500">
+                      <div className="space-y-3">
+                        <BookingCalendar
+                          value={selectedDate}
+                          min={todayIso()}
+                          max={maxBookingDateIso()}
+                          onChange={handleChangeDate}
+                        />
+                        <p className="text-xs text-slate-500">
                           Hệ thống hỗ trợ đặt lịch tối đa 3 tháng tính từ hôm nay.
                         </p>
                       </div>
                     ) : null}
 
                     {selectorKey === 'specialty' ? (
-                      <div className="space-y-2">
+                      <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
                         <Label>Chuyên khoa</Label>
                         <Select
                           value={specialtyId || ''}
                           onValueChange={handleChangeSpecialty}
                           disabled={entryMode === 'BY_DOCTOR' && Boolean(selectedDoctor)}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className="bg-white">
                             <SelectValue placeholder="Chọn chuyên khoa" />
                           </SelectTrigger>
-                          <SelectContent className="z-[90]">
+                          <SelectContent className="z-[120] bg-white">
                             {(specialties ?? []).map((item) => (
                               <SelectItem key={item.CK_MA} value={String(item.CK_MA)}>
                                 {item.CK_TEN}
@@ -809,8 +847,19 @@ export default function BookingPage() {
                           <StateCard message="Bác sĩ không có lịch trong ngày đã chọn." dashed />
                         ) : (
                           <div className="space-y-4">
+                            <div className="flex flex-wrap items-center gap-2 text-xs">
+                              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700">
+                                <span className="h-2 w-2 rounded-full bg-emerald-500" /> Còn trống
+                              </span>
+                              <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-blue-700">
+                                <span className="h-2 w-2 rounded-full bg-blue-500" /> Đang chọn
+                              </span>
+                              <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-slate-500">
+                                <span className="h-2 w-2 rounded-full bg-slate-400" /> Đã đầy
+                              </span>
+                            </div>
                             {(slotsQuery.data ?? []).map((session) => (
-                              <div key={`${session.B_TEN}-${session.PHONG || 'NA'}`} className="rounded-2xl border border-slate-200 p-4">
+                              <div key={`${session.B_TEN}-${session.PHONG || 'NA'}`} className="rounded-2xl border border-slate-200 bg-white p-4">
                                 <div className="mb-3 flex items-center justify-between gap-2">
                                   <div>
                                     <p className="font-semibold text-slate-900">
@@ -841,7 +890,7 @@ export default function BookingPage() {
                                         }`}
                                       >
                                         <p>{slot.KG_BAT_DAU.slice(11, 16)} - {slot.KG_KET_THUC.slice(11, 16)}</p>
-                                        <p className="text-[11px] opacity-80">
+                                        <p className="text-[11px] opacity-90">
                                           {!slot.available ? 'Đầy' : isSelected ? 'Đang chọn' : 'Còn trống'}
                                         </p>
                                       </button>
@@ -921,13 +970,13 @@ export default function BookingPage() {
                         <StateCard message="Đang tải danh sách loại BHYT..." compact />
                       ) : bhytTypesQuery.isError ? (
                         <InlineError
-                          message={getPatientFlowErrorMessage(
+                          message={getPatientSafeErrorMessage(
                             bhytTypesQuery.error,
                             'Không tải được danh sách loại BHYT.',
                           )}
                         />
                       ) : (
-                        <div className="max-h-64 space-y-2 overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-2">
+                        <div className="relative z-20 max-h-64 space-y-2 overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-2">
                           {(bhytTypesQuery.data ?? []).map((item) => (
                             <button
                               key={item.id}
@@ -974,7 +1023,7 @@ export default function BookingPage() {
                         <StateCard message="Đang tải danh sách công ty..." compact />
                       ) : privateProvidersQuery.isError ? (
                         <InlineError
-                          message={getPatientFlowErrorMessage(
+                          message={getPatientSafeErrorMessage(
                             privateProvidersQuery.error,
                             'Không tải được danh sách công ty bảo hiểm.',
                           )}
@@ -982,7 +1031,7 @@ export default function BookingPage() {
                       ) : availableProviders.length === 0 ? (
                         <StateCard message="Không tìm thấy công ty phù hợp." compact dashed />
                       ) : (
-                        <div className="max-h-64 space-y-2 overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-2">
+                        <div className="relative z-20 max-h-64 space-y-2 overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-2">
                           {availableProviders.map((item) => (
                             <button
                               key={item.id}
@@ -1115,7 +1164,7 @@ export default function BookingPage() {
 
                 <BookingActionBar
                   onBack={goBack}
-                  nextLabel={createMutation.isPending ? 'Đang tạo thanh toán...' : 'Xác nhận và thanh toán'}
+                  nextLabel={createMutation.isPending ? 'Đang tạo thanh toán...' : 'Xác nhận và tạo thanh toán'}
                   onNext={submitCreateBooking}
                   nextDisabled={createMutation.isPending}
                 />
@@ -1259,7 +1308,7 @@ export default function BookingPage() {
                       <Link to={`/appointments/${createdAppointmentId}`}>Xem chi tiết lịch hẹn</Link>
                     </Button>
                   ) : null}
-                  <Button variant="outline" onClick={() => setStep('entry')}>
+                  <Button variant="outline" onClick={() => setStep('profile')}>
                     Đặt lịch mới
                   </Button>
                 </div>
@@ -1294,13 +1343,8 @@ export default function BookingPage() {
                 : null
             }
             guidance={summaryGuidance}
+            nextAction={summaryNextAction}
           />
-
-          {selectedProfile ? (
-            <div className="mt-4">
-              <PatientProfileSummaryCard profile={selectedProfile} mode="booking" compact />
-            </div>
-          ) : null}
         </aside>
       </div>
     </div>
@@ -1399,6 +1443,7 @@ function SummaryPanel(props: {
   createdPaymentRef: number | null;
   currentPaymentStatus: string | null;
   guidance: string[];
+  nextAction: string;
 }) {
   const {
     selectedProfile,
@@ -1417,6 +1462,7 @@ function SummaryPanel(props: {
     createdPaymentRef,
     currentPaymentStatus,
     guidance,
+    nextAction,
   } = props;
 
   const entryLabel = ENTRY_OPTIONS.find((item) => item.mode === entryMode)?.title || null;
@@ -1425,17 +1471,48 @@ function SummaryPanel(props: {
     <Card className="xl:sticky xl:top-24 border-slate-200">
       <CardHeader>
         <CardTitle className="text-base">Tóm tắt lựa chọn</CardTitle>
-        <CardDescription>Chỉ hiển thị thông tin đã chọn để bạn dễ theo dõi.</CardDescription>
+        <CardDescription>Thông tin bạn đã chọn và việc cần làm tiếp theo.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="rounded-xl border border-cyan-200 bg-cyan-50 p-3">
+          <p className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-cyan-700">
+            <Sparkles className="h-3.5 w-3.5" /> Việc cần làm ngay
+          </p>
+          <p className="mt-1 text-sm font-medium leading-5 text-cyan-900">{nextAction}</p>
+          {guidance.length > 0 ? (
+            <ul className="mt-2 space-y-1 text-sm text-cyan-800">
+              {guidance.slice(0, 2).map((item) => (
+                <li key={item} className="break-words">
+                  • {item}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Hồ sơ đã chọn</p>
+          {selectedProfile ? (
+            <div className="mt-2 flex items-center gap-3">
+              <Avatar className="h-10 w-10 border border-slate-200">
+                <AvatarImage src={selectedProfile.BN_ANH || ''} alt={getPatientProfileFullName(selectedProfile)} />
+                <AvatarFallback className="bg-blue-100 text-blue-700">
+                  <UserRound className="h-4 w-4" />
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-slate-900">{getPatientProfileFullName(selectedProfile)}</p>
+                <p className="text-xs text-slate-500">Mã hồ sơ #{selectedProfile.BN_MA}</p>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-2 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-2 text-sm text-slate-600">
+              Chưa chọn hồ sơ. Vui lòng chọn hồ sơ ở bước hiện tại.
+            </div>
+          )}
+        </div>
+
         {entryLabel ? <SummaryLine icon={<ChevronRight className="h-4 w-4" />} label="Cách đặt" value={entryLabel} /> : null}
-        {selectedProfile ? (
-          <SummaryLine
-            icon={<UserRound className="h-4 w-4" />}
-            label="Hồ sơ"
-            value={`${getPatientProfileFullName(selectedProfile)} (#${selectedProfile.BN_MA})`}
-          />
-        ) : null}
         {selectedDate ? (
           <SummaryLine icon={<CalendarDays className="h-4 w-4" />} label="Ngày khám" value={formatDateDdMmYyyy(selectedDate)} />
         ) : null}
@@ -1477,20 +1554,6 @@ function SummaryPanel(props: {
             {currentPaymentStatus ? <p className="text-blue-800">Trạng thái: {currentPaymentStatus}</p> : null}
           </div>
         ) : null}
-
-        {guidance.length > 0 ? (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
-            <p className="text-sm font-medium text-amber-900">Gợi ý bước tiếp theo</p>
-            <ul className="mt-2 space-y-1 text-sm text-amber-800">
-              {guidance.map((item) => (
-                <li key={item} className="flex items-start gap-2">
-                  <span className="mt-1 h-1.5 w-1.5 rounded-full bg-amber-700" />
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
       </CardContent>
     </Card>
   );
@@ -1505,6 +1568,225 @@ function SummaryLine({ icon, label, value }: { icon: ReactNode; label: string; v
         <p className="break-words font-medium text-slate-900">{value}</p>
       </div>
     </div>
+  );
+}
+
+type BookingCalendarDayStatus =
+  | 'available'
+  | 'selected'
+  | 'today'
+  | 'outsideRange'
+  | 'outsideMonth'
+  | 'holiday'
+  | 'full';
+
+type BookingCalendarDay = {
+  iso: string;
+  day: number;
+  inCurrentMonth: boolean;
+  status: BookingCalendarDayStatus;
+};
+
+function parseIsoDate(iso: string) {
+  const [year, month, day] = iso.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function isoFromDate(date: Date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function startOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function monthTitle(date: Date) {
+  return date.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' });
+}
+
+function isSameMonth(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
+}
+
+function buildMonthMatrix(params: {
+  monthDate: Date;
+  selectedIso: string;
+  minIso: string;
+  maxIso: string;
+  holidayDates?: Set<string>;
+  fullDates?: Set<string>;
+}) {
+  const { monthDate, selectedIso, minIso, maxIso, holidayDates, fullDates } = params;
+  const first = startOfMonth(monthDate);
+  const startOffset = first.getDay();
+  const gridStart = new Date(first);
+  gridStart.setDate(first.getDate() - startOffset);
+  const today = todayIso();
+
+  const cells: BookingCalendarDay[] = [];
+  for (let i = 0; i < 42; i += 1) {
+    const current = new Date(gridStart);
+    current.setDate(gridStart.getDate() + i);
+    const iso = isoFromDate(current);
+    const inCurrentMonth = isSameMonth(current, monthDate);
+
+    let status: BookingCalendarDayStatus = 'available';
+    if (!inCurrentMonth) status = 'outsideMonth';
+    else if (iso < minIso || iso > maxIso) status = 'outsideRange';
+    else if (holidayDates?.has(iso)) status = 'holiday';
+    else if (fullDates?.has(iso)) status = 'full';
+    else if (iso === selectedIso) status = 'selected';
+    else if (iso === today) status = 'today';
+
+    cells.push({
+      iso,
+      day: current.getDate(),
+      inCurrentMonth,
+      status,
+    });
+  }
+  return cells;
+}
+
+function BookingCalendar({
+  value,
+  min,
+  max,
+  onChange,
+  holidayDates,
+  fullDates,
+}: {
+  value: string;
+  min: string;
+  max: string;
+  onChange: (value: string) => void;
+  holidayDates?: Set<string>;
+  fullDates?: Set<string>;
+}) {
+  const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(parseIsoDate(value)));
+
+  const cells = useMemo(
+    () =>
+      buildMonthMatrix({
+        monthDate: visibleMonth,
+        selectedIso: value,
+        minIso: min,
+        maxIso: max,
+        holidayDates,
+        fullDates,
+      }),
+    [fullDates, holidayDates, max, min, value, visibleMonth],
+  );
+
+  const minMonth = startOfMonth(parseIsoDate(min));
+  const maxMonth = startOfMonth(parseIsoDate(max));
+  const canGoPrev = visibleMonth > minMonth;
+  const canGoNext = visibleMonth < maxMonth;
+
+  const goPrev = () => {
+    if (!canGoPrev) return;
+    setVisibleMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  };
+  const goNext = () => {
+    if (!canGoNext) return;
+    setVisibleMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
+  const goToday = () => {
+    const today = todayIso();
+    if (today < min || today > max) return;
+    setVisibleMonth(startOfMonth(parseIsoDate(today)));
+    onChange(today);
+  };
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-semibold text-slate-900">Lịch tháng</p>
+          <p className="text-xs text-slate-500">Vui lòng chọn ngày có thể đặt khám.</p>
+        </div>
+        <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
+          <Button type="button" variant="ghost" size="icon" onClick={goPrev} disabled={!canGoPrev} aria-label="Tháng trước">
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <p className="min-w-[148px] text-center text-sm font-medium capitalize text-slate-900">{monthTitle(visibleMonth)}</p>
+          <Button type="button" variant="ghost" size="icon" onClick={goNext} disabled={!canGoNext} aria-label="Tháng sau">
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="mb-2 flex justify-end">
+        <Button type="button" variant="outline" size="sm" onClick={goToday}>
+          Hôm nay
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1.5 text-center text-xs font-semibold uppercase text-slate-500">
+        {['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].map((day) => (
+          <div key={day} className="py-1">{day}</div>
+        ))}
+      </div>
+
+      <div className="mt-1 grid grid-cols-7 gap-1.5">
+        {cells.map((cell) => {
+          const selectable = cell.status === 'available' || cell.status === 'today' || cell.status === 'selected';
+          const className =
+            cell.status === 'selected'
+              ? 'border-blue-200 bg-blue-50 text-blue-800'
+              : cell.status === 'today'
+              ? 'border-blue-300 bg-blue-50 text-blue-700'
+              : cell.status === 'holiday'
+              ? 'border-rose-200 bg-rose-50 text-rose-600'
+              : cell.status === 'full'
+              ? 'border-amber-200 bg-amber-50 text-amber-700'
+              : cell.status === 'outsideRange'
+              ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
+              : cell.status === 'outsideMonth'
+              ? 'cursor-not-allowed border-transparent bg-transparent text-slate-300'
+              : 'border-blue-600 bg-blue-600 text-white hover:border-blue-700 hover:bg-blue-700';
+
+          return (
+            <button
+              key={cell.iso}
+              type="button"
+              onClick={() => (selectable ? onChange(cell.iso) : undefined)}
+              disabled={!selectable}
+              className={`relative h-11 rounded-lg border text-sm transition ${className}`}
+              aria-label={`Ngày ${parseIsoDate(cell.iso).toLocaleDateString('vi-VN')}`}
+            >
+              {cell.day}
+              {cell.status === 'today' ? <span className="absolute bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-blue-600" /> : null}
+            </button>
+          );
+        })}
+      </div>
+
+      <p className="mt-3 text-sm text-slate-700">
+        Ngày đã chọn: <span className="font-semibold">{formatDateDdMmYyyy(value)}</span>
+      </p>
+
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-600">
+        <LegendDot className="border-blue-600 bg-blue-600" label="Ngày có thể chọn" />
+        <LegendDot className="border-blue-200 bg-blue-50" label="Ngày đã chọn" />
+        <LegendDot className="border-blue-300 bg-blue-50" label="Hôm nay" />
+        <LegendDot className="border-slate-200 bg-slate-100" label="Ngoài phạm vi đặt khám" />
+        <LegendDot className="border-rose-200 bg-rose-50" label="Ngày nghỉ / lễ / tết" />
+        <LegendDot className="border-amber-200 bg-amber-50" label="Đã đầy lịch" />
+      </div>
+    </div>
+  );
+}
+
+function LegendDot({ className, label }: { className: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className={`h-3 w-3 rounded border ${className}`} />
+      {label}
+    </span>
   );
 }
 
