@@ -33,6 +33,22 @@ export interface CreateBookingInput {
   LHK_MA?: number;
   symptoms?: string;
   preVisitNote?: string;
+  hasBHYT?: boolean;
+  bhytType?: string;
+  hasPrivateInsurance?: boolean;
+  privateInsuranceProvider?: string;
+  paymentMethod?: string;
+}
+
+export interface BhyTypeOption {
+  id: string;
+  label: string;
+  description?: string | null;
+}
+
+export interface PrivateInsuranceProviderOption {
+  id: string;
+  name: string;
 }
 
 export interface BookingAvailabilityDebugShift {
@@ -101,7 +117,25 @@ export const bookingApi = {
     const res = await axiosClient.post('/booking', data);
     return res.data as {
       booking: { DK_MA: number };
+      payment?: { TT_MA?: number; TT_TRANG_THAI?: string };
       payment_url?: string;
     };
+  },
+
+  getBHYTTypes: async (params: { profileId?: number; specialtyId?: number }) => {
+    const res = await axiosClient.get<{ items: BhyTypeOption[] }>('/booking/insurance/bhyt-types', {
+      params,
+    });
+    return res.data.items;
+  },
+
+  getPrivateInsuranceProviders: async (q?: string) => {
+    const res = await axiosClient.get<{ items: PrivateInsuranceProviderOption[] }>(
+      '/booking/insurance/private-providers',
+      {
+        params: q ? { q } : undefined,
+      },
+    );
+    return res.data.items;
   },
 };

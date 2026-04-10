@@ -77,6 +77,20 @@ export class BookingController {
   }
 
   // @ts-ignore
+  @Get('insurance/bhyt-types')
+  @Roles(ROLE.BENH_NHAN, ROLE.ADMIN)
+  async getBHYTTypes(): Promise<any> {
+    return this.booking.getBHYTTypes();
+  }
+
+  // @ts-ignore
+  @Get('insurance/private-providers')
+  @Roles(ROLE.BENH_NHAN, ROLE.ADMIN)
+  async getPrivateInsuranceProviders(@Query('q') q?: string): Promise<any> {
+    return this.booking.getPrivateInsuranceProviders(q);
+  }
+
+  // @ts-ignore
   @Post()
   @Roles(ROLE.BENH_NHAN)
   async create(

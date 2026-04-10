@@ -1,5 +1,6 @@
 // src/modules/booking/dto/create-booking.dto.ts
 import {
+  IsBoolean,
   ArrayMaxSize,
   IsArray,
   IsInt,
@@ -67,4 +68,27 @@ export class CreateBookingDto {
   @ValidateNested({ each: true })
   @Type(() => CreatePreVisitAttachmentDto)
   attachments?: CreatePreVisitAttachmentDto[];
+
+  @IsOptional()
+  @IsBoolean()
+  hasBHYT?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  bhytType?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  hasPrivateInsurance?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  privateInsuranceProvider?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  paymentMethod?: string;
 }

@@ -15,6 +15,37 @@ import { PaymentRepository } from '../payment/payment.repository';
 
 const ALLOWED_PRE_VISIT_MIME = ['application/pdf', 'image/jpeg', 'image/png'];
 const MAX_PRE_VISIT_ATTACHMENT_SIZE = 10 * 1024 * 1024;
+const SUPPORTED_PAYMENT_METHOD = 'VNPAY';
+
+const BHYT_TYPE_OPTIONS = [
+  {
+    id: 'BHYT_DK_KCB_BD_BV_DHYD',
+    label: 'Có thẻ BHYT ĐK KCB BD tại BV ĐHYD',
+    description: 'Áp dụng với đối tượng hợp lệ theo quy định bệnh viện',
+  },
+  {
+    id: 'BHYT_TAI_KHAM_THEO_HEN',
+    label: 'Có tái khám theo hẹn trên đơn thuốc BHYT của BV ĐHYD',
+    description: 'Giấy chuyển tuyến còn hạn và có tái khám theo hẹn',
+  },
+  {
+    id: 'BHYT_CHUYEN_TUYEN_DUNG_TUYEN',
+    label: 'Có giấy chuyển BHYT đúng tuyến đến BV ĐHYD',
+    description: 'Giấy chuyển tuyến còn hiệu lực theo quy định',
+  },
+];
+
+const PRIVATE_INSURANCE_PROVIDERS = [
+  { id: 'BAO_VIET', name: 'Tổng công ty bảo hiểm Bảo Việt' },
+  { id: 'PVI', name: 'Công ty bảo hiểm PVI Phía Nam' },
+  { id: 'PTI', name: 'Tổng công ty cổ phần bảo hiểm Bưu điện (PTI)' },
+  { id: 'VBI', name: 'Công ty CP bảo hiểm Ngân hàng TMCP Công Thương Việt Nam (VBI)' },
+  { id: 'PACIFIC_CROSS', name: 'Công ty TNHH MTV Pacific Cross (BHV)' },
+  { id: 'MIC', name: 'Công ty cổ phần bảo hiểm Quân đội (MIC)' },
+  { id: 'GENERALI', name: 'Công ty TNHH bảo hiểm nhân thọ Generali Việt Nam' },
+  { id: 'MANULIFE', name: 'Công ty cổ phần Insmart (Manulife)' },
+  { id: 'PRUDENTIAL', name: 'Công ty cổ phần Insmart (Prudential)' },
+];
 
 @Injectable()
 export class BookingService {
@@ -34,6 +65,44 @@ export class BookingService {
         throw new BadRequestException('Kich thuoc file dinh kem vuot qua gioi han');
       }
     });
+  }
+
+  private validateInsuranceAndPayment(dto: CreateBookingDto) {
+    if (typeof dto.hasBHYT !== 'boolean') {
+      throw new BadRequestException('Thong tin BHYT bat buoc chon Co/Khong');
+    }
+    if (typeof dto.hasPrivateInsurance !== 'boolean') {
+      throw new BadRequestException('Thong tin bao hiem tu nhan bat buoc chon Co/Khong');
+    }
+
+    if (dto.hasBHYT && !String(dto.bhytType || '').trim()) {
+      throw new BadRequestException('Vui long chon loai BHYT cu the');
+    }
+
+    if (
+      dto.hasBHYT &&
+      dto.bhytType &&
+      !BHYT_TYPE_OPTIONS.some((item) => item.id === dto.bhytType)
+    ) {
+      throw new BadRequestException('Loai BHYT khong hop le');
+    }
+
+    if (dto.hasPrivateInsurance && !String(dto.privateInsuranceProvider || '').trim()) {
+      throw new BadRequestException('Vui long chon cong ty bao hiem tu nhan');
+    }
+
+    if (
+      dto.hasPrivateInsurance &&
+      dto.privateInsuranceProvider &&
+      !PRIVATE_INSURANCE_PROVIDERS.some((item) => item.id === dto.privateInsuranceProvider)
+    ) {
+      throw new BadRequestException('Cong ty bao hiem tu nhan khong hop le');
+    }
+
+    const paymentMethod = String(dto.paymentMethod || SUPPORTED_PAYMENT_METHOD).toUpperCase();
+    if (paymentMethod !== SUPPORTED_PAYMENT_METHOD) {
+      throw new BadRequestException('Phuong thuc thanh toan hien chi ho tro VNPAY');
+    }
   }
 
   private parseDateOnlyOrThrow(raw?: string | null) {
@@ -95,6 +164,7 @@ export class BookingService {
     clientIp = '127.0.0.1',
   ) {
     this.validatePreVisitAttachments(dto);
+    this.validateInsuranceAndPayment(dto);
     const N_NGAY = this.parseDateOnlyOrThrow(dto.N_NGAY);
     this.assertDateWithinBookingHorizon(N_NGAY);
 
@@ -140,9 +210,11 @@ export class BookingService {
       }
     }
 
-    const price = dto.LHK_MA
-      ? (await this.repo.findLoaiHinhKham(dto.LHK_MA))?.LHK_GIA ?? 0
-      : 0;
+    const loaiHinhKham = dto.LHK_MA ? await this.repo.findLoaiHinhKham(dto.LHK_MA) : null;
+    if (dto.LHK_MA && !loaiHinhKham) {
+      throw new BadRequestException('Loai hinh kham khong ton tai');
+    }
+    const price = loaiHinhKham?.LHK_GIA ?? 0;
 
     let booking: any;
     try {
@@ -161,6 +233,13 @@ export class BookingService {
         KG_MA: dto.KG_MA,
         LHK_MA: dto.LHK_MA,
         DK_STT: nextStt,
+        DK_CO_BHYT: dto.hasBHYT ?? null,
+        DK_LOAI_BHYT: dto.hasBHYT ? dto.bhytType?.trim() || null : null,
+        DK_CO_BHTN: dto.hasPrivateInsurance ?? null,
+        DK_BHTN_DON_VI: dto.hasPrivateInsurance
+          ? dto.privateInsuranceProvider?.trim() || null
+          : null,
+        DK_PT_THANH_TOAN: String(dto.paymentMethod || SUPPORTED_PAYMENT_METHOD).toUpperCase(),
       });
     } catch (e: any) {
       if (
@@ -168,6 +247,18 @@ export class BookingService {
         e.code === 'P2002'
       ) {
         throw new ConflictException('Khung gio nay da co nguoi dat');
+      }
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === 'P2003'
+      ) {
+        throw new BadRequestException('Du lieu dat lich khong hop le hoac da thay doi');
+      }
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === 'P2025'
+      ) {
+        throw new NotFoundException('Thong tin lich kham khong con ton tai');
       }
       throw e;
     }
@@ -177,7 +268,7 @@ export class BookingService {
       TT_TONG_TIEN: Number(price),
       TT_TIEN_KHAM: Number(price),
       TT_LOAI: 'DAT_LICH',
-      TT_PHUONG_THUC: 'VNPAY',
+      TT_PHUONG_THUC: String(dto.paymentMethod || SUPPORTED_PAYMENT_METHOD).toUpperCase(),
     });
 
     const orderInfo = `Dat lich kham BS ${dto.BS_MA} ngay ${dto.N_NGAY}`;
@@ -262,6 +353,23 @@ export class BookingService {
       CHUYEN_KHOA: d.CHUYEN_KHOA ? d.CHUYEN_KHOA.CK_TEN : null,
       CK_MA: d.CK_MA,
     }));
+  }
+
+  async getBHYTTypes() {
+    return { items: BHYT_TYPE_OPTIONS };
+  }
+
+  async getPrivateInsuranceProviders(q?: string) {
+    const keyword = String(q ?? '').trim().toLowerCase();
+    if (!keyword) {
+      return { items: PRIVATE_INSURANCE_PROVIDERS };
+    }
+
+    return {
+      items: PRIVATE_INSURANCE_PROVIDERS.filter((item) =>
+        item.name.toLowerCase().includes(keyword),
+      ),
+    };
   }
 
   async getAvailabilityDebug(YYYY_MM_DD: string, CK_MA?: number, q?: string) {

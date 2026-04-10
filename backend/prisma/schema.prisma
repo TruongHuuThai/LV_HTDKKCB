@@ -166,6 +166,11 @@ model DANG_KY {
   DK_LY_DO_HUY     String?
   DK_TRIEU_CHUNG   String?
   DK_GHI_CHU_TIEN_KHAM String?
+  DK_CO_BHYT       Boolean?
+  DK_LOAI_BHYT     String?
+  DK_CO_BHTN       Boolean?
+  DK_BHTN_DON_VI   String?
+  DK_PT_THANH_TOAN String?
   DK_TIEN_KHAM_CAP_NHAT_LUC DateTime? @db.Timestamp(6)
   DK_TIEN_KHAM_CAP_NHAT_BOI String?
   DK_THOI_GIAN_TAO DateTime?        @default(now()) @db.Timestamp(6)

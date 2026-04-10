@@ -1,0 +1,922 @@
+﻿openapi: 3.1.0
+info:
+  title: UMC Web Booking Flow API
+  version: 1.0.0
+  description: >-
+    API contract for redesigned patient web booking flow. Supports 3 entry modes
+    (by date, by department, by doctor) and converges into unified booking + payment pipeline.
+servers:
+  - url: https://api.example.com
+    description: Production
+  - url: https://staging-api.example.com
+    description: Staging
+
+tags:
+  - name: Patient Profiles
+  - name: Booking Draft
+  - name: Availability
+  - name: Insurance
+  - name: Payment
+  - name: Booking Result
+
+paths:
+  /v1/patient-profiles:
+    get:
+      tags: [Patient Profiles]
+      summary: Get patient profile list of current user
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientProfileListResponse'
+    post:
+      tags: [Patient Profiles]
+      summary: Create new patient profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePatientProfileRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientProfile'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /v1/patient-profiles/{profileId}:
+    patch:
+      tags: [Patient Profiles]
+      summary: Update patient profile
+      parameters:
+        - $ref: '#/components/parameters/ProfileId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePatientProfileRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientProfile'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /v1/booking-drafts:
+    post:
+      tags: [Booking Draft]
+      summary: Create or resume booking draft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDraftRequest'
+      responses:
+        '200':
+          description: Draft ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingDraftResponse'
+
+  /v1/booking-drafts/{draftId}:
+    get:
+      tags: [Booking Draft]
+      summary: Get draft detail
+      parameters:
+        - $ref: '#/components/parameters/DraftId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingDraftResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    patch:
+      tags: [Booking Draft]
+      summary: Update draft step data with optimistic locking
+      parameters:
+        - $ref: '#/components/parameters/DraftId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchDraftRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingDraftResponse'
+        '409':
+          description: Draft version conflict or stale tab
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/booking-drafts/resume:
+    get:
+      tags: [Booking Draft]
+      summary: Resume latest in-progress draft for current user
+      responses:
+        '200':
+          description: Draft or null
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [draft]
+                properties:
+                  draft:
+                    oneOf:
+                      - $ref: '#/components/schemas/BookingDraftResponse'
+                      - type: 'null'
+
+  /v1/booking-drafts/{draftId}/availability/dates:
+    get:
+      tags: [Availability]
+      summary: Get selectable dates based on current draft context
+      parameters:
+        - $ref: '#/components/parameters/DraftId'
+        - in: query
+          name: month
+          required: true
+          schema:
+            type: string
+            pattern: '^\\d{4}-\\d{2}$'
+            example: '2026-06'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AvailableDate'
+
+  /v1/booking-drafts/{draftId}/availability/departments:
+    get:
+      tags: [Availability]
+      summary: Get available departments based on current draft context
+      parameters:
+        - $ref: '#/components/parameters/DraftId'
+        - in: query
+          name: q
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DepartmentOption'
+
+  /v1/booking-drafts/{draftId}/availability/doctors:
+    get:
+      tags: [Availability]
+      summary: Get available doctors based on current draft context
+      parameters:
+        - $ref: '#/components/parameters/DraftId'
+        - in: query
+          name: q
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DoctorOption'
+
+  /v1/booking-drafts/{draftId}/availability/slots:
+    get:
+      tags: [Availability]
+      summary: Get available slots based on selected doctor/date/department
+      parameters:
+        - $ref: '#/components/parameters/DraftId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sessions]
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DoctorSession'
+
+  /v1/insurance/bhyt-types:
+    get:
+      tags: [Insurance]
+      summary: Get BHYT options
+      parameters:
+        - in: query
+          name: profileId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: departmentId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BHYTType'
+
+  /v1/insurance/private-insurers:
+    get:
+      tags: [Insurance]
+      summary: Get private insurers accepted by hospital
+      parameters:
+        - in: query
+          name: q
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PrivateInsurer'
+
+  /v1/booking-drafts/{draftId}/validate:
+    post:
+      tags: [Booking Draft]
+      summary: Validate draft before hold/payment
+      parameters:
+        - $ref: '#/components/parameters/DraftId'
+      responses:
+        '200':
+          description: Valid
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+        '409':
+          description: Invalid due to slot conflict or pricing changes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/booking-drafts/{draftId}/hold-slot:
+    post:
+      tags: [Booking Draft]
+      summary: Hold selected slot for payment
+      parameters:
+        - $ref: '#/components/parameters/DraftId'
+      responses:
+        '200':
+          description: Hold created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HoldSlotResponse'
+        '409':
+          description: Slot conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/payments/intents:
+    post:
+      tags: [Payment]
+      summary: Create payment intent from held booking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentIntentRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentIntent'
+
+  /v1/payments/intents/{paymentIntentId}:
+    get:
+      tags: [Payment]
+      summary: Get payment intent detail
+      parameters:
+        - $ref: '#/components/parameters/PaymentIntentId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentIntent'
+
+  /v1/payments/intents/{paymentIntentId}/status:
+    get:
+      tags: [Payment]
+      summary: Poll payment status
+      parameters:
+        - $ref: '#/components/parameters/PaymentIntentId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [paymentIntentId, status]
+                properties:
+                  paymentIntentId:
+                    type: string
+                  status:
+                    $ref: '#/components/schemas/PaymentStatus'
+                  providerTxnRef:
+                    type: string
+                    nullable: true
+                  updatedAt:
+                    type: string
+                    format: date-time
+
+  /v1/payments/intents/{paymentIntentId}/refresh:
+    post:
+      tags: [Payment]
+      summary: Regenerate payment info when expired
+      parameters:
+        - $ref: '#/components/parameters/PaymentIntentId'
+      responses:
+        '200':
+          description: Refreshed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentIntent'
+
+  /v1/bookings/confirm:
+    post:
+      tags: [Booking Result]
+      summary: Confirm booking after payment success
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmBookingRequest'
+      responses:
+        '200':
+          description: Booking confirmed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfirmBookingResponse'
+        '202':
+          description: Payment received, booking finalization pending
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfirmBookingResponse'
+
+  /v1/bookings/{bookingId}:
+    get:
+      tags: [Booking Result]
+      summary: Get booking detail
+      parameters:
+        - $ref: '#/components/parameters/BookingId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingDetail'
+
+components:
+  parameters:
+    ProfileId:
+      in: path
+      name: profileId
+      required: true
+      schema:
+        type: string
+    DraftId:
+      in: path
+      name: draftId
+      required: true
+      schema:
+        type: string
+    PaymentIntentId:
+      in: path
+      name: paymentIntentId
+      required: true
+      schema:
+        type: string
+    BookingId:
+      in: path
+      name: bookingId
+      required: true
+      schema:
+        type: string
+
+  responses:
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    EntryMode:
+      type: string
+      enum: [BY_DATE, BY_DEPARTMENT, BY_DOCTOR]
+
+    PaymentMethod:
+      type: string
+      enum: [MOMO, VNPAY, QR_BANKING, INTERNAL]
+
+    PaymentStatus:
+      type: string
+      enum: [PENDING, SUCCESS, FAILED, EXPIRED]
+
+    BookingStatus:
+      type: string
+      enum: [DRAFT, HOLDING_SLOT, PAYMENT_PENDING, CONFIRMING, CONFIRMED, FAILED, EXPIRED]
+
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum:
+            - VALIDATION_FAILED
+            - DRAFT_VERSION_CONFLICT
+            - SLOT_CONFLICT
+            - SLOT_EXPIRED
+            - PRICE_CHANGED
+            - PAYMENT_EXPIRED
+            - PAYMENT_FAILED
+            - PROFILE_NOT_ELIGIBLE
+            - INSURANCE_REQUIRED
+            - UNKNOWN
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+
+    PatientProfile:
+      type: object
+      required: [id, fullName, dateOfBirth, gender, phone, isEligible]
+      properties:
+        id:
+          type: string
+        fullName:
+          type: string
+        dateOfBirth:
+          type: string
+          format: date
+        gender:
+          type: string
+          enum: [MALE, FEMALE, OTHER]
+        phone:
+          type: string
+        nationalId:
+          type: string
+          nullable: true
+        isEligible:
+          type: boolean
+        missingFields:
+          type: array
+          items:
+            type: string
+
+    PatientProfileListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PatientProfile'
+
+    CreatePatientProfileRequest:
+      type: object
+      required: [fullName, dateOfBirth, gender, phone]
+      properties:
+        fullName:
+          type: string
+        dateOfBirth:
+          type: string
+          format: date
+        gender:
+          type: string
+          enum: [MALE, FEMALE, OTHER]
+        phone:
+          type: string
+        nationalId:
+          type: string
+          nullable: true
+
+    UpdatePatientProfileRequest:
+      type: object
+      additionalProperties: true
+
+    CreateDraftRequest:
+      type: object
+      required: [entryMode]
+      properties:
+        entryMode:
+          $ref: '#/components/schemas/EntryMode'
+        resumeIfExists:
+          type: boolean
+          default: true
+
+    InsuranceSelection:
+      type: object
+      required: [hasBHYT, hasPrivateInsurance]
+      properties:
+        hasBHYT:
+          type: boolean
+        bhytTypeId:
+          type: string
+          nullable: true
+        hasPrivateInsurance:
+          type: boolean
+        privateInsurerId:
+          type: string
+          nullable: true
+
+    BookingDraft:
+      type: object
+      required: [draftId, draftVersion, entryMode, status]
+      properties:
+        draftId:
+          type: string
+        draftVersion:
+          type: integer
+        entryMode:
+          $ref: '#/components/schemas/EntryMode'
+        patientProfileId:
+          type: string
+          nullable: true
+        appointmentDate:
+          type: string
+          format: date
+          nullable: true
+        departmentId:
+          type: string
+          nullable: true
+        doctorId:
+          type: string
+          nullable: true
+        roomId:
+          type: string
+          nullable: true
+        slotId:
+          type: string
+          nullable: true
+        consultationFee:
+          type: number
+          format: float
+          nullable: true
+        priceVersion:
+          type: string
+          nullable: true
+        insurance:
+          $ref: '#/components/schemas/InsuranceSelection'
+        bookingHoldId:
+          type: string
+          nullable: true
+        holdExpiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        paymentIntentId:
+          type: string
+          nullable: true
+        paymentStatus:
+          $ref: '#/components/schemas/PaymentStatus'
+        status:
+          $ref: '#/components/schemas/BookingStatus'
+        updatedAt:
+          type: string
+          format: date-time
+
+    BookingDraftResponse:
+      type: object
+      required: [draft]
+      properties:
+        draft:
+          $ref: '#/components/schemas/BookingDraft'
+
+    PatchDraftRequest:
+      type: object
+      required: [draftVersion]
+      properties:
+        draftVersion:
+          type: integer
+        patientProfileId:
+          type: string
+          nullable: true
+        appointmentDate:
+          type: string
+          format: date
+          nullable: true
+        departmentId:
+          type: string
+          nullable: true
+        doctorId:
+          type: string
+          nullable: true
+        roomId:
+          type: string
+          nullable: true
+        slotId:
+          type: string
+          nullable: true
+        insurance:
+          $ref: '#/components/schemas/InsuranceSelection'
+
+    AvailableDate:
+      type: object
+      required: [date, status]
+      properties:
+        date:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [SELECTABLE, OUT_OF_RANGE, HOLIDAY, UNAVAILABLE]
+        note:
+          type: string
+          nullable: true
+
+    DepartmentOption:
+      type: object
+      required: [departmentId, name, consultationFee]
+      properties:
+        departmentId:
+          type: string
+        name:
+          type: string
+        consultationFee:
+          type: number
+        conditionsNote:
+          type: string
+          nullable: true
+
+    DoctorOption:
+      type: object
+      required: [doctorId, name, title, departmentIds]
+      properties:
+        doctorId:
+          type: string
+        name:
+          type: string
+        title:
+          type: string
+          nullable: true
+        departmentIds:
+          type: array
+          items:
+            type: string
+        room:
+          type: string
+          nullable: true
+        specialNote:
+          type: string
+          nullable: true
+
+    SlotOption:
+      type: object
+      required: [slotId, startTime, endTime, available]
+      properties:
+        slotId:
+          type: string
+        startTime:
+          type: string
+          example: '06:30'
+        endTime:
+          type: string
+          example: '07:30'
+        available:
+          type: boolean
+
+    DoctorSession:
+      type: object
+      required: [doctorId, doctorName, room, sessionName, date, slots]
+      properties:
+        doctorId:
+          type: string
+        doctorName:
+          type: string
+        room:
+          type: string
+        sessionName:
+          type: string
+        date:
+          type: string
+          format: date
+        note:
+          type: string
+          nullable: true
+        slots:
+          type: array
+          items:
+            $ref: '#/components/schemas/SlotOption'
+
+    BHYTType:
+      type: object
+      required: [id, label]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        description:
+          type: string
+          nullable: true
+
+    PrivateInsurer:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+
+    HoldSlotResponse:
+      type: object
+      required: [bookingHoldId, holdExpiresAt]
+      properties:
+        bookingHoldId:
+          type: string
+        holdExpiresAt:
+          type: string
+          format: date-time
+
+    CreatePaymentIntentRequest:
+      type: object
+      required: [draftId, bookingHoldId, paymentMethod]
+      properties:
+        draftId:
+          type: string
+        bookingHoldId:
+          type: string
+        paymentMethod:
+          $ref: '#/components/schemas/PaymentMethod'
+
+    PaymentIntent:
+      type: object
+      required: [paymentIntentId, amount, currency, status, expiresAt]
+      properties:
+        paymentIntentId:
+          type: string
+        amount:
+          type: number
+        currency:
+          type: string
+          example: VND
+        status:
+          $ref: '#/components/schemas/PaymentStatus'
+        paymentMethod:
+          $ref: '#/components/schemas/PaymentMethod'
+        paymentUrl:
+          type: string
+          nullable: true
+        qrCodeContent:
+          type: string
+          nullable: true
+        transferContent:
+          type: string
+          nullable: true
+        providerTxnRef:
+          type: string
+          nullable: true
+        expiresAt:
+          type: string
+          format: date-time
+
+    ConfirmBookingRequest:
+      type: object
+      required: [draftId, paymentIntentId]
+      properties:
+        draftId:
+          type: string
+        paymentIntentId:
+          type: string
+
+    ConfirmBookingResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [CONFIRMED, PENDING_CONFIRMATION]
+        bookingId:
+          type: string
+          nullable: true
+        bookingCode:
+          type: string
+          nullable: true
+
+    BookingDetail:
+      type: object
+      required: [bookingId, bookingCode, status]
+      properties:
+        bookingId:
+          type: string
+        bookingCode:
+          type: string
+        status:
+          type: string
+          enum: [CONFIRMED, CANCELLED, CHECKED_IN]
+        patientProfileId:
+          type: string
+        departmentId:
+          type: string
+        doctorId:
+          type: string
+        roomId:
+          type: string
+        slotId:
+          type: string
+        appointmentDate:
+          type: string
+          format: date
+        startTime:
+          type: string
+        endTime:
+          type: string
+        consultationFee:
+          type: number
+        insurance:
+          $ref: '#/components/schemas/InsuranceSelection'

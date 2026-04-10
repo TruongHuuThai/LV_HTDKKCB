@@ -1,5 +1,6 @@
 // src/modules/booking/booking.repository.ts
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { combineDateAndTime } from './booking.utils';
 import {
@@ -21,7 +22,17 @@ import {
 
 @Injectable()
 export class BookingRepository {
+  private static readonly dangKyFields = new Set(
+    (Prisma.dmmf.datamodel.models.find((model) => model.name === 'DANG_KY')?.fields ?? []).map(
+      (field) => field.name,
+    ),
+  );
+
   constructor(private readonly prisma: PrismaService) { }
+
+  private supportsDangKyField(fieldName: string) {
+    return BookingRepository.dangKyFields.has(fieldName);
+  }
 
   private toUtcDayRange(date: Date) {
     const start = new Date(
@@ -190,6 +201,11 @@ export class BookingRepository {
     KG_MA: number;
     LHK_MA?: number;
     DK_STT?: number;
+    DK_CO_BHYT?: boolean | null;
+    DK_LOAI_BHYT?: string | null;
+    DK_CO_BHTN?: boolean | null;
+    DK_BHTN_DON_VI?: string | null;
+    DK_PT_THANH_TOAN?: string | null;
   }) {
     const payload: any = {
       BN_MA: data.BN_MA,
@@ -199,20 +215,24 @@ export class BookingRepository {
       KG_MA: data.KG_MA,
       DK_STT: data.DK_STT ?? null,
       DK_TRANG_THAI: 'CHO_KHAM',
-      BENH_NHAN: { connect: { BN_MA: data.BN_MA } },
-      KHUNG_GIO: { connect: { KG_MA: data.KG_MA } },
-      LICH_BSK: {
-        connect: {
-          BS_MA_N_NGAY_B_TEN: {
-            BS_MA: data.BS_MA,
-            N_NGAY: data.N_NGAY,
-            B_TEN: data.B_TEN,
-          },
-        },
-      },
     };
+    if (this.supportsDangKyField('DK_CO_BHYT')) {
+      payload.DK_CO_BHYT = data.DK_CO_BHYT ?? null;
+    }
+    if (this.supportsDangKyField('DK_LOAI_BHYT')) {
+      payload.DK_LOAI_BHYT = data.DK_LOAI_BHYT ?? null;
+    }
+    if (this.supportsDangKyField('DK_CO_BHTN')) {
+      payload.DK_CO_BHTN = data.DK_CO_BHTN ?? null;
+    }
+    if (this.supportsDangKyField('DK_BHTN_DON_VI')) {
+      payload.DK_BHTN_DON_VI = data.DK_BHTN_DON_VI ?? null;
+    }
+    if (this.supportsDangKyField('DK_PT_THANH_TOAN')) {
+      payload.DK_PT_THANH_TOAN = data.DK_PT_THANH_TOAN ?? null;
+    }
     if (data.LHK_MA) {
-      payload.LOAI_HINH_KHAM = { connect: { LHK_MA: data.LHK_MA } };
+      payload.LHK_MA = data.LHK_MA;
     }
     return this.prisma.dANG_KY.create({
       data: payload,
