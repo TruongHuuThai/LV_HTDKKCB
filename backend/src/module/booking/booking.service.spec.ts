@@ -7,8 +7,9 @@ describe('BookingService debug availability', () => {
   } as any;
   const vnpay = {} as any;
   const paymentRepo = {} as any;
+  const qrBanking = {} as any;
 
-  const service = new BookingService(repo, vnpay, paymentRepo);
+  const service = new BookingService(repo, vnpay, paymentRepo, qrBanking);
 
   beforeEach(() => {
     jest.clearAllMocks();

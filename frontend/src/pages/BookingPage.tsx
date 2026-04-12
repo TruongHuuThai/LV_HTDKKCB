@@ -1,6 +1,6 @@
-﻿import { type ReactNode, useEffect, useMemo, useState } from 'react';
+﻿import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
   ArrowLeft,
@@ -10,8 +10,11 @@ import {
   ChevronRight,
   Circle,
   Clock3,
+  Copy,
   CreditCard,
+  ExternalLink,
   LoaderCircle,
+  QrCode,
   Search,
   ShieldCheck,
   Sparkles,
@@ -24,6 +27,7 @@ import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -35,14 +39,14 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useSpecialties } from '@/hooks/useSpecialties';
-import { canOpenPaymentUrl, getPaymentStatusLabel } from '@/lib/appointments';
+import { canOpenPaymentUrl } from '@/lib/appointments';
 import { logFrontendError } from '@/lib/frontendLogger';
 import { getPatientFlowErrorMessage } from '@/lib/patientFlowError';
 import { setLastPaymentContext } from '@/lib/patientPaymentFlow';
 import { getPatientProfileFullName } from '@/lib/patientProfiles';
 import { formatDateDdMmYyyy, getSessionLabel } from '@/lib/scheduleDisplay';
 import { appointmentsApi } from '@/services/api/appointmentsApi';
-import { bookingApi, type BookingDoctor } from '@/services/api/bookingApi';
+import { bookingApi, type BookingDoctor, type BookingServiceTypeOption } from '@/services/api/bookingApi';
 import { patientProfilesApi, type PatientProfile } from '@/services/api/patientProfilesApi';
 import { queryKeys } from '@/services/api/queryKeys';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -56,7 +60,7 @@ type FlowStep =
   | 'insurance'
   | 'review'
   | 'paymentMethod'
-  | 'paymentInfo'
+  | 'paymentCheckout'
   | 'result';
 type StepGroupKey = 'setup' | 'schedule' | 'insurance' | 'payment';
 type StepStatus = 'done' | 'current' | 'upcoming';
@@ -69,7 +73,7 @@ const FLOW_SEQUENCE: FlowStep[] = [
   'insurance',
   'review',
   'paymentMethod',
-  'paymentInfo',
+  'paymentCheckout',
   'result',
 ];
 
@@ -79,8 +83,8 @@ const STEP_LABELS: Record<FlowStep, string> = {
   clinical: 'Lịch khám',
   insurance: 'Bảo hiểm',
   review: 'Xem lại',
-  paymentMethod: 'Thanh toán',
-  paymentInfo: 'Theo dõi thanh toán',
+  paymentMethod: 'Chọn thanh toán',
+  paymentCheckout: 'Thanh toán',
   result: 'Hoàn tất',
 };
 
@@ -118,9 +122,9 @@ const ENTRY_OPTIONS: Array<{
 ];
 
 const PAYMENT_METHOD_OPTIONS = [
-  { value: 'VNPAY', label: 'VNPAY', note: 'Khả dụng ngay', available: true },
+  { value: 'QR_BANKING', label: 'QR Banking', note: 'Khuyến nghị cho chuyển khoản nhanh', available: true },
+  { value: 'VNPAY', label: 'VNPAY', note: 'Thanh toán qua cổng VNPAY', available: true },
   { value: 'MOMO', label: 'MoMo', note: 'Sắp hỗ trợ', available: false },
-  { value: 'QR_BANKING', label: 'QR Banking', note: 'Sắp hỗ trợ', available: false },
 ];
 
 function todayIso() {
@@ -178,6 +182,65 @@ function sectionTitleForSelector(key: ClinicalSelectorKey) {
   return 'Chọn khung giờ';
 }
 
+function buildQrTransferContent(appointmentId?: number | null, paymentRef?: number | null) {
+  if (!appointmentId || !paymentRef) return null;
+  return `TT DK ${appointmentId} TT ${paymentRef}`;
+}
+
+function getPaymentMethodLabel(value?: string | null) {
+  const normalized = String(value || '')
+    .trim()
+    .toUpperCase();
+  if (!normalized) return 'Chưa chọn';
+  return PAYMENT_METHOD_OPTIONS.find((item) => item.value === normalized)?.label || normalized;
+}
+
+function toVndLabel(raw?: number | string | null) {
+  const amount = Number(raw ?? 0);
+  if (!Number.isFinite(amount)) return '--';
+  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+}
+
+function formatCountdown(ms: number) {
+  if (ms <= 0) return '00:00';
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+  const seconds = String(totalSeconds % 60).padStart(2, '0');
+  return `${minutes}:${seconds}`;
+}
+
+function isLikelyQrImageUrl(url?: string | null) {
+  if (!canOpenPaymentUrl(url)) return false;
+  const value = String(url || '').toLowerCase();
+  return value.includes('vietqr.io/image') || value.endsWith('.png') || value.includes('.png?');
+}
+
+function parseQrInfo(url?: string | null) {
+  if (!canOpenPaymentUrl(url)) return null;
+  try {
+    const parsed = new URL(url as string);
+    const marker = '/image/';
+    const idx = parsed.pathname.indexOf(marker);
+    let bankId = '';
+    let accountNo = '';
+    if (idx >= 0) {
+      const slug = parsed.pathname.slice(idx + marker.length).split('/')[0];
+      const [bank, account] = slug.split('-');
+      bankId = decodeURIComponent(bank || '');
+      accountNo = decodeURIComponent(account || '');
+    }
+    return {
+      bankId: bankId || null,
+      accountNo: accountNo || null,
+      accountName: parsed.searchParams.get('accountName') || null,
+      amount: parsed.searchParams.get('amount') || null,
+      addInfo: parsed.searchParams.get('addInfo') || null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function getPatientSafeErrorMessage(error: unknown, fallback: string) {
   const raw = getPatientFlowErrorMessage(error, fallback);
   const normalized = raw.toLowerCase();
@@ -206,6 +269,7 @@ export default function BookingPage() {
   const [entryMode, setEntryMode] = useState<EntryMode | null>(null);
 
   const [specialtyId, setSpecialtyId] = useState<string>('');
+  const [selectedServiceTypeId, setSelectedServiceTypeId] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState(todayIso());
   const [doctorSearch, setDoctorSearch] = useState('');
   const [doctorSearchDebounced, setDoctorSearchDebounced] = useState('');
@@ -221,11 +285,17 @@ export default function BookingPage() {
   const [privateInsuranceProvider, setPrivateInsuranceProvider] = useState<string>('');
   const [privateInsuranceSearch, setPrivateInsuranceSearch] = useState('');
 
-  const [paymentMethod, setPaymentMethod] = useState<string>('VNPAY');
+  const [paymentMethod, setPaymentMethod] = useState<string>('QR_BANKING');
   const [createdAppointmentId, setCreatedAppointmentId] = useState<number | null>(null);
   const [createdPaymentRef, setCreatedPaymentRef] = useState<number | null>(null);
   const [createdPaymentUrl, setCreatedPaymentUrl] = useState<string | null>(null);
-  const [resultTone, setResultTone] = useState<'success' | 'failed' | 'pending'>('pending');
+  const [isValidatingSlotBeforePayment, setIsValidatingSlotBeforePayment] = useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [paymentSuccessDialogOpen, setPaymentSuccessDialogOpen] = useState(false);
+  const [isSuccessTransitioning, setIsSuccessTransitioning] = useState(false);
+  const queryClient = useQueryClient();
+  const successHandledRef = useRef<string | null>(null);
+  const successRedirectTimerRef = useRef<number | null>(null);
 
   const profilesQuery = useQuery({
     queryKey: queryKeys.patientProfiles.mine,
@@ -259,6 +329,12 @@ export default function BookingPage() {
     enabled: Boolean(selectedProfile),
   });
 
+  const serviceTypesQuery = useQuery({
+    queryKey: queryKeys.booking.serviceTypes(specialtyId || ''),
+    queryFn: () => bookingApi.getServiceTypesBySpecialty(Number(specialtyId)),
+    enabled: Boolean(selectedProfile && specialtyId),
+  });
+
   const doctorList = useMemo(() => {
     const keyword = normalizeVietnameseText(doctorSearchDebounced);
     if (!keyword) return doctorsQuery.data ?? [];
@@ -285,14 +361,17 @@ export default function BookingPage() {
     if (entryMode !== 'BY_DOCTOR' || !selectedDoctor) return;
     if (String(selectedDoctor.CK_MA) !== specialtyId) {
       setSpecialtyId(String(selectedDoctor.CK_MA));
+      setSelectedServiceTypeId('');
       setSelectedSlotKey(null);
     }
   }, [entryMode, selectedDoctor, specialtyId]);
 
   const slotsQuery = useQuery({
-    queryKey: queryKeys.booking.slots(selectedDoctorId, selectedDate),
-    queryFn: () => bookingApi.getDoctorSlotsForDay(selectedDoctorId!, selectedDate),
+    queryKey: queryKeys.booking.slots(selectedDoctorId, selectedDate, selectedProfile?.BN_MA || null),
+    queryFn: () =>
+      bookingApi.getDoctorSlotsForDay(selectedDoctorId!, selectedDate, selectedProfile?.BN_MA),
     enabled: Boolean(selectedDoctorId && selectedDate && selectedProfile),
+    refetchInterval: step === 'clinical' && selectedDoctorId ? 15000 : false,
   });
 
   const allSlots = useMemo(
@@ -308,7 +387,28 @@ export default function BookingPage() {
     [slotsQuery.data],
   );
 
-  const selectedSlot = allSlots.find((item) => item.key === selectedSlotKey && item.available) || null;
+  const selectedSlot =
+    allSlots.find((item) => item.key === selectedSlotKey && item.available && !item.alreadyBookedByProfile) ||
+    null;
+  const alreadyBookedSlots = useMemo(
+    () => allSlots.filter((item) => Boolean(item.alreadyBookedByProfile)),
+    [allSlots],
+  );
+
+  useEffect(() => {
+    if (!selectedSlotKey) return;
+    const matchedSlot = allSlots.find((item) => item.key === selectedSlotKey);
+    const stillAvailable = Boolean(matchedSlot?.available) && !matchedSlot?.alreadyBookedByProfile;
+    if (stillAvailable) return;
+    setSelectedSlotKey(null);
+    if (step === 'clinical') {
+      toast.error(
+        matchedSlot?.alreadyBookedByProfile
+          ? 'Bạn đã có lịch khám ở khung giờ này. Vui lòng chọn khung giờ khác.'
+          : 'Khung giờ bạn chọn vừa đầy chỗ. Vui lòng chọn khung giờ khác.',
+      );
+    }
+  }, [allSlots, selectedSlotKey, step]);
 
   const bhytTypesQuery = useQuery({
     queryKey: ['booking-bhyt-types', selectedProfile?.BN_MA, specialtyId],
@@ -329,28 +429,64 @@ export default function BookingPage() {
   const paymentStatusQuery = useQuery({
     queryKey: queryKeys.appointments.paymentStatus(createdAppointmentId || 0),
     queryFn: () => appointmentsApi.getPaymentStatus(createdAppointmentId!),
-    enabled: Boolean(createdAppointmentId) && (step === 'paymentInfo' || step === 'result'),
-    refetchInterval: step === 'paymentInfo' ? 7000 : false,
+    enabled: Boolean(createdAppointmentId) && (step === 'paymentCheckout' || step === 'result'),
+    refetchInterval: step === 'paymentCheckout' && !isSuccessTransitioning ? 6000 : false,
   });
 
   useEffect(() => {
-    const status = paymentStatusQuery.data?.payment?.normalizedStatus;
-    if (!status) return;
-    if (status === 'paid') {
-      setResultTone('success');
-      setStep('result');
+    const fallbackUrl = paymentStatusQuery.data?.payment?.paymentUrl;
+    if (!canOpenPaymentUrl(fallbackUrl)) return;
+    setCreatedPaymentUrl((current) => current || (fallbackUrl as string));
+  }, [paymentStatusQuery.data?.payment?.paymentUrl]);
+
+  useEffect(() => {
+    if (step !== 'paymentCheckout') return;
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [step]);
+
+  const openPaymentGateway = (url?: string | null, method?: string) => {
+    if (!canOpenPaymentUrl(url)) {
+      toast.error('Không có URL thanh toán hợp lệ.');
       return;
     }
-    if (status === 'failed' || status === 'expired') {
-      setResultTone('failed');
-    } else {
-      setResultTone('pending');
+
+    const targetMethod = String(method || paymentMethod).toUpperCase();
+    if (targetMethod === 'QR_BANKING') {
+      const nextTab = window.open(url as string, '_blank', 'noopener,noreferrer');
+      if (!nextTab) {
+        toast.error('Trình duyệt đang chặn tab mới. Vui lòng cho phép popup rồi thử lại.');
+      }
+      return;
     }
-  }, [paymentStatusQuery.data?.payment?.normalizedStatus]);
+
+    window.location.assign(url as string);
+  };
+
+  const copyTransferContent = async (value?: string | null) => {
+    if (!value) {
+      toast.error('Chưa có nội dung chuyển khoản để sao chép.');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success('Đã sao chép nội dung chuyển khoản.');
+    } catch {
+      toast.error('Không thể sao chép tự động. Vui lòng thử lại.');
+    }
+  };
 
   const createMutation = useMutation({
     mutationFn: bookingApi.createBooking,
     onSuccess: (result) => {
+      if (successRedirectTimerRef.current) {
+        window.clearTimeout(successRedirectTimerRef.current);
+        successRedirectTimerRef.current = null;
+      }
+      successHandledRef.current = null;
+      setPaymentSuccessDialogOpen(false);
+      setIsSuccessTransitioning(false);
+
       const appointmentId = result.booking?.DK_MA;
       if (appointmentId) {
         setCreatedAppointmentId(appointmentId);
@@ -358,7 +494,7 @@ export default function BookingPage() {
       }
       setCreatedPaymentRef(result.payment?.TT_MA || null);
       setCreatedPaymentUrl((result.payment_url as string) || null);
-      setStep('paymentInfo');
+      setStep('paymentCheckout');
       toast.success('Đã tạo lịch hẹn. Vui lòng hoàn tất thanh toán để xác nhận.');
     },
     onError: (error) => {
@@ -368,18 +504,42 @@ export default function BookingPage() {
         selectedSlotKey,
         entryMode,
       });
-      toast.error(getPatientSafeErrorMessage(error, 'Không thể tạo lịch khám lúc này. Vui lòng thử lại.'));
+      const safeMessage = getPatientSafeErrorMessage(error, 'Không thể tạo lịch khám lúc này. Vui lòng thử lại.');
+      const normalized = safeMessage.toLowerCase();
+      const isAlreadyBookedConflict = normalized.includes('benh nhan da dang ky 1 lich trong khung gio nay');
+      const isSlotConflict =
+        normalized.includes('khung gio nay da du so luong benh nhan') ||
+        normalized.includes('khung gio nay da co nguoi dat') ||
+        normalized.includes('slot moi da het cho');
+      if (isSlotConflict || isAlreadyBookedConflict) {
+        setSelectedSlotKey(null);
+        setStep('clinical');
+        void slotsQuery.refetch();
+        toast.error(
+          isAlreadyBookedConflict
+            ? 'Bạn đã có lịch khám ở khung giờ này. Vui lòng chọn khung giờ khác.'
+            : 'Khung giờ bạn chọn vừa đầy chỗ. Vui lòng chọn khung giờ khác.',
+        );
+        return;
+      }
+      toast.error(safeMessage);
     },
   });
 
   const retryPaymentMutation = useMutation({
     mutationFn: (appointmentId: number) => appointmentsApi.retryPayment(appointmentId),
     onSuccess: (result) => {
+      if (successRedirectTimerRef.current) {
+        window.clearTimeout(successRedirectTimerRef.current);
+        successRedirectTimerRef.current = null;
+      }
+      successHandledRef.current = null;
+      setPaymentSuccessDialogOpen(false);
+      setIsSuccessTransitioning(false);
+      setCreatedPaymentRef(result.payment?.TT_MA || null);
       const nextUrl = (result.payment_url as string) || null;
       setCreatedPaymentUrl(nextUrl);
-      if (canOpenPaymentUrl(nextUrl)) {
-        window.location.assign(nextUrl as string);
-      }
+      toast.success('Đã tạo lại phiên thanh toán. Vui lòng tiếp tục thanh toán.');
     },
     onError: (error) => {
       toast.error(getPatientSafeErrorMessage(error, 'Không thể tạo lại link thanh toán.'));
@@ -387,6 +547,9 @@ export default function BookingPage() {
   });
 
   const selectedSpecialty = (specialties ?? []).find((item) => String(item.CK_MA) === specialtyId);
+  const selectedServiceType = (serviceTypesQuery.data ?? []).find(
+    (item) => String(item.LHK_MA) === selectedServiceTypeId,
+  ) as BookingServiceTypeOption | undefined;
   const clinicalOrder = getClinicalOrder(entryMode);
   const currentStepIndex = FLOW_SEQUENCE.findIndex((item) => item === step);
   const currentStepLabel = STEP_LABELS[step];
@@ -394,7 +557,13 @@ export default function BookingPage() {
 
   const canContinueProfile = Boolean(selectedProfile);
   const canContinueEntry = Boolean(selectedProfile && entryMode);
-  const canContinueClinical = Boolean(selectedDate && specialtyId && selectedDoctor && selectedSlot);
+  const canContinueClinical = Boolean(
+    selectedDate &&
+      specialtyId &&
+      selectedServiceType &&
+      selectedDoctor &&
+      selectedSlot,
+  );
   const canContinueInsurance =
     hasBHYT !== null &&
     hasPrivateInsurance !== null &&
@@ -413,9 +582,109 @@ export default function BookingPage() {
   const slotsError = slotsQuery.isError
     ? getPatientSafeErrorMessage(slotsQuery.error, 'Không tải được danh sách khung giờ. Vui lòng thử lại.')
     : null;
+  const serviceTypesError = serviceTypesQuery.isError
+    ? getPatientSafeErrorMessage(serviceTypesQuery.error, 'Không tải được danh sách loại hình khám.')
+    : null;
+
+  const paymentStatusRaw = paymentStatusQuery.data?.payment?.normalizedStatus || null;
+  const paymentExpiresAtIso = paymentStatusQuery.data?.payment?.expiresAt || null;
+  const paymentExpiresAt = paymentExpiresAtIso ? new Date(paymentExpiresAtIso).getTime() : null;
+  const paymentRemainingMs = paymentExpiresAt ? paymentExpiresAt - nowMs : null;
+  const paymentAmountRaw = paymentStatusQuery.data?.payment?.TT_TONG_TIEN ?? null;
+  const paymentAmountLabel = paymentAmountRaw !== null ? toVndLabel(paymentAmountRaw) : null;
+  const activePaymentMethod =
+    String(paymentStatusQuery.data?.payment?.TT_PHUONG_THUC || paymentMethod || '')
+      .trim()
+      .toUpperCase() || 'QR_BANKING';
+  const activePaymentRef = paymentStatusQuery.data?.payment?.TT_MA || createdPaymentRef || null;
+  const qrInfo = useMemo(() => parseQrInfo(createdPaymentUrl), [createdPaymentUrl]);
+  const transferContent =
+    qrInfo?.addInfo || buildQrTransferContent(createdAppointmentId, activePaymentRef) || null;
+  const paymentTransactionRef = paymentStatusQuery.data?.payment?.TT_MA_GIAO_DICH || null;
+  const paymentPaidAtRaw = paymentStatusQuery.data?.payment?.TT_THOI_GIAN || null;
+  const paymentPaidAtLabel = paymentPaidAtRaw
+    ? new Date(paymentPaidAtRaw).toLocaleString('vi-VN', {
+        hour12: false,
+      })
+    : null;
+  const selectedSlotLabel = selectedSlot
+    ? `${selectedSlot.KG_BAT_DAU.slice(11, 16)} - ${selectedSlot.KG_KET_THUC.slice(11, 16)}`
+    : null;
+  const selectedServiceTypeLabel = selectedServiceType?.LHK_TEN || null;
+  const selectedServiceTypePriceLabel = selectedServiceType
+    ? toVndLabel(selectedServiceType.LHK_GIA)
+    : null;
+  const summaryPaymentAmountLabel = paymentAmountLabel || selectedServiceTypePriceLabel;
+  const selectedProfileName = selectedProfile ? getPatientProfileFullName(selectedProfile) : null;
+  const paymentStatusUi:
+    | 'pending'
+    | 'checking'
+    | 'paid'
+    | 'failed'
+    | 'expired'
+    | 'error' = paymentStatusQuery.isError
+    ? 'error'
+    : paymentStatusRaw === 'paid'
+    ? 'paid'
+    : paymentStatusRaw === 'failed'
+    ? 'failed'
+    : paymentStatusRaw === 'expired' || Boolean(paymentRemainingMs !== null && paymentRemainingMs <= 0)
+    ? 'expired'
+    : paymentStatusQuery.isFetching || paymentStatusRaw === 'pending'
+    ? 'checking'
+    : 'pending';
+  const paymentSuccessToken =
+    paymentStatusRaw === 'paid' && createdAppointmentId
+      ? `${createdAppointmentId}-${activePaymentRef || 0}-${
+          paymentTransactionRef || ''
+        }`
+      : null;
+
+  useEffect(() => {
+    if (step !== 'paymentCheckout') return;
+    if (!paymentSuccessToken) return;
+    if (successHandledRef.current === paymentSuccessToken) return;
+
+    successHandledRef.current = paymentSuccessToken;
+    queueMicrotask(() => {
+      setIsSuccessTransitioning(true);
+      setPaymentSuccessDialogOpen(true);
+    });
+
+    if (createdAppointmentId && createdAppointmentId > 0) {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.appointments.paymentStatus(createdAppointmentId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.appointments.detail(createdAppointmentId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.appointments.cancelPolicy(createdAppointmentId),
+      });
+    }
+    void queryClient.invalidateQueries({ queryKey: ['appointments-my'] });
+
+    if (successRedirectTimerRef.current) {
+      window.clearTimeout(successRedirectTimerRef.current);
+    }
+    successRedirectTimerRef.current = window.setTimeout(() => {
+      setPaymentSuccessDialogOpen(false);
+      setIsSuccessTransitioning(false);
+      setStep('result');
+    }, 2000);
+  }, [createdAppointmentId, paymentSuccessToken, queryClient, step]);
+
+  useEffect(() => {
+    return () => {
+      if (successRedirectTimerRef.current) {
+        window.clearTimeout(successRedirectTimerRef.current);
+      }
+    };
+  }, []);
 
   const resetFlowFromBookingMethodChange = () => {
     setSpecialtyId('');
+    setSelectedServiceTypeId('');
     setSelectedDoctorId(null);
     setSelectedSlotKey(null);
     setSymptoms('');
@@ -425,10 +694,17 @@ export default function BookingPage() {
     setHasPrivateInsurance(null);
     setPrivateInsuranceProvider('');
     setPrivateInsuranceSearch('');
-    setPaymentMethod('VNPAY');
+    setPaymentMethod('QR_BANKING');
     setCreatedAppointmentId(null);
     setCreatedPaymentRef(null);
     setCreatedPaymentUrl(null);
+    setPaymentSuccessDialogOpen(false);
+    setIsSuccessTransitioning(false);
+    successHandledRef.current = null;
+    if (successRedirectTimerRef.current) {
+      window.clearTimeout(successRedirectTimerRef.current);
+      successRedirectTimerRef.current = null;
+    }
   };
 
   const resetFlowFromProfileChange = () => {
@@ -458,6 +734,7 @@ export default function BookingPage() {
 
   const handleChangeSpecialty = (value: string) => {
     setSpecialtyId(value);
+    setSelectedServiceTypeId('');
     setSelectedDoctorId(null);
     setSelectedSlotKey(null);
   };
@@ -476,13 +753,48 @@ export default function BookingPage() {
     if (step === 'insurance') return setStep('clinical');
     if (step === 'review') return setStep('insurance');
     if (step === 'paymentMethod') return setStep('review');
-    if (step === 'paymentInfo') return setStep('paymentMethod');
-    if (step === 'result') return setStep('paymentInfo');
+    if (step === 'paymentCheckout') return setStep('paymentMethod');
+    if (step === 'result') return setStep('paymentCheckout');
   };
 
-  const submitCreateBooking = () => {
-    if (!selectedProfile || !selectedDoctor || !selectedSlot || !selectedDate) {
-      toast.error('Vui lòng chọn đủ hồ sơ, ngày khám, bác sĩ và khung giờ.');
+  const findSlotByKey = (
+    sessions:
+      | Array<{
+          B_TEN: string;
+          PHONG?: string | null;
+          slots: Array<{
+            KG_MA: number;
+            KG_BAT_DAU: string;
+            KG_KET_THUC: string;
+            available: boolean;
+            availabilityStatus?: 'available' | 'full' | 'past' | 'already_booked';
+            alreadyBookedByProfile?: boolean;
+            existingBookingId?: number | null;
+          }>;
+        }>
+      | undefined,
+    key: string | null,
+  ) => {
+    if (!sessions || !key) return null;
+    for (const session of sessions) {
+      for (const slot of session.slots || []) {
+        const slotKey = `${session.B_TEN}-${slot.KG_MA}`;
+        if (slotKey === key) {
+          return {
+            ...slot,
+            B_TEN: session.B_TEN,
+            PHONG: session.PHONG,
+            key: slotKey,
+          };
+        }
+      }
+    }
+    return null;
+  };
+
+  const submitCreateBooking = async () => {
+    if (!selectedProfile || !selectedDoctor || !selectedSlot || !selectedDate || !selectedServiceType) {
+      toast.error('Vui lòng chọn đủ hồ sơ, ngày khám, loại hình khám, bác sĩ và khung giờ.');
       return;
     }
 
@@ -491,12 +803,51 @@ export default function BookingPage() {
       return;
     }
 
+    if (!selectedSlotKey) {
+      toast.error('Vui lòng chọn khung giờ còn trống.');
+      return;
+    }
+
+    setIsValidatingSlotBeforePayment(true);
+    let latestSelectedSlot: {
+      KG_MA: number;
+      B_TEN: string;
+      available: boolean;
+      availabilityStatus?: 'available' | 'full' | 'past' | 'already_booked';
+      alreadyBookedByProfile?: boolean;
+      existingBookingId?: number | null;
+    } | null = null;
+    try {
+      const latestSlotsResult = await slotsQuery.refetch();
+      if (latestSlotsResult.isError) {
+        toast.error('Không thể kiểm tra lại khung giờ hiện tại. Vui lòng thử lại.');
+        return;
+      }
+      const matched = findSlotByKey(latestSlotsResult.data as any, selectedSlotKey);
+      if (!matched || !matched.available) {
+        setSelectedSlotKey(null);
+        setStep('clinical');
+        if (matched?.alreadyBookedByProfile || matched?.availabilityStatus === 'already_booked') {
+          toast.error('Bạn đã có lịch khám trong khung giờ này. Vui lòng chọn khung giờ khác.');
+        } else {
+          toast.error('Khung giờ bạn chọn vừa đầy chỗ. Vui lòng chọn khung giờ khác.');
+        }
+        return;
+      }
+      latestSelectedSlot = matched;
+    } finally {
+      setIsValidatingSlotBeforePayment(false);
+    }
+
+    if (!latestSelectedSlot) return;
+
     createMutation.mutate({
       BN_MA: selectedProfile.BN_MA,
       BS_MA: selectedDoctor.BS_MA,
       N_NGAY: selectedDate,
-      B_TEN: selectedSlot.B_TEN,
-      KG_MA: selectedSlot.KG_MA,
+      B_TEN: latestSelectedSlot.B_TEN,
+      KG_MA: latestSelectedSlot.KG_MA,
+      LHK_MA: selectedServiceType.LHK_MA,
       symptoms: symptoms.trim() || undefined,
       preVisitNote: preVisitNote.trim() || undefined,
       hasBHYT: hasBHYT ?? false,
@@ -511,22 +862,23 @@ export default function BookingPage() {
     const guidance: string[] = [];
     if (!selectedProfile) return ['Chọn hồ sơ bệnh nhân để tiếp tục.'];
     if (!entryMode) return ['Chọn cách đặt lịch phù hợp với nhu cầu của bạn.'];
+    if (!selectedServiceType) guidance.push('Chọn loại hình khám để biết chi phí trước khi thanh toán.');
     if (!selectedDoctor) guidance.push('Chọn bác sĩ khám phù hợp.');
     if (!selectedSlot) guidance.push('Chọn khung giờ còn trống.');
     if (hasBHYT === null || hasPrivateInsurance === null) {
       guidance.push('Trả lời đầy đủ thông tin bảo hiểm.');
     }
     return guidance.slice(0, 3);
-  }, [entryMode, hasBHYT, hasPrivateInsurance, selectedDoctor, selectedProfile, selectedSlot]);
+  }, [entryMode, hasBHYT, hasPrivateInsurance, selectedDoctor, selectedProfile, selectedServiceType, selectedSlot]);
 
   const summaryNextAction = useMemo(() => {
     if (step === 'profile') return selectedProfile ? 'Tiếp tục sang bước chọn cách đặt lịch.' : 'Chọn hồ sơ bệnh nhân để bắt đầu.';
     if (step === 'entry') return selectedProfile ? 'Chọn cách đặt lịch cho hồ sơ đã chọn.' : 'Quay lại chọn hồ sơ bệnh nhân trước.';
-    if (step === 'clinical') return canContinueClinical ? 'Kiểm tra lại lịch đã chọn rồi tiếp tục.' : 'Hoàn tất chọn ngày, bác sĩ và khung giờ.';
+    if (step === 'clinical') return canContinueClinical ? 'Kiểm tra lại lịch đã chọn rồi tiếp tục.' : 'Hoàn tất chọn ngày, loại hình khám, bác sĩ và khung giờ.';
     if (step === 'insurance') return canContinueInsurance ? 'Bạn đã xong phần thông tin, có thể tiếp tục.' : 'Trả lời 2 câu hỏi bảo hiểm để tiếp tục.';
     if (step === 'review') return 'Xác nhận lại thông tin trước khi thanh toán.';
-    if (step === 'paymentMethod') return 'Chọn phương thức thanh toán khả dụng để tạo giao dịch.';
-    if (step === 'paymentInfo') return 'Hoàn tất thanh toán rồi kiểm tra trạng thái.';
+    if (step === 'paymentMethod') return 'Chọn phương thức thanh toán phù hợp rồi tạo mã thanh toán.';
+    if (step === 'paymentCheckout') return 'Quét mã QR hoặc mở cổng thanh toán, sau đó kiểm tra trạng thái.';
     return 'Xem kết quả và quản lý lịch hẹn của bạn.';
   }, [canContinueClinical, canContinueInsurance, selectedProfile, step]);
 
@@ -776,6 +1128,51 @@ export default function BookingPage() {
                             Chuyên khoa được tự động đồng bộ theo bác sĩ bạn đã chọn.
                           </p>
                         ) : null}
+
+                        <div className="pt-2">
+                          <Label>Loại hình khám</Label>
+                          {!specialtyId ? (
+                            <p className="mt-2 text-xs text-slate-500">Chọn chuyên khoa trước để xem loại hình khám và chi phí.</p>
+                          ) : serviceTypesQuery.isLoading ? (
+                            <div className="mt-2">
+                              <StateCard message="Đang tải loại hình khám..." compact />
+                            </div>
+                          ) : serviceTypesError ? (
+                            <div className="mt-2">
+                              <InlineError message={serviceTypesError} />
+                            </div>
+                          ) : (serviceTypesQuery.data ?? []).length === 0 ? (
+                            <div className="mt-2">
+                              <StateCard message="Chuyên khoa này chưa có loại hình khám khả dụng." compact dashed />
+                            </div>
+                          ) : (
+                            <div className="mt-2 grid gap-2">
+                              {(serviceTypesQuery.data ?? []).map((item) => {
+                                const isSelected = selectedServiceTypeId === String(item.LHK_MA);
+                                return (
+                                  <button
+                                    key={item.LHK_MA}
+                                    type="button"
+                                    onClick={() => setSelectedServiceTypeId(String(item.LHK_MA))}
+                                    className={`w-full rounded-lg border px-3 py-2 text-left transition ${
+                                      isSelected
+                                        ? 'border-blue-400 bg-blue-50'
+                                        : 'border-slate-200 bg-white hover:border-blue-200'
+                                    }`}
+                                  >
+                                    <div className="flex items-start justify-between gap-2">
+                                      <p className="text-sm font-medium text-slate-900">{item.LHK_TEN}</p>
+                                      <p className="text-sm font-semibold text-blue-700">{toVndLabel(item.LHK_GIA)}</p>
+                                    </div>
+                                    {item.LHK_MO_TA ? (
+                                      <p className="mt-1 text-xs text-slate-500">{item.LHK_MO_TA}</p>
+                                    ) : null}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ) : null}
 
@@ -854,10 +1251,19 @@ export default function BookingPage() {
                               <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-blue-700">
                                 <span className="h-2 w-2 rounded-full bg-blue-500" /> Đang chọn
                               </span>
+                              <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-700">
+                                <span className="h-2 w-2 rounded-full bg-amber-500" /> Đã đặt
+                              </span>
                               <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-slate-500">
                                 <span className="h-2 w-2 rounded-full bg-slate-400" /> Đã đầy
                               </span>
                             </div>
+                            {alreadyBookedSlots.length > 0 ? (
+                              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                Bạn đã có lịch ở {alreadyBookedSlots.length} khung giờ trong chuyên khoa này. Các ô
+                                “Đã đặt” sẽ không thể chọn lại.
+                              </div>
+                            ) : null}
                             {(slotsQuery.data ?? []).map((session) => (
                               <div key={`${session.B_TEN}-${session.PHONG || 'NA'}`} className="rounded-2xl border border-slate-200 bg-white p-4">
                                 <div className="mb-3 flex items-center justify-between gap-2">
@@ -875,14 +1281,18 @@ export default function BookingPage() {
                                   {session.slots.map((slot) => {
                                     const key = `${session.B_TEN}-${slot.KG_MA}`;
                                     const isSelected = selectedSlotKey === key;
+                                    const isAlreadyBooked = Boolean(slot.alreadyBookedByProfile);
+                                    const isUnavailable = !slot.available || isAlreadyBooked;
                                     return (
                                       <button
                                         key={key}
                                         type="button"
-                                        disabled={!slot.available}
+                                        disabled={isUnavailable}
                                         onClick={() => setSelectedSlotKey(key)}
                                         className={`rounded-lg border px-3 py-2 text-sm transition ${
-                                          !slot.available
+                                          isAlreadyBooked
+                                            ? 'cursor-not-allowed border-amber-200 bg-amber-50 text-amber-700'
+                                            : !slot.available
                                             ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
                                             : isSelected
                                             ? 'border-blue-600 bg-blue-600 font-medium text-white'
@@ -891,7 +1301,13 @@ export default function BookingPage() {
                                       >
                                         <p>{slot.KG_BAT_DAU.slice(11, 16)} - {slot.KG_KET_THUC.slice(11, 16)}</p>
                                         <p className="text-[11px] opacity-90">
-                                          {!slot.available ? 'Đầy' : isSelected ? 'Đang chọn' : 'Còn trống'}
+                                          {isAlreadyBooked
+                                            ? `Đã đặt${slot.existingBookingId ? ` #${slot.existingBookingId}` : ''}`
+                                            : !slot.available
+                                            ? 'Đầy'
+                                            : isSelected
+                                            ? 'Đang chọn'
+                                            : 'Còn trống'}
                                         </p>
                                       </button>
                                     );
@@ -940,7 +1356,7 @@ export default function BookingPage() {
                   nextDisabled={!canContinueClinical}
                   helperText={
                     !canContinueClinical
-                      ? 'Bạn cần chọn đủ ngày khám, chuyên khoa, bác sĩ và khung giờ.'
+                      ? 'Bạn cần chọn đủ ngày khám, chuyên khoa, loại hình khám, bác sĩ và khung giờ.'
                       : undefined
                   }
                 />
@@ -1124,7 +1540,7 @@ export default function BookingPage() {
             <Card className="border-slate-200">
               <CardHeader>
                 <CardTitle>Chọn phương thức thanh toán</CardTitle>
-                <CardDescription>Hiện tại hệ thống hỗ trợ thanh toán trực tuyến qua VNPAY.</CardDescription>
+                <CardDescription>Hệ thống sẽ tạo một màn thanh toán tập trung với QR, trạng thái và hướng dẫn đầy đủ.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {PAYMENT_METHOD_OPTIONS.map((item) => {
@@ -1164,81 +1580,191 @@ export default function BookingPage() {
 
                 <BookingActionBar
                   onBack={goBack}
-                  nextLabel={createMutation.isPending ? 'Đang tạo thanh toán...' : 'Xác nhận và tạo thanh toán'}
+                  nextLabel={
+                    isValidatingSlotBeforePayment
+                      ? 'Đang kiểm tra khung giờ...'
+                      : createMutation.isPending
+                      ? 'Đang tạo mã thanh toán...'
+                      : 'Tạo mã thanh toán'
+                  }
                   onNext={submitCreateBooking}
-                  nextDisabled={createMutation.isPending}
+                  nextDisabled={createMutation.isPending || isValidatingSlotBeforePayment}
                 />
               </CardContent>
             </Card>
           ) : null}
 
-          {step === 'paymentInfo' ? (
+          {step === 'paymentCheckout' ? (
             <Card className="border-slate-200">
               <CardHeader>
-                <CardTitle>Theo dõi thanh toán</CardTitle>
-                <CardDescription>Hoàn tất thanh toán để xác nhận lịch hẹn.</CardDescription>
+                <CardTitle>Thanh toán lịch khám</CardTitle>
+                <CardDescription>Quét mã QR hoặc mở cổng thanh toán để xác nhận lịch hẹn.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-sm text-slate-500">Mã lịch hẹn</p>
-                  <p className="text-xl font-semibold text-slate-900">#{createdAppointmentId || '--'}</p>
-                  <p className="mt-3 text-sm text-slate-500">Mã tham chiếu thanh toán</p>
-                  <p className="text-lg font-semibold text-slate-900">{createdPaymentRef || '--'}</p>
-                  <p className="mt-3 text-sm text-slate-500">Trạng thái thanh toán</p>
-                  <span className="mt-1 inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700">
-                    {paymentStatusQuery.data?.payment
-                      ? getPaymentStatusLabel(paymentStatusQuery.data.payment.normalizedStatus)
-                      : 'Chưa thanh toán'}
-                  </span>
+                {paymentStatusQuery.isError ? (
+                  <InlineError
+                    message={getPatientSafeErrorMessage(
+                      paymentStatusQuery.error,
+                      'Không thể kiểm tra trạng thái thanh toán lúc này. Vui lòng thử lại.',
+                    )}
+                  />
+                ) : null}
+
+                <div className="grid items-start gap-4">
+                  <div className="rounded-2xl border border-blue-200 bg-gradient-to-b from-blue-50 to-white p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">Thông tin thanh toán</p>
+                        <p className="mt-1 text-2xl font-semibold text-slate-900">{paymentAmountLabel || '--'}</p>
+                        <p className="text-sm text-slate-600">
+                          Mã lịch hẹn <strong>#{createdAppointmentId || '--'}</strong> · Mã thanh toán{' '}
+                          <strong>{activePaymentRef || '--'}</strong>
+                        </p>
+                      </div>
+                      <PaymentStatusBadge status={paymentStatusUi} />
+                    </div>
+
+                    <div className="mt-4 grid items-start gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+                      <div className="w-full max-w-[320px] rounded-2xl border border-blue-200 bg-white p-3 xl:max-w-none">
+                        {activePaymentMethod === 'QR_BANKING' && isLikelyQrImageUrl(createdPaymentUrl) ? (
+                          <img
+                            src={createdPaymentUrl || ''}
+                            alt="Mã QR thanh toán lịch khám"
+                            className="mx-auto aspect-square w-full max-w-[280px] rounded-xl border border-slate-200 bg-white object-contain p-2"
+                          />
+                        ) : (
+                          <div className="mx-auto flex aspect-square w-full max-w-[280px] flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 text-center">
+                            <QrCode className="h-10 w-10 text-blue-600" />
+                            <p className="mt-2 text-sm font-medium text-slate-800">Mã QR chưa sẵn sàng</p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              Bạn có thể mở cổng thanh toán để hoàn tất giao dịch.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="min-w-0 space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+                        <PaymentInfoRow label="Phương thức" value={getPaymentMethodLabel(activePaymentMethod)} />
+                        <PaymentInfoRow label="Số tiền cần thanh toán" value={paymentAmountLabel || '--'} />
+                        <PaymentInfoRow label="Ngân hàng nhận" value={qrInfo?.bankId || '--'} />
+                        <PaymentInfoRow label="Số tài khoản nhận" value={qrInfo?.accountNo || '--'} />
+                        <PaymentInfoRow label="Tên người nhận" value={qrInfo?.accountName || '--'} />
+                        <PaymentInfoRow
+                          label="Nội dung chuyển khoản"
+                          value={transferContent || '--'}
+                          valueClassName="font-mono text-[13px] leading-5"
+                          action={
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-8"
+                              onClick={() => copyTransferContent(transferContent)}
+                              disabled={!transferContent}
+                            >
+                              <Copy className="mr-1 h-3.5 w-3.5" /> Sao chép
+                            </Button>
+                          }
+                        />
+                        <PaymentInfoRow
+                          label="Thời hạn thanh toán"
+                          value={
+                            paymentRemainingMs === null
+                              ? '--'
+                              : paymentRemainingMs > 0
+                              ? `Còn ${formatCountdown(paymentRemainingMs)}`
+                              : 'Đã hết hạn'
+                          }
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    onClick={() => {
-                      if (!canOpenPaymentUrl(createdPaymentUrl)) {
-                        toast.error('Không có URL thanh toán hợp lệ.');
-                        return;
+                <div className="grid items-start gap-3 md:grid-cols-2">
+                  <PaymentStatusCard status={paymentStatusUi} />
+                  <div className="rounded-2xl border border-slate-200 bg-white p-3 text-sm text-slate-700">
+                    <p className="font-medium text-slate-900">Việc cần làm</p>
+                    <p className="mt-1">1. Mở QR hoặc cổng thanh toán.</p>
+                    <p>2. Hoàn tất thanh toán đúng số tiền và nội dung chuyển khoản.</p>
+                    <p>3. Nhấn “Kiểm tra trạng thái” hoặc chờ hệ thống cập nhật tự động.</p>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      onClick={() => {
+                        openPaymentGateway(createdPaymentUrl, activePaymentMethod);
+                      }}
+                      className="bg-blue-600 hover:bg-blue-700"
+                      disabled={
+                        !canOpenPaymentUrl(createdPaymentUrl) ||
+                        paymentStatusUi === 'expired' ||
+                        isSuccessTransitioning
                       }
-                      window.location.assign(createdPaymentUrl as string);
-                    }}
-                    className="bg-blue-600 hover:bg-blue-700"
-                    disabled={!canOpenPaymentUrl(createdPaymentUrl)}
-                  >
-                    <Wallet className="mr-2 h-4 w-4" /> Mở thanh toán
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => paymentStatusQuery.refetch()}
-                    disabled={paymentStatusQuery.isFetching}
-                  >
-                    {paymentStatusQuery.isFetching ? (
-                      <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Clock3 className="mr-2 h-4 w-4" />
-                    )}
-                    Kiểm tra trạng thái
-                  </Button>
-                  {createdAppointmentId ? (
+                    >
+                      {activePaymentMethod === 'QR_BANKING' ? (
+                        <QrCode className="mr-2 h-4 w-4" />
+                      ) : (
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                      )}
+                      {activePaymentMethod === 'QR_BANKING' ? 'Mở / phóng to QR' : 'Mở cổng thanh toán'}
+                    </Button>
                     <Button
                       variant="outline"
-                      onClick={() => retryPaymentMutation.mutate(createdAppointmentId)}
-                      disabled={retryPaymentMutation.isPending}
+                      onClick={() => paymentStatusQuery.refetch()}
+                      disabled={paymentStatusQuery.isFetching || paymentStatusUi === 'paid' || isSuccessTransitioning}
                     >
-                      {retryPaymentMutation.isPending ? (
+                      {paymentStatusQuery.isFetching ? (
                         <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
                       ) : (
-                        <CreditCard className="mr-2 h-4 w-4" />
+                        <Clock3 className="mr-2 h-4 w-4" />
                       )}
-                      Thanh toán lại
+                      Kiểm tra trạng thái
                     </Button>
-                  ) : null}
+                    {createdAppointmentId &&
+                    (paymentStatusUi === 'failed' || paymentStatusUi === 'expired' || paymentStatusUi === 'error') ? (
+                      <Button
+                        variant="outline"
+                        onClick={() => retryPaymentMutation.mutate(createdAppointmentId)}
+                        disabled={retryPaymentMutation.isPending || isSuccessTransitioning}
+                      >
+                        {retryPaymentMutation.isPending ? (
+                          <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <CreditCard className="mr-2 h-4 w-4" />
+                        )}
+                        Thanh toán lại
+                      </Button>
+                    ) : null}
+                    <Button
+                      variant="outline"
+                      onClick={() => paymentStatusQuery.refetch()}
+                      disabled={paymentStatusQuery.isFetching || paymentStatusUi === 'paid' || isSuccessTransitioning}
+                    >
+                      <CheckCircle2 className="mr-2 h-4 w-4" /> Tôi đã thanh toán
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={paymentStatusUi === 'paid' ? 'default' : 'outline'}
+                      className={paymentStatusUi === 'paid' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
+                      onClick={() => setStep('result')}
+                      disabled={
+                        paymentStatusUi === 'pending' || paymentStatusUi === 'checking' || isSuccessTransitioning
+                      }
+                    >
+                      Đi tới kết quả
+                    </Button>
+                  </div>
                 </div>
 
                 <BookingActionBar
                   onBack={goBack}
-                  nextLabel="Đi tới kết quả"
+                  nextLabel="Tôi sẽ kiểm tra lại sau"
                   onNext={() => setStep('result')}
                   nextVariant="outline"
+                  nextDisabled={isSuccessTransitioning}
                 />
               </CardContent>
             </Card>
@@ -1247,23 +1773,41 @@ export default function BookingPage() {
           {step === 'result' ? (
             <Card className="border-slate-200">
               <CardHeader>
-                <CardTitle>Hoàn tất</CardTitle>
-                <CardDescription>Kết quả xử lý thanh toán và lịch hẹn của bạn.</CardDescription>
+                <CardTitle>{paymentStatusUi === 'paid' ? 'Đặt lịch thành công' : 'Kết quả thanh toán'}</CardTitle>
+                <CardDescription>
+                  {paymentStatusUi === 'paid'
+                    ? 'Lịch hẹn của bạn đã được xác nhận. Bạn có thể lưu lại màn hình này để đối soát khi cần.'
+                    : 'Hệ thống đã ghi nhận phiên thanh toán của bạn. Vui lòng kiểm tra trạng thái bên dưới.'}
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {resultTone === 'success' ? (
+                {paymentStatusUi === 'paid' ? (
                   <StatusBanner
                     tone="success"
                     icon={<CheckCircle2 className="h-5 w-5" />}
                     title="Thanh toán thành công"
-                    description="Lịch hẹn đã được xác nhận."
+                    description="Lịch hẹn đã được xác nhận. Hệ thống sẽ giữ đầy đủ thông tin trong mục Lịch hẹn của tôi."
                   />
-                ) : resultTone === 'failed' ? (
+                ) : paymentStatusUi === 'failed' ? (
                   <StatusBanner
                     tone="error"
                     icon={<XCircle className="h-5 w-5" />}
                     title="Thanh toán chưa thành công"
                     description="Bạn có thể thử thanh toán lại hoặc kiểm tra lịch hẹn của mình."
+                  />
+                ) : paymentStatusUi === 'expired' ? (
+                  <StatusBanner
+                    tone="warning"
+                    icon={<Clock3 className="h-5 w-5" />}
+                    title="Mã thanh toán đã hết hạn"
+                    description="Bạn cần tạo lại thanh toán để tiếp tục xác nhận lịch hẹn."
+                  />
+                ) : paymentStatusUi === 'error' ? (
+                  <StatusBanner
+                    tone="warning"
+                    icon={<AlertCircle className="h-5 w-5" />}
+                    title="Không thể kiểm tra trạng thái thanh toán"
+                    description="Vui lòng thử kiểm tra lại sau hoặc liên hệ hỗ trợ nếu cần."
                   />
                 ) : (
                   <StatusBanner
@@ -1274,30 +1818,38 @@ export default function BookingPage() {
                   />
                 )}
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
-                  <p>
-                    Mã lịch hẹn: <strong>#{createdAppointmentId || '--'}</strong>
-                  </p>
-                  <p>
-                    Trạng thái hiện tại:{' '}
-                    <strong>
-                      {paymentStatusQuery.data?.payment
-                        ? getPaymentStatusLabel(paymentStatusQuery.data.payment.normalizedStatus)
-                        : 'Chưa có dữ liệu'}
-                    </strong>
-                  </p>
-                  <p>
-                    Bác sĩ: <strong>{selectedDoctor?.BS_HO_TEN || '--'}</strong>
-                  </p>
-                  <p>
-                    Khung giờ:{' '}
-                    <strong>
-                      {selectedSlot
-                        ? `${selectedSlot.KG_BAT_DAU.slice(11, 16)} - ${selectedSlot.KG_KET_THUC.slice(11, 16)}`
-                        : '--'}
-                    </strong>
-                  </p>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <SuccessDataCard title="Thông tin lịch hẹn">
+                    <SuccessDataRow label="Mã lịch hẹn" value={createdAppointmentId ? `#${createdAppointmentId}` : '--'} />
+                    <SuccessDataRow label="Hồ sơ bệnh nhân" value={selectedProfileName || '--'} />
+                    <SuccessDataRow label="Ngày khám" value={selectedDate ? formatDateDdMmYyyy(selectedDate) : '--'} />
+                    <SuccessDataRow label="Khung giờ" value={selectedSlotLabel || '--'} />
+                    <SuccessDataRow label="Chuyên khoa" value={selectedSpecialty?.CK_TEN || '--'} />
+                    <SuccessDataRow label="Bác sĩ" value={selectedDoctor?.BS_HO_TEN || '--'} />
+                    <SuccessDataRow label="Phòng khám" value={selectedSlot?.PHONG || '--'} />
+                  </SuccessDataCard>
+
+                  <SuccessDataCard title="Thông tin thanh toán">
+                    <SuccessDataRow label="Trạng thái" value={getPaymentStatusMeta(paymentStatusUi).label} emphasize />
+                    <SuccessDataRow label="Số tiền đã thanh toán" value={paymentAmountLabel || '--'} />
+                    <SuccessDataRow label="Phương thức thanh toán" value={getPaymentMethodLabel(activePaymentMethod)} />
+                    <SuccessDataRow label="Mã thanh toán" value={activePaymentRef ? String(activePaymentRef) : '--'} />
+                    <SuccessDataRow label="Mã giao dịch" value={paymentTransactionRef || '--'} />
+                    <SuccessDataRow label="Thời gian thanh toán" value={paymentPaidAtLabel || '--'} />
+                    <SuccessDataRow label="Nội dung đối soát" value={transferContent || '--'} />
+                  </SuccessDataCard>
                 </div>
+
+                {paymentStatusUi === 'paid' ? (
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+                    <p className="font-semibold">Bước tiếp theo dành cho bạn</p>
+                    <ul className="mt-2 space-y-1">
+                      <li>• Vui lòng đến trước giờ hẹn 10-15 phút để làm thủ tục.</li>
+                      <li>• Mang theo CCCD và thẻ BHYT (nếu có).</li>
+                      <li>• Bạn có thể xem lại toàn bộ thông tin trong mục “Lịch hẹn của tôi”.</li>
+                    </ul>
+                  </div>
+                ) : null}
 
                 <div className="flex flex-wrap gap-2">
                   <Button asChild className="bg-blue-600 hover:bg-blue-700">
@@ -1311,6 +1863,48 @@ export default function BookingPage() {
                   <Button variant="outline" onClick={() => setStep('profile')}>
                     Đặt lịch mới
                   </Button>
+                  {paymentStatusUi !== 'paid' && createdAppointmentId ? (
+                    <Button variant="outline" onClick={() => setStep('paymentCheckout')}>
+                      Quay lại thanh toán
+                    </Button>
+                  ) : null}
+                </div>
+                {paymentStatusUi === 'paid' ? (
+                  <p className="text-xs text-slate-500">
+                    Gợi ý: Bạn có thể chụp màn hình trang này để lưu thông tin xác nhận nhanh.
+                  </p>
+                ) : null}
+                <div className="flex flex-wrap gap-2">
+                  {paymentStatusUi !== 'paid' ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => paymentStatusQuery.refetch()}
+                      disabled={paymentStatusQuery.isFetching}
+                    >
+                      {paymentStatusQuery.isFetching ? (
+                        <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Clock3 className="mr-2 h-4 w-4" />
+                      )}
+                      Kiểm tra lại trạng thái
+                    </Button>
+                  ) : null}
+                  {paymentStatusUi !== 'paid' && createdAppointmentId ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => retryPaymentMutation.mutate(createdAppointmentId)}
+                      disabled={retryPaymentMutation.isPending}
+                    >
+                      {retryPaymentMutation.isPending ? (
+                        <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <CreditCard className="mr-2 h-4 w-4" />
+                      )}
+                      Tạo lại thanh toán
+                    </Button>
+                  ) : null}
                 </div>
               </CardContent>
             </Card>
@@ -1324,29 +1918,43 @@ export default function BookingPage() {
             selectedDate={selectedDate}
             selectedSpecialty={selectedSpecialty?.CK_TEN || null}
             selectedDoctor={selectedDoctor?.BS_HO_TEN || null}
-            selectedSlotLabel={
-              selectedSlot
-                ? `${selectedSlot.KG_BAT_DAU.slice(11, 16)} - ${selectedSlot.KG_KET_THUC.slice(11, 16)}`
-                : null
-            }
+            selectedSlotLabel={selectedSlotLabel}
             selectedRoom={selectedSlot?.PHONG || null}
             hasBHYT={hasBHYT}
             bhytTypeLabel={bhytTypeLabel || null}
             hasPrivateInsurance={hasPrivateInsurance}
             privateInsuranceLabel={privateInsuranceLabel || null}
             paymentMethod={paymentMethod}
+            currentPaymentAmount={paymentAmountLabel}
             createdAppointmentId={createdAppointmentId}
-            createdPaymentRef={createdPaymentRef}
+            createdPaymentRef={activePaymentRef}
             currentPaymentStatus={
-              paymentStatusQuery.data?.payment
-                ? getPaymentStatusLabel(paymentStatusQuery.data.payment.normalizedStatus)
-                : null
+              activePaymentRef ? getPaymentStatusMeta(paymentStatusUi).label : null
             }
             guidance={summaryGuidance}
             nextAction={summaryNextAction}
           />
         </aside>
       </div>
+
+      <Dialog open={paymentSuccessDialogOpen}>
+        <DialogContent
+          showCloseButton={false}
+          className="max-w-sm border-emerald-200 bg-white p-5 sm:max-w-sm"
+          onInteractOutside={(event) => event.preventDefault()}
+          onEscapeKeyDown={(event) => event.preventDefault()}
+        >
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+            <CheckCircle2 className="h-7 w-7" />
+          </div>
+          <DialogHeader className="items-center text-center">
+            <DialogTitle className="text-xl font-semibold text-slate-900">Thanh toán thành công</DialogTitle>
+            <DialogDescription className="text-sm text-slate-600">
+              Đặt lịch của bạn đã được xác nhận. Hệ thống đang chuyển bạn đến trang hoàn tất đặt lịch.
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1439,6 +2047,7 @@ function SummaryPanel(props: {
   hasPrivateInsurance: boolean | null;
   privateInsuranceLabel: string | null;
   paymentMethod: string;
+  currentPaymentAmount?: string | null;
   createdAppointmentId: number | null;
   createdPaymentRef: number | null;
   currentPaymentStatus: string | null;
@@ -1458,6 +2067,7 @@ function SummaryPanel(props: {
     hasPrivateInsurance,
     privateInsuranceLabel,
     paymentMethod,
+    currentPaymentAmount,
     createdAppointmentId,
     createdPaymentRef,
     currentPaymentStatus,
@@ -1543,15 +2153,20 @@ function SummaryPanel(props: {
           />
         ) : null}
         {paymentMethod ? (
-          <SummaryLine icon={<Wallet className="h-4 w-4" />} label="Thanh toán" value={paymentMethod} />
+          <SummaryLine icon={<Wallet className="h-4 w-4" />} label="Thanh toán" value={getPaymentMethodLabel(paymentMethod)} />
+        ) : null}
+        {currentPaymentAmount ? (
+          <SummaryLine icon={<CreditCard className="h-4 w-4" />} label="Số tiền" value={currentPaymentAmount} />
         ) : null}
 
         {createdAppointmentId || createdPaymentRef || currentPaymentStatus ? (
-          <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm">
-            <p className="font-medium text-blue-900">Thông tin thanh toán</p>
-            {createdAppointmentId ? <p className="text-blue-800">Mã lịch hẹn: #{createdAppointmentId}</p> : null}
-            {createdPaymentRef ? <p className="text-blue-800">Mã thanh toán: {createdPaymentRef}</p> : null}
-            {currentPaymentStatus ? <p className="text-blue-800">Trạng thái: {currentPaymentStatus}</p> : null}
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+            <p className="font-semibold">Trạng thái thanh toán</p>
+            {currentPaymentStatus ? <p className="mt-1 font-medium">{currentPaymentStatus}</p> : null}
+            <div className="mt-1 space-y-0.5 text-xs text-blue-800">
+              {createdAppointmentId ? <p>Mã lịch hẹn: #{createdAppointmentId}</p> : null}
+              {createdPaymentRef ? <p>Mã thanh toán: {createdPaymentRef}</p> : null}
+            </div>
           </div>
         ) : null}
       </CardContent>
@@ -1567,6 +2182,143 @@ function SummaryLine({ icon, label, value }: { icon: ReactNode; label: string; v
         <p className="text-xs uppercase tracking-[0.08em] text-slate-500">{label}</p>
         <p className="break-words font-medium text-slate-900">{value}</p>
       </div>
+    </div>
+  );
+}
+
+type PaymentUiStatus = 'pending' | 'checking' | 'paid' | 'failed' | 'expired' | 'error';
+
+function getPaymentStatusMeta(status: PaymentUiStatus) {
+  if (status === 'paid') {
+    return {
+      label: 'Thanh toán thành công',
+      description: 'Lịch hẹn của bạn đã được xác nhận. Bạn có thể đi tới bước kết quả.',
+      badgeClass: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+      cardClass: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+      icon: <CheckCircle2 className="h-5 w-5" />,
+    };
+  }
+  if (status === 'failed') {
+    return {
+      label: 'Thanh toán thất bại',
+      description: 'Giao dịch chưa thành công. Vui lòng tạo lại thanh toán và thử lại.',
+      badgeClass: 'border-rose-200 bg-rose-50 text-rose-700',
+      cardClass: 'border-rose-200 bg-rose-50 text-rose-800',
+      icon: <XCircle className="h-5 w-5" />,
+    };
+  }
+  if (status === 'expired') {
+    return {
+      label: 'Mã thanh toán đã hết hạn',
+      description: 'Vui lòng nhấn “Thanh toán lại” để tạo mã mới.',
+      badgeClass: 'border-amber-200 bg-amber-50 text-amber-700',
+      cardClass: 'border-amber-200 bg-amber-50 text-amber-800',
+      icon: <Clock3 className="h-5 w-5" />,
+    };
+  }
+  if (status === 'error') {
+    return {
+      label: 'Không thể kiểm tra trạng thái',
+      description: 'Vui lòng thử lại sau ít phút hoặc nhấn “Kiểm tra trạng thái”.',
+      badgeClass: 'border-slate-200 bg-slate-100 text-slate-700',
+      cardClass: 'border-slate-200 bg-slate-100 text-slate-800',
+      icon: <AlertCircle className="h-5 w-5" />,
+    };
+  }
+  if (status === 'checking') {
+    return {
+      label: 'Đang kiểm tra giao dịch',
+      description: 'Hệ thống đang đối soát thanh toán của bạn, vui lòng chờ trong giây lát.',
+      badgeClass: 'border-blue-200 bg-blue-50 text-blue-700',
+      cardClass: 'border-blue-200 bg-blue-50 text-blue-800',
+      icon: <LoaderCircle className="h-5 w-5 animate-spin" />,
+    };
+  }
+  return {
+    label: 'Đang chờ thanh toán',
+    description: 'Vui lòng quét mã QR và chuyển khoản đúng nội dung để xác nhận lịch hẹn.',
+    badgeClass: 'border-cyan-200 bg-cyan-50 text-cyan-700',
+    cardClass: 'border-cyan-200 bg-cyan-50 text-cyan-800',
+    icon: <Clock3 className="h-5 w-5" />,
+  };
+}
+
+function PaymentStatusBadge({ status }: { status: PaymentUiStatus }) {
+  const meta = getPaymentStatusMeta(status);
+  return (
+    <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${meta.badgeClass}`}>
+      {meta.label}
+    </span>
+  );
+}
+
+function PaymentStatusCard({ status }: { status: PaymentUiStatus }) {
+  const meta = getPaymentStatusMeta(status);
+  return (
+    <div className={`rounded-2xl border p-3 ${meta.cardClass}`}>
+      <div className="flex items-start gap-2">
+        {meta.icon}
+        <div>
+          <p className="text-sm font-semibold">{meta.label}</p>
+          <p className="text-xs leading-5">{meta.description}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PaymentInfoRow({
+  label,
+  value,
+  action,
+  valueClassName,
+}: {
+  label: string;
+  value: string;
+  action?: ReactNode;
+  valueClassName?: string;
+}) {
+  return (
+    <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs uppercase tracking-[0.08em] text-slate-500">{label}</p>
+        {action || null}
+      </div>
+      <p className={`mt-1 min-w-0 whitespace-normal break-words text-sm font-medium text-slate-900 ${valueClassName || ''}`}>{value}</p>
+    </div>
+  );
+}
+
+function SuccessDataCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-4">
+      <h3 className="text-sm font-semibold uppercase tracking-[0.08em] text-slate-500">{title}</h3>
+      <div className="mt-3 space-y-2">{children}</div>
+    </section>
+  );
+}
+
+function SuccessDataRow({
+  label,
+  value,
+  emphasize,
+}: {
+  label: string;
+  value: string;
+  emphasize?: boolean;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3 text-sm">
+      <span className="text-slate-500">{label}</span>
+      <span className={`max-w-[70%] text-right ${emphasize ? 'font-semibold text-emerald-700' : 'font-medium text-slate-900'}`}>
+        {value}
+      </span>
     </div>
   );
 }
@@ -1950,6 +2702,7 @@ function StatusBanner({
     </div>
   );
 }
+
 
 
 

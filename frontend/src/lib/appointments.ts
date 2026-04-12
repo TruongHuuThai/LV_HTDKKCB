@@ -35,6 +35,7 @@ export function getStatusGroupLabel(group: AppointmentStatusGroup) {
 
 export function getAppointmentStatusLabel(status?: string | null) {
   const map: Record<string, string> = {
+    CHO_THANH_TOAN: 'Ch? thanh toán',
     CHO_KHAM: 'Ch? khám',
     DA_CHECKIN: 'Ð? check-in',
     DA_KHAM: 'Ð? khám',
@@ -71,3 +72,6 @@ export function canOpenPaymentUrl(url?: string | null) {
     return false;
   }
 }
+
+
+

@@ -70,10 +70,25 @@ export class BookingController {
   @Get('doctors/:bsMa/slots')
   @Roles(ROLE.BENH_NHAN, ROLE.ADMIN)
   async getDoctorSlots(
+    @CurrentUser() user: CurrentUserPayload,
     @Param('bsMa', ParseIntPipe) bsMa: number,
     @Query('date') date: string,
+    @Query('BN_MA') BN_MA?: string,
   ): Promise<any> {
-    return this.booking.getDoctorSlotsForDay(bsMa, date);
+    const profileId = BN_MA ? Number.parseInt(BN_MA, 10) : undefined;
+    return this.booking.getDoctorSlotsForDay(bsMa, date, {
+      user,
+      BN_MA: Number.isFinite(profileId ?? NaN) ? profileId : undefined,
+    });
+  }
+
+  // @ts-ignore
+  @Get('service-types')
+  @Roles(ROLE.BENH_NHAN, ROLE.ADMIN)
+  async getServiceTypes(
+    @Query('specialtyId', ParseIntPipe) specialtyId: number,
+  ): Promise<any> {
+    return this.booking.getServiceTypesBySpecialty(specialtyId);
   }
 
   // @ts-ignore

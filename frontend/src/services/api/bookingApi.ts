@@ -21,6 +21,9 @@ export interface DoctorSlotSession {
     KG_BAT_DAU: string;
     KG_KET_THUC: string;
     available: boolean;
+    availabilityStatus?: 'available' | 'full' | 'past' | 'already_booked';
+    alreadyBookedByProfile?: boolean;
+    existingBookingId?: number | null;
   }>;
 }
 
@@ -38,6 +41,14 @@ export interface CreateBookingInput {
   hasPrivateInsurance?: boolean;
   privateInsuranceProvider?: string;
   paymentMethod?: string;
+}
+
+export interface BookingServiceTypeOption {
+  LHK_MA: number;
+  CK_MA: number;
+  LHK_TEN: string;
+  LHK_GIA: number | string;
+  LHK_MO_TA?: string | null;
 }
 
 export interface BhyTypeOption {
@@ -95,11 +106,14 @@ export const bookingApi = {
     return res.data;
   },
 
-  getDoctorSlotsForDay: async (doctorId: number, date: string) => {
+  getDoctorSlotsForDay: async (doctorId: number, date: string, profileId?: number) => {
     const res = await axiosClient.get<DoctorSlotSession[]>(
       `/booking/doctors/${doctorId}/slots`,
       {
-        params: { date },
+        params: {
+          date,
+          ...(profileId ? { BN_MA: profileId } : {}),
+        },
       },
     );
     return res.data;
@@ -120,6 +134,13 @@ export const bookingApi = {
       payment?: { TT_MA?: number; TT_TRANG_THAI?: string };
       payment_url?: string;
     };
+  },
+
+  getServiceTypesBySpecialty: async (specialtyId: number) => {
+    const res = await axiosClient.get<{ items: BookingServiceTypeOption[] }>('/booking/service-types', {
+      params: { specialtyId },
+    });
+    return res.data.items;
   },
 
   getBHYTTypes: async (params: { profileId?: number; specialtyId?: number }) => {

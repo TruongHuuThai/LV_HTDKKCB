@@ -65,12 +65,15 @@ export class PaymentReliabilityService {
 
     try {
       if (verify.responseCode === '00') {
-        await this.paymentRepo.updatePaymentStatus(
+        const updatedPayment = await this.paymentRepo.updatePaymentStatus(
           TT_MA,
           'DA_THANH_TOAN',
           verify.bankTransactionId,
           query['vnp_BankCode'],
         );
+        if (updatedPayment?.DK_MA) {
+          await this.paymentRepo.confirmAppointmentAfterPayment(updatedPayment.DK_MA);
+        }
       } else {
         await this.paymentRepo.updatePaymentStatus(TT_MA, 'THAT_BAI');
       }

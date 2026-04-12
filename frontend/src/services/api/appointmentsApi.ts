@@ -50,6 +50,9 @@ export interface PaymentStatusResponse {
   payment: null | {
     TT_MA: number;
     TT_TRANG_THAI: string;
+    TT_TONG_TIEN?: number | string | null;
+    TT_PHUONG_THUC?: string | null;
+    TT_PHUONG_THUC_TT?: string | null;
     normalizedStatus: PaymentStatus;
     TT_MA_GIAO_DICH?: string | null;
     TT_THOI_GIAN?: string | null;
@@ -148,7 +151,13 @@ export const appointmentsApi = {
   },
 
   retryPayment: async (appointmentId: number) => {
-    const res = await axiosClient.post<{ DK_MA: number; payment_url?: string }>(
+    const res = await axiosClient.post<{
+      DK_MA: number;
+      payment_url?: string;
+      payment?: {
+        TT_MA?: number;
+      };
+    }>(
       `/appointments/${appointmentId}/payment-retry`,
     );
     return res.data;

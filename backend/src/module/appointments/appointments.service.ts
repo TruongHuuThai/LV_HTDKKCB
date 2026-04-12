@@ -14,6 +14,7 @@ import { CurrentUserPayload } from '../auth/current-user.decorator';
 import { BookingService } from '../booking/booking.service';
 import { combineDateAndTime, parseDateOnly } from '../booking/booking.utils';
 import { VnpayService } from '../payment/vnpay.service';
+import { QrBankingService } from '../payment/qr-banking.service';
 import {
   AdminWaitlistListQueryDto,
   AdminAppointmentListQueryDto,
@@ -53,11 +54,12 @@ import { AttachmentStorageService } from './attachment-storage.service';
 import { AttachmentScanService } from './attachment-scan.service';
 import { SHIFT_STATUS, WEEK_STATUS } from '../schedules/schedule-status';
 
-const ACTIVE_BOOKING_STATUS = ['CHO_KHAM', 'DA_CHECKIN'];
+const ACTIVE_BOOKING_STATUS = ['CHO_THANH_TOAN', 'CHO_KHAM', 'DA_CHECKIN'];
 const REFUND_STATUSES = ['REFUND_PENDING', 'REFUNDED', 'REFUND_FAILED', 'REFUND_REJECTED'];
 const ALLOWED_PRE_VISIT_MIME = ['application/pdf', 'image/jpeg', 'image/png'];
 const MAX_PRE_VISIT_ATTACHMENT_SIZE = 10 * 1024 * 1024;
 const ALLOWED_PRE_VISIT_EXT = ['pdf', 'jpg', 'jpeg', 'png'];
+const SUPPORTED_PAYMENT_METHODS = new Set(['VNPAY', 'QR_BANKING']);
 
 @Injectable()
 export class AppointmentsService {
@@ -67,6 +69,7 @@ export class AppointmentsService {
     private readonly prisma: PrismaService,
     private readonly bookingService: BookingService,
     private readonly vnpay: VnpayService,
+    private readonly qrBanking: QrBankingService,
     private readonly config: ConfigService,
     private readonly attachmentStorage: AttachmentStorageService,
     private readonly attachmentScan: AttachmentScanService,
@@ -1913,7 +1916,10 @@ export class AppointmentsService {
     const appointment = await this.getAppointmentOrThrow(appointmentId);
     this.validateAppointmentOwner(user, appointment.BENH_NHAN?.TK_SDT);
 
-    const latest = appointment.THANH_TOAN[0] || null;
+    let latest: any = appointment.THANH_TOAN[0] || null;
+    if (latest && this.qrBanking.isQrBankingMethod(latest.TT_PHUONG_THUC)) {
+      latest = await this.qrBanking.reconcileUnpaidPayment(latest);
+    }
     const expiresAt =
       latest?.TT_THOI_GIAN && latest.TT_TRANG_THAI === 'CHUA_THANH_TOAN'
         ? new Date(new Date(latest.TT_THOI_GIAN).getTime() + 15 * 60 * 1000)
@@ -1926,6 +1932,9 @@ export class AppointmentsService {
         ? {
             TT_MA: latest.TT_MA,
             TT_TRANG_THAI: latest.TT_TRANG_THAI,
+            TT_TONG_TIEN: latest.TT_TONG_TIEN,
+            TT_PHUONG_THUC: latest.TT_PHUONG_THUC,
+            TT_PHUONG_THUC_TT: latest.TT_PHUONG_THUC_TT,
             normalizedStatus: this.normalizePaymentStatus(
               latest.TT_TRANG_THAI,
               latest.TT_THOI_GIAN,
@@ -1933,7 +1942,7 @@ export class AppointmentsService {
             TT_MA_GIAO_DICH: latest.TT_MA_GIAO_DICH,
             TT_THOI_GIAN: latest.TT_THOI_GIAN,
             expiresAt,
-            paymentUrl: null,
+            paymentUrl: this.qrBanking.getPaymentUrlForRecord(latest),
           }
         : null,
       refund: this.buildRefundSummary(appointment),
@@ -1987,6 +1996,18 @@ export class AppointmentsService {
       }
     }
 
+    const retryPaymentMethod = String(
+      latest?.TT_PHUONG_THUC || appointment.DK_PT_THANH_TOAN || 'VNPAY',
+    )
+      .trim()
+      .toUpperCase();
+    const normalizedRetryMethod = SUPPORTED_PAYMENT_METHODS.has(retryPaymentMethod)
+      ? retryPaymentMethod
+      : 'VNPAY';
+    if (normalizedRetryMethod === 'QR_BANKING') {
+      this.qrBanking.ensureQrConfigOrThrow();
+    }
+
     const baseAmount =
       Number(latest?.TT_TONG_TIEN ?? 0) ||
       Number(appointment.LOAI_HINH_KHAM?.LHK_GIA ?? 0) ||
@@ -2007,7 +2028,7 @@ export class AppointmentsService {
           TT_TIEN_KHAM: baseAmount,
           TT_THUC_THU: baseAmount,
           TT_LOAI: 'DAT_LICH',
-          TT_PHUONG_THUC: 'VNPAY',
+          TT_PHUONG_THUC: normalizedRetryMethod,
           TT_TRANG_THAI: 'CHUA_THANH_TOAN',
         },
       });
@@ -2035,12 +2056,19 @@ export class AppointmentsService {
       return payment;
     });
 
-    const paymentUrl = this.vnpay.createPaymentUrl(
-      baseAmount,
-      String(created.TT_MA),
-      `Thanh toan lai lich kham DK ${appointment.DK_MA}`,
-      clientIp,
-    );
+    const paymentUrl =
+      normalizedRetryMethod === 'QR_BANKING'
+        ? this.qrBanking.createPaymentUrl({
+            amount: baseAmount,
+            paymentId: created.TT_MA,
+            bookingId: appointment.DK_MA,
+          })
+        : this.vnpay.createPaymentUrl(
+            baseAmount,
+            String(created.TT_MA),
+            `Thanh toan lai lich kham DK ${appointment.DK_MA}`,
+            clientIp,
+          );
 
     return {
       DK_MA: appointment.DK_MA,

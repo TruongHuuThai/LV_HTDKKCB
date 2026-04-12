@@ -92,6 +92,18 @@ export class PaymentRepository {
         });
     }
 
+    confirmAppointmentAfterPayment(DK_MA: number) {
+        return this.prisma.dANG_KY.updateMany({
+            where: {
+                DK_MA,
+                DK_TRANG_THAI: 'CHO_THANH_TOAN',
+            },
+            data: {
+                DK_TRANG_THAI: 'CHO_KHAM',
+            },
+        });
+    }
+
     updateWebhookEventResult(
         eventId: number,
         status: 'PROCESSED' | 'FAILED' | 'IGNORED',

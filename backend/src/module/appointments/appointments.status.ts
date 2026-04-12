@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 
 export const APPOINTMENT_STATUS = {
+  CHO_THANH_TOAN: 'CHO_THANH_TOAN',
   CHO_KHAM: 'CHO_KHAM',
   DA_CHECKIN: 'DA_CHECKIN',
   DA_KHAM: 'DA_KHAM',
@@ -13,6 +14,7 @@ export type AppointmentStatusValue =
   (typeof APPOINTMENT_STATUS)[keyof typeof APPOINTMENT_STATUS];
 
 const TRANSITIONS: Record<string, string[]> = {
+  [APPOINTMENT_STATUS.CHO_THANH_TOAN]: [APPOINTMENT_STATUS.CHO_KHAM],
   [APPOINTMENT_STATUS.CHO_KHAM]: [
     APPOINTMENT_STATUS.DA_CHECKIN,
     APPOINTMENT_STATUS.NO_SHOW,

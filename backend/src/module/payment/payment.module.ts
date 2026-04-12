@@ -5,11 +5,12 @@ import { PaymentRepository } from './payment.repository';
 import { PaymentController, PaymentWebhookController, RefundWebhookController } from './payment.controller';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { PaymentReliabilityService } from './payment-reliability.service';
+import { QrBankingService } from './qr-banking.service';
 
 @Module({
     imports: [PrismaModule],
-    providers: [VnpayService, PaymentRepository, PaymentReliabilityService],
+    providers: [VnpayService, PaymentRepository, PaymentReliabilityService, QrBankingService],
     controllers: [PaymentController, PaymentWebhookController, RefundWebhookController],
-    exports: [VnpayService, PaymentRepository],
+    exports: [VnpayService, PaymentRepository, QrBankingService],
 })
 export class PaymentModule { }

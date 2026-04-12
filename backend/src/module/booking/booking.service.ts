@@ -12,10 +12,12 @@ import { combineDateAndTime, parseDateOnly } from './booking.utils';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { VnpayService } from '../payment/vnpay.service';
 import { PaymentRepository } from '../payment/payment.repository';
+import { QrBankingService } from '../payment/qr-banking.service';
 
 const ALLOWED_PRE_VISIT_MIME = ['application/pdf', 'image/jpeg', 'image/png'];
 const MAX_PRE_VISIT_ATTACHMENT_SIZE = 10 * 1024 * 1024;
-const SUPPORTED_PAYMENT_METHOD = 'VNPAY';
+const DEFAULT_PAYMENT_METHOD = 'VNPAY';
+const SUPPORTED_PAYMENT_METHODS = new Set(['VNPAY', 'QR_BANKING']);
 
 const BHYT_TYPE_OPTIONS = [
   {
@@ -53,6 +55,7 @@ export class BookingService {
     private readonly repo: BookingRepository,
     private readonly vnpay: VnpayService,
     private readonly paymentRepo: PaymentRepository,
+    private readonly qrBanking: QrBankingService,
   ) {}
 
   private validatePreVisitAttachments(dto: CreateBookingDto) {
@@ -99,9 +102,14 @@ export class BookingService {
       throw new BadRequestException('Cong ty bao hiem tu nhan khong hop le');
     }
 
-    const paymentMethod = String(dto.paymentMethod || SUPPORTED_PAYMENT_METHOD).toUpperCase();
-    if (paymentMethod !== SUPPORTED_PAYMENT_METHOD) {
-      throw new BadRequestException('Phuong thuc thanh toan hien chi ho tro VNPAY');
+    const paymentMethod = String(dto.paymentMethod || DEFAULT_PAYMENT_METHOD).toUpperCase();
+    if (!SUPPORTED_PAYMENT_METHODS.has(paymentMethod)) {
+      throw new BadRequestException(
+        'Phuong thuc thanh toan khong hop le. He thong chi ho tro VNPAY hoac QR_BANKING.',
+      );
+    }
+    if (paymentMethod === 'QR_BANKING') {
+      this.qrBanking.ensureQrConfigOrThrow();
     }
   }
 
@@ -165,6 +173,7 @@ export class BookingService {
   ) {
     this.validatePreVisitAttachments(dto);
     this.validateInsuranceAndPayment(dto);
+    const paymentMethod = String(dto.paymentMethod || DEFAULT_PAYMENT_METHOD).toUpperCase();
     const N_NGAY = this.parseDateOnlyOrThrow(dto.N_NGAY);
     this.assertDateWithinBookingHorizon(N_NGAY);
 
@@ -210,11 +219,18 @@ export class BookingService {
       }
     }
 
-    const loaiHinhKham = dto.LHK_MA ? await this.repo.findLoaiHinhKham(dto.LHK_MA) : null;
-    if (dto.LHK_MA && !loaiHinhKham) {
+    if (!dto.LHK_MA) {
+      throw new BadRequestException('Vui long chon loai hinh kham');
+    }
+
+    const loaiHinhKham = await this.repo.findLoaiHinhKham(dto.LHK_MA);
+    if (!loaiHinhKham) {
       throw new BadRequestException('Loai hinh kham khong ton tai');
     }
-    const price = loaiHinhKham?.LHK_GIA ?? 0;
+    if (specialtyId && Number(loaiHinhKham.CK_MA) !== Number(specialtyId)) {
+      throw new BadRequestException('Loai hinh kham khong thuoc chuyen khoa da chon');
+    }
+    const price = loaiHinhKham.LHK_GIA;
 
     let booking: any;
     try {
@@ -239,7 +255,7 @@ export class BookingService {
         DK_BHTN_DON_VI: dto.hasPrivateInsurance
           ? dto.privateInsuranceProvider?.trim() || null
           : null,
-        DK_PT_THANH_TOAN: String(dto.paymentMethod || SUPPORTED_PAYMENT_METHOD).toUpperCase(),
+        DK_PT_THANH_TOAN: paymentMethod,
       });
     } catch (e: any) {
       if (
@@ -263,21 +279,34 @@ export class BookingService {
       throw e;
     }
 
+    const normalizedPrice = Number(price);
+    if (!Number.isFinite(normalizedPrice) || normalizedPrice <= 0) {
+      throw new BadRequestException('Loai hinh kham chua duoc cau hinh gia hop le');
+    }
+    const payableAmount = normalizedPrice;
+
     const payment = await this.paymentRepo.createPayment({
       DK_MA: booking.DK_MA,
-      TT_TONG_TIEN: Number(price),
-      TT_TIEN_KHAM: Number(price),
+      TT_TONG_TIEN: payableAmount,
+      TT_TIEN_KHAM: payableAmount,
       TT_LOAI: 'DAT_LICH',
-      TT_PHUONG_THUC: String(dto.paymentMethod || SUPPORTED_PAYMENT_METHOD).toUpperCase(),
+      TT_PHUONG_THUC: paymentMethod,
     });
 
-    const orderInfo = `Dat lich kham BS ${dto.BS_MA} ngay ${dto.N_NGAY}`;
-    const paymentUrl = this.vnpay.createPaymentUrl(
-      Number(price) || 10000,
-      String(payment.TT_MA),
-      orderInfo,
-      clientIp,
-    );
+    const orderInfo = `Dat lich kham DK ${booking.DK_MA} BS ${dto.BS_MA} ngay ${dto.N_NGAY}`;
+    const paymentUrl =
+      paymentMethod === 'QR_BANKING'
+        ? this.qrBanking.createPaymentUrl({
+            amount: payableAmount,
+            paymentId: payment.TT_MA,
+            bookingId: booking.DK_MA,
+          })
+        : this.vnpay.createPaymentUrl(
+            payableAmount,
+            String(payment.TT_MA),
+            orderInfo,
+            clientIp,
+          );
 
     const hasPreVisit =
       Boolean(dto.symptoms?.trim()) ||
@@ -372,13 +401,29 @@ export class BookingService {
     };
   }
 
+  async getServiceTypesBySpecialty(CK_MA: number) {
+    const specialty = await this.repo.findSpecialtyById(CK_MA);
+    if (!specialty) {
+      throw new NotFoundException('Khong tim thay chuyen khoa');
+    }
+    const items = await this.repo.listLoaiHinhKhamBySpecialty(CK_MA);
+    return { items };
+  }
+
   async getAvailabilityDebug(YYYY_MM_DD: string, CK_MA?: number, q?: string) {
     const N_NGAY = this.parseDateOnlyOrThrow(YYYY_MM_DD);
     this.assertDateWithinBookingHorizon(N_NGAY);
     return this.repo.debugAvailability(N_NGAY, CK_MA, q);
   }
 
-  async getDoctorSlotsForDay(BS_MA: number, yyyy_mm_dd: string) {
+  async getDoctorSlotsForDay(
+    BS_MA: number,
+    yyyy_mm_dd: string,
+    options?: {
+      user?: { TK_SDT: string; role?: string };
+      BN_MA?: number;
+    },
+  ) {
     const N_NGAY = this.parseDateOnlyOrThrow(yyyy_mm_dd);
     this.assertDateWithinBookingHorizon(N_NGAY);
     const sches = await this.repo.listDoctorSchedulesForDate(BS_MA, N_NGAY);
@@ -391,6 +436,33 @@ export class BookingService {
     booked.forEach((item) => {
       bookedCount.set(item.KG_MA, (bookedCount.get(item.KG_MA) ?? 0) + 1);
     });
+
+    const specialtyId = Number(sches[0]?.BAC_SI?.CK_MA || 0) || null;
+    let patientBookedBySlot = new Map<number, number>();
+    const requestedProfileId = Number(options?.BN_MA || 0) || null;
+    const requester = options?.user;
+    if (requestedProfileId && specialtyId) {
+      let effectiveProfileId: number | null = null;
+      if (requester?.role === ROLE.BENH_NHAN && requester.TK_SDT) {
+        effectiveProfileId = await this.ensureOwnedPatientProfileOrThrow(
+          requester.TK_SDT,
+          requestedProfileId,
+        );
+      } else if (requester?.role === ROLE.ADMIN) {
+        effectiveProfileId = await this.ensurePatientProfileByIdOrThrow(requestedProfileId);
+      }
+
+      if (effectiveProfileId) {
+        const patientBookings = await this.repo.listPatientActiveBookingsInSpecialtySlotByDate(
+          effectiveProfileId,
+          N_NGAY,
+          specialtyId,
+        );
+        patientBookedBySlot = new Map(
+          patientBookings.map((item) => [item.KG_MA, item.DK_MA]),
+        );
+      }
+    }
     const now = new Date();
 
     return sches.map((sch) => {
@@ -398,9 +470,28 @@ export class BookingService {
         KG_MA: kg.KG_MA,
         KG_BAT_DAU: kg.KG_BAT_DAU,
         KG_KET_THUC: kg.KG_KET_THUC,
-        available:
-          (bookedCount.get(kg.KG_MA) ?? 0) < (kg.KG_SO_BN_TOI_DA ?? 5) &&
-          combineDateAndTime(N_NGAY, kg.KG_BAT_DAU).getTime() > now.getTime(),
+        ...(() => {
+          const isFuture = combineDateAndTime(N_NGAY, kg.KG_BAT_DAU).getTime() > now.getTime();
+          const isFull = (bookedCount.get(kg.KG_MA) ?? 0) >= (kg.KG_SO_BN_TOI_DA ?? 5);
+          const existingBookingId = patientBookedBySlot.get(kg.KG_MA) ?? null;
+          const alreadyBookedByProfile = Boolean(existingBookingId);
+
+          const availabilityStatus: 'available' | 'full' | 'past' | 'already_booked' =
+            !isFuture
+              ? 'past'
+              : alreadyBookedByProfile
+              ? 'already_booked'
+              : isFull
+              ? 'full'
+              : 'available';
+
+          return {
+            available: availabilityStatus === 'available',
+            availabilityStatus,
+            alreadyBookedByProfile,
+            existingBookingId,
+          };
+        })(),
       }));
 
       return {

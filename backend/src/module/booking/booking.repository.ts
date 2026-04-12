@@ -89,6 +89,16 @@ export class BookingRepository {
     });
   }
 
+  findSpecialtyById(CK_MA: number) {
+    return this.prisma.cHUYEN_KHOA.findUnique({
+      where: { CK_MA },
+      select: {
+        CK_MA: true,
+        CK_TEN: true,
+      },
+    });
+  }
+
   async findDoctorSchedule(BS_MA: number, N_NGAY: Date, B_TEN: string) {
     const { start, end } = this.toUtcDayRange(N_NGAY);
     const slotOpenedByWeek = await this.isWeekSlotOpened(N_NGAY);
@@ -214,7 +224,7 @@ export class BookingRepository {
       B_TEN: data.B_TEN,
       KG_MA: data.KG_MA,
       DK_STT: data.DK_STT ?? null,
-      DK_TRANG_THAI: 'CHO_KHAM',
+      DK_TRANG_THAI: 'CHO_THANH_TOAN',
     };
     if (this.supportsDangKyField('DK_CO_BHYT')) {
       payload.DK_CO_BHYT = data.DK_CO_BHYT ?? null;
@@ -546,10 +556,37 @@ export class BookingRepository {
             }),
       },
       include: {
+        BAC_SI: {
+          select: {
+            CK_MA: true,
+          },
+        },
         BUOI: { include: { KHUNG_GIO: { orderBy: { KG_BAT_DAU: 'asc' } } } },
         PHONG: true,
         DOT_LICH_TUAN: true,
       }
+    });
+  }
+
+  listPatientActiveBookingsInSpecialtySlotByDate(BN_MA: number, N_NGAY: Date, CK_MA: number) {
+    const { start, end } = this.toUtcDayRange(N_NGAY);
+    return this.prisma.dANG_KY.findMany({
+      where: {
+        BN_MA,
+        N_NGAY: { gte: start, lt: end },
+        DK_TRANG_THAI: { notIn: ['HUY', 'HUY_BS_NGHI'] },
+        LICH_BSK: {
+          is: {
+            BAC_SI: {
+              CK_MA,
+            },
+          },
+        },
+      },
+      select: {
+        DK_MA: true,
+        KG_MA: true,
+      },
     });
   }
 
@@ -568,7 +605,21 @@ export class BookingRepository {
   findLoaiHinhKham(LHK_MA: number) {
     return this.prisma.lOAI_HINH_KHAM?.findUnique({
       where: { LHK_MA },
-      select: { LHK_GIA: true, LHK_TEN: true },
+      select: { LHK_MA: true, CK_MA: true, LHK_GIA: true, LHK_TEN: true, LHK_MO_TA: true },
+    });
+  }
+
+  listLoaiHinhKhamBySpecialty(CK_MA: number) {
+    return this.prisma.lOAI_HINH_KHAM.findMany({
+      where: { CK_MA },
+      select: {
+        LHK_MA: true,
+        CK_MA: true,
+        LHK_TEN: true,
+        LHK_GIA: true,
+        LHK_MO_TA: true,
+      },
+      orderBy: [{ LHK_GIA: 'asc' }, { LHK_TEN: 'asc' }],
     });
   }
 }
