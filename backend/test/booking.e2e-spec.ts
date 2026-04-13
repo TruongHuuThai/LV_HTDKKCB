@@ -27,6 +27,7 @@ describe('BookingController (e2e)', () => {
   let app: INestApplication<App>;
   const bookingService = {
     getAvailableDoctors: jest.fn(),
+    getDoctorCatalog: jest.fn(),
     getAvailabilityDebug: jest.fn(),
   };
 
@@ -88,5 +89,33 @@ describe('BookingController (e2e)', () => {
     );
     expect(res.body.summary.reasons).toEqual([BOOKING_AVAILABILITY_REASON.NO_SHIFT_ON_DATE]);
     expect(res.body.contractVersion).toBe(SCHEDULE_STATUS_CONTRACT_VERSION);
+  });
+
+  it('GET /booking/doctor-catalog parses paging and filter params', async () => {
+    bookingService.getDoctorCatalog.mockResolvedValueOnce({
+      items: [],
+      page: 2,
+      pageSize: 8,
+      total: 0,
+      totalPages: 1,
+      filters: { specialties: [], degrees: [], genderSupported: false },
+    });
+
+    await request(app.getHttpServer())
+      .get(
+        '/booking/doctor-catalog?q=an&specialtyId=21&degree=TS%20BS.&gender=male&sortBy=name&sortDirection=desc&page=2&pageSize=8',
+      )
+      .expect(200);
+
+    expect(bookingService.getDoctorCatalog).toHaveBeenCalledWith({
+      q: 'an',
+      specialtyId: 21,
+      degree: 'TS BS.',
+      gender: 'male',
+      sortBy: 'name',
+      sortDirection: 'desc',
+      page: 2,
+      pageSize: 8,
+    });
   });
 });

@@ -20,6 +20,10 @@ import {
   summarizeDoctorReasons,
 } from './booking-availability.util';
 
+type DoctorCatalogSortBy = 'name' | 'specialty' | 'degree';
+type DoctorCatalogSortDirection = 'asc' | 'desc';
+type DoctorCatalogGender = 'male' | 'female';
+
 @Injectable()
 export class BookingRepository {
   private static readonly dangKyFields = new Set(
@@ -41,6 +45,13 @@ export class BookingRepository {
     const end = new Date(start);
     end.setUTCDate(end.getUTCDate() + 1);
     return { start, end };
+  }
+
+  private toUtcDateKey(date: Date) {
+    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(
+      2,
+      '0',
+    )}-${String(date.getUTCDate()).padStart(2, '0')}`;
   }
 
   private toUtcWeekMonday(date: Date) {
@@ -492,6 +503,258 @@ export class BookingRepository {
       },
       orderBy: { BS_MA: 'asc' },
     });
+  }
+
+  async listDoctorBookableDates(BS_MA: number, fromDate: Date, toDate: Date) {
+    const rangeStart = this.toUtcDayRange(fromDate).start;
+    const rangeEndExclusive = this.toUtcDayRange(toDate).end;
+
+    const [schedules, bookings, weekBatches] = await Promise.all([
+      this.prisma.lICH_BSK.findMany({
+        where: {
+          BS_MA,
+          N_NGAY: { gte: rangeStart, lt: rangeEndExclusive },
+          LBSK_IS_ARCHIVED: false,
+          LBSK_TRANG_THAI: SHIFT_STATUS.finalized,
+        },
+        include: {
+          BUOI: { include: { KHUNG_GIO: { orderBy: { KG_BAT_DAU: 'asc' } } } },
+          DOT_LICH_TUAN: { select: { DLT_TRANG_THAI: true } },
+        },
+        orderBy: { N_NGAY: 'asc' },
+      }),
+      this.prisma.dANG_KY.findMany({
+        where: {
+          BS_MA,
+          N_NGAY: { gte: rangeStart, lt: rangeEndExclusive },
+          DK_TRANG_THAI: { notIn: ['HUY', 'HUY_BS_NGHI'] },
+        },
+        select: {
+          N_NGAY: true,
+          B_TEN: true,
+          KG_MA: true,
+        },
+      }),
+      this.prisma.dOT_LICH_TUAN.findMany({
+        where: {
+          DLT_TUAN_BAT_DAU: {
+            gte: this.toUtcWeekMonday(fromDate),
+            lt: (() => {
+              const weekAfterEnd = this.toUtcWeekMonday(toDate);
+              weekAfterEnd.setUTCDate(weekAfterEnd.getUTCDate() + 7);
+              return weekAfterEnd;
+            })(),
+          },
+        },
+        select: {
+          DLT_TUAN_BAT_DAU: true,
+          DLT_TRANG_THAI: true,
+        },
+      }),
+    ]);
+
+    if (schedules.length === 0) {
+      return {
+        availableDates: [] as string[],
+        fullDates: [] as string[],
+      };
+    }
+
+    const weekStatusByMonday = new Map<string, string | null>();
+    weekBatches.forEach((batch) => {
+      weekStatusByMonday.set(
+        this.toUtcDateKey(batch.DLT_TUAN_BAT_DAU),
+        batch.DLT_TRANG_THAI ?? null,
+      );
+    });
+
+    const bookingCountByKey = new Map<string, number>();
+    bookings.forEach((booking) => {
+      const dayKey = this.toUtcDateKey(booking.N_NGAY);
+      const key = `${dayKey}::${booking.B_TEN}::${booking.KG_MA}`;
+      bookingCountByKey.set(key, (bookingCountByKey.get(key) ?? 0) + 1);
+    });
+
+    const now = new Date();
+    const dayState = new Map<string, { hasVisibleShift: boolean; hasBookableSlot: boolean }>();
+
+    schedules.forEach((shift) => {
+      const dayKey = this.toUtcDateKey(shift.N_NGAY);
+      const mondayKey = this.toUtcDateKey(this.toUtcWeekMonday(shift.N_NGAY));
+      const slotOpenedByWeek = isWeekOpenForBooking(weekStatusByMonday.get(mondayKey));
+      const weekStatus = String(shift.DOT_LICH_TUAN?.DLT_TRANG_THAI ?? '')
+        .trim()
+        .toLowerCase();
+      const visibleByWeek = slotOpenedByWeek || weekStatus === WEEK_STATUS.slot_opened;
+      if (!visibleByWeek) return;
+
+      const current = dayState.get(dayKey) ?? {
+        hasVisibleShift: false,
+        hasBookableSlot: false,
+      };
+      current.hasVisibleShift = true;
+
+      for (const slot of shift.BUOI?.KHUNG_GIO ?? []) {
+        const key = `${dayKey}::${shift.B_TEN}::${slot.KG_MA}`;
+        const booked = bookingCountByKey.get(key) ?? 0;
+        const capacity = slot.KG_SO_BN_TOI_DA ?? 5;
+        const slotStart = combineDateAndTime(shift.N_NGAY, slot.KG_BAT_DAU);
+        const isFuture = slotStart.getTime() > now.getTime();
+        if (booked < capacity && isFuture) {
+          current.hasBookableSlot = true;
+          break;
+        }
+      }
+
+      dayState.set(dayKey, current);
+    });
+
+    const availableDates: string[] = [];
+    const fullDates: string[] = [];
+    Array.from(dayState.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .forEach(([dayKey, state]) => {
+        if (state.hasBookableSlot) {
+          availableDates.push(dayKey);
+          return;
+        }
+        if (state.hasVisibleShift) {
+          fullDates.push(dayKey);
+        }
+      });
+
+    return {
+      availableDates,
+      fullDates,
+    };
+  }
+
+  async listDoctorCatalog(params: {
+    page: number;
+    pageSize: number;
+    q?: string;
+    specialtyId?: number;
+    degree?: string;
+    gender?: DoctorCatalogGender;
+    sortBy: DoctorCatalogSortBy;
+    sortDirection: DoctorCatalogSortDirection;
+  }) {
+    const keyword = String(params.q ?? '').trim();
+    const degree = String(params.degree ?? '').trim();
+    const safePageSize = Math.min(Math.max(Math.floor(params.pageSize || 10), 6), 24);
+    const requestedPage = Math.max(Math.floor(params.page || 1), 1);
+
+    const where: Prisma.BAC_SIWhereInput = {
+      BS_DA_XOA: false,
+      ...(params.specialtyId ? { CK_MA: params.specialtyId } : {}),
+      ...(degree ? { BS_HOC_HAM: degree } : {}),
+      ...(params.gender
+        ? {
+            BS_LANAM: params.gender === 'male',
+          }
+        : {}),
+      ...(keyword
+        ? {
+            OR: [
+              {
+                BS_HO_TEN: {
+                  contains: keyword,
+                  mode: 'insensitive',
+                },
+              },
+              {
+                BS_HOC_HAM: {
+                  contains: keyword,
+                  mode: 'insensitive',
+                },
+              },
+              {
+                CHUYEN_KHOA: {
+                  CK_TEN: {
+                    contains: keyword,
+                    mode: 'insensitive',
+                  },
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+
+    let orderBy: Prisma.BAC_SIOrderByWithRelationInput[] = [
+      { BS_HO_TEN: params.sortDirection },
+      { BS_MA: 'asc' },
+    ];
+    if (params.sortBy === 'specialty') {
+      orderBy = [
+        { CHUYEN_KHOA: { CK_TEN: params.sortDirection } },
+        { BS_HO_TEN: 'asc' },
+        { BS_MA: 'asc' },
+      ];
+    } else if (params.sortBy === 'degree') {
+      orderBy = [
+        { BS_HOC_HAM: params.sortDirection },
+        { BS_HO_TEN: 'asc' },
+        { BS_MA: 'asc' },
+      ];
+    }
+
+    const total = await this.prisma.bAC_SI.count({ where });
+    const totalPages = total > 0 ? Math.ceil(total / safePageSize) : 1;
+    const page = Math.min(requestedPage, totalPages);
+    const skip = (page - 1) * safePageSize;
+
+    const [items, specialties, degreeRows] = await Promise.all([
+      this.prisma.bAC_SI.findMany({
+        where,
+        include: {
+          CHUYEN_KHOA: true,
+        },
+        orderBy,
+        skip,
+        take: safePageSize,
+      }),
+      this.prisma.cHUYEN_KHOA.findMany({
+        where: {
+          BAC_SI: {
+            some: {
+              BS_DA_XOA: false,
+            },
+          },
+        },
+        select: {
+          CK_MA: true,
+          CK_TEN: true,
+        },
+        orderBy: { CK_TEN: 'asc' },
+      }),
+      this.prisma.bAC_SI.findMany({
+        where: {
+          BS_DA_XOA: false,
+          BS_HOC_HAM: { not: null },
+        },
+        select: {
+          BS_HOC_HAM: true,
+        },
+        distinct: ['BS_HOC_HAM'],
+        orderBy: { BS_HOC_HAM: 'asc' },
+      }),
+    ]);
+
+    return {
+      items,
+      page,
+      pageSize: safePageSize,
+      total,
+      totalPages,
+      filters: {
+        specialties,
+        degrees: degreeRows
+          .map((row) => String(row.BS_HOC_HAM ?? '').trim())
+          .filter((value) => Boolean(value)),
+        genderSupported: true,
+      },
+    };
   }
 
   updatePreVisitInfo(

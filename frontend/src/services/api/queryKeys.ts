@@ -2,6 +2,18 @@ export const queryKeys = {
   booking: {
     doctors: (specialtyId: string, date: string, q: string) =>
       ['booking-doctors', specialtyId, date, q] as const,
+    doctorCatalog: (params: {
+      q: string;
+      specialtyId: string;
+      degree: string;
+      gender: string;
+      sortBy: string;
+      sortDirection: string;
+      page: number;
+      pageSize: number;
+    }) => ['booking-doctor-catalog', params] as const,
+    doctorBookableDates: (doctorId: number | null, from: string, to: string) =>
+      ['booking-doctor-bookable-dates', doctorId, from, to] as const,
     slots: (doctorId: number | null, date: string, profileId?: number | null) =>
       ['booking-slots', doctorId, date, profileId ?? null] as const,
     serviceTypes: (specialtyId: string) => ['booking-service-types', specialtyId] as const,

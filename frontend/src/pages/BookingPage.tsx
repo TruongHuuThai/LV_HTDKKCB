@@ -1,4 +1,4 @@
-﻿import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, type ButtonHTMLAttributes, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   CalendarDays,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Circle,
@@ -21,6 +22,7 @@ import {
   Stethoscope,
   UserRound,
   Wallet,
+  X,
   XCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -28,6 +30,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -46,7 +49,13 @@ import { setLastPaymentContext } from '@/lib/patientPaymentFlow';
 import { getPatientProfileFullName } from '@/lib/patientProfiles';
 import { formatDateDdMmYyyy, getSessionLabel } from '@/lib/scheduleDisplay';
 import { appointmentsApi } from '@/services/api/appointmentsApi';
-import { bookingApi, type BookingDoctor, type BookingServiceTypeOption } from '@/services/api/bookingApi';
+import {
+  bookingApi,
+  type BookingDoctor,
+  type BookingServiceTypeOption,
+  type DoctorCatalogSortBy,
+  type DoctorCatalogSortDirection,
+} from '@/services/api/bookingApi';
 import { patientProfilesApi, type PatientProfile } from '@/services/api/patientProfilesApi';
 import { queryKeys } from '@/services/api/queryKeys';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -127,6 +136,27 @@ const PAYMENT_METHOD_OPTIONS = [
   { value: 'MOMO', label: 'MoMo', note: 'Sắp hỗ trợ', available: false },
 ];
 
+const DOCTOR_CATALOG_PAGE_SIZE = 8;
+
+const DOCTOR_SORT_OPTIONS: Array<{
+  label: string;
+  sortBy: DoctorCatalogSortBy;
+  sortDirection: DoctorCatalogSortDirection;
+}> = [
+  { label: 'Tên A-Z', sortBy: 'name', sortDirection: 'asc' },
+  { label: 'Tên Z-A', sortBy: 'name', sortDirection: 'desc' },
+  { label: 'Chuyên khoa A-Z', sortBy: 'specialty', sortDirection: 'asc' },
+  { label: 'Học hàm/chức danh', sortBy: 'degree', sortDirection: 'asc' },
+];
+
+type DoctorFilterKey = 'keyword' | 'specialty' | 'degree' | 'gender';
+type DoctorFilterPanelKey = 'specialty' | 'degree' | 'gender' | 'sort';
+
+type DoctorFilterOption = {
+  value: string;
+  label: string;
+};
+
 function todayIso() {
   const now = new Date();
   const year = now.getFullYear();
@@ -154,10 +184,51 @@ function normalizeVietnameseText(value: string) {
     .trim();
 }
 
+function getDoctorDisplayName(doctor: Pick<BookingDoctor, 'BS_HO_TEN' | 'BS_HOC_HAM'>) {
+  return doctor.BS_HOC_HAM ? `${doctor.BS_HOC_HAM} ${doctor.BS_HO_TEN}` : doctor.BS_HO_TEN;
+}
+
+function getInitials(value: string) {
+  const compact = value.trim();
+  if (!compact) return 'BS';
+  const words = compact.split(/\s+/).filter(Boolean);
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return `${words[words.length - 2][0] || ''}${words[words.length - 1][0] || ''}`.toUpperCase();
+}
+
+function getDoctorSearchableText(doctor: BookingDoctor) {
+  return normalizeVietnameseText(
+    [
+      doctor.BS_HO_TEN,
+      doctor.BS_HOC_HAM || '',
+      doctor.CHUYEN_KHOA || '',
+      doctor.CHUYEN_KHOA_DOI_TUONG_KHAM || '',
+    ]
+      .join(' ')
+      .trim(),
+  );
+}
+
+function buildDoctorSortValue(sortBy: DoctorCatalogSortBy, sortDirection: DoctorCatalogSortDirection) {
+  return `${sortBy}:${sortDirection}`;
+}
+
+function parseDoctorSortValue(value: string): {
+  sortBy: DoctorCatalogSortBy;
+  sortDirection: DoctorCatalogSortDirection;
+} {
+  const [sortByRaw, sortDirectionRaw] = String(value || '').split(':');
+  const sortBy: DoctorCatalogSortBy =
+    sortByRaw === 'specialty' || sortByRaw === 'degree' ? sortByRaw : 'name';
+  const sortDirection: DoctorCatalogSortDirection =
+    sortDirectionRaw === 'desc' ? 'desc' : 'asc';
+  return { sortBy, sortDirection };
+}
+
 function getClinicalOrder(mode: EntryMode | null): ClinicalSelectorKey[] {
   if (mode === 'BY_DATE') return ['date', 'specialty', 'doctor', 'slot'];
   if (mode === 'BY_DEPARTMENT') return ['specialty', 'date', 'doctor', 'slot'];
-  return ['doctor', 'date', 'specialty', 'slot'];
+  return ['doctor', 'specialty', 'date', 'slot'];
 }
 
 function getStepGroup(step: FlowStep): StepGroupKey {
@@ -175,9 +246,9 @@ function getStepStatus(currentStep: FlowStep, group: StepGroupKey): StepStatus {
   return 'upcoming';
 }
 
-function sectionTitleForSelector(key: ClinicalSelectorKey) {
+function sectionTitleForSelector(key: ClinicalSelectorKey, mode?: EntryMode | null) {
   if (key === 'date') return 'Chọn ngày khám';
-  if (key === 'specialty') return 'Chọn chuyên khoa';
+  if (key === 'specialty') return mode === 'BY_DOCTOR' ? 'Chọn loại hình khám' : 'Chọn chuyên khoa';
   if (key === 'doctor') return 'Chọn bác sĩ';
   return 'Chọn khung giờ';
 }
@@ -274,7 +345,16 @@ export default function BookingPage() {
   const [doctorSearch, setDoctorSearch] = useState('');
   const [doctorSearchDebounced, setDoctorSearchDebounced] = useState('');
   const [selectedDoctorId, setSelectedDoctorId] = useState<number | null>(null);
+  const [selectedDoctorSnapshot, setSelectedDoctorSnapshot] = useState<BookingDoctor | null>(null);
   const [selectedSlotKey, setSelectedSlotKey] = useState<string | null>(null);
+  const [doctorCatalogSpecialtyFilter, setDoctorCatalogSpecialtyFilter] = useState<string>('all');
+  const [doctorCatalogGenderFilter, setDoctorCatalogGenderFilter] = useState<string>('all');
+  const [doctorCatalogDegreeFilter, setDoctorCatalogDegreeFilter] = useState<string>('all');
+  const [doctorCatalogSortValue, setDoctorCatalogSortValue] = useState<string>(
+    buildDoctorSortValue('name', 'asc'),
+  );
+  const [doctorCatalogPage, setDoctorCatalogPage] = useState<number>(1);
+  const [activeDoctorFilterPanel, setActiveDoctorFilterPanel] = useState<DoctorFilterPanelKey | null>(null);
 
   const [symptoms, setSymptoms] = useState('');
   const [preVisitNote, setPreVisitNote] = useState('');
@@ -308,6 +388,18 @@ export default function BookingPage() {
     return () => window.clearTimeout(timer);
   }, [doctorSearch]);
 
+  useEffect(() => {
+    if (entryMode !== 'BY_DOCTOR') return;
+    setDoctorCatalogPage(1);
+  }, [
+    doctorCatalogDegreeFilter,
+    doctorCatalogGenderFilter,
+    doctorCatalogSortValue,
+    doctorCatalogSpecialtyFilter,
+    doctorSearchDebounced,
+    entryMode,
+  ]);
+
   const activeProfiles = (profilesQuery.data?.items ?? []).filter((item) => item.BN_DA_VO_HIEU !== true);
   const selectedProfile = activeProfiles.find((item) => item.BN_MA === selectedProfileId) || null;
 
@@ -318,7 +410,14 @@ export default function BookingPage() {
     }
   }, [activeProfiles, selectedProfileId, setSelectedProfile, user?.TK_SDT]);
 
-  const doctorsQuery = useQuery({
+  const doctorCatalogSort = useMemo(
+    () => parseDoctorSortValue(doctorCatalogSortValue),
+    [doctorCatalogSortValue],
+  );
+  const bookingDateMin = todayIso();
+  const bookingDateMax = maxBookingDateIso();
+
+  const availableDoctorsQuery = useQuery({
     queryKey: queryKeys.booking.doctors(specialtyId || 'all', selectedDate, doctorSearchDebounced),
     queryFn: () =>
       bookingApi.getAvailableDoctors({
@@ -326,8 +425,41 @@ export default function BookingPage() {
         specialtyId: specialtyId ? Number(specialtyId) : undefined,
         q: doctorSearchDebounced || undefined,
       }),
-    enabled: Boolean(selectedProfile),
+    enabled: Boolean(selectedProfile && entryMode !== 'BY_DOCTOR'),
   });
+
+  const doctorCatalogQuery = useQuery({
+    queryKey: queryKeys.booking.doctorCatalog({
+      q: doctorSearchDebounced,
+      specialtyId: doctorCatalogSpecialtyFilter,
+      degree: doctorCatalogDegreeFilter,
+      gender: doctorCatalogGenderFilter,
+      sortBy: doctorCatalogSort.sortBy,
+      sortDirection: doctorCatalogSort.sortDirection,
+      page: doctorCatalogPage,
+      pageSize: DOCTOR_CATALOG_PAGE_SIZE,
+    }),
+    queryFn: () =>
+      bookingApi.getDoctorCatalog({
+        q: doctorSearchDebounced || undefined,
+        specialtyId:
+          doctorCatalogSpecialtyFilter !== 'all' ? Number(doctorCatalogSpecialtyFilter) : undefined,
+        degree: doctorCatalogDegreeFilter !== 'all' ? doctorCatalogDegreeFilter : undefined,
+        gender: doctorCatalogGenderFilter !== 'all' ? doctorCatalogGenderFilter : undefined,
+        sortBy: doctorCatalogSort.sortBy,
+        sortDirection: doctorCatalogSort.sortDirection,
+        page: doctorCatalogPage,
+        pageSize: DOCTOR_CATALOG_PAGE_SIZE,
+      }),
+    enabled: Boolean(selectedProfile && entryMode === 'BY_DOCTOR'),
+  });
+
+  useEffect(() => {
+    if (entryMode !== 'BY_DOCTOR') return;
+    const serverPage = doctorCatalogQuery.data?.page;
+    if (!serverPage || serverPage === doctorCatalogPage) return;
+    setDoctorCatalogPage(serverPage);
+  }, [doctorCatalogPage, doctorCatalogQuery.data?.page, entryMode]);
 
   const serviceTypesQuery = useQuery({
     queryKey: queryKeys.booking.serviceTypes(specialtyId || ''),
@@ -336,26 +468,64 @@ export default function BookingPage() {
   });
 
   const doctorList = useMemo(() => {
+    if (entryMode === 'BY_DOCTOR') return doctorCatalogQuery.data?.items ?? [];
     const keyword = normalizeVietnameseText(doctorSearchDebounced);
-    if (!keyword) return doctorsQuery.data ?? [];
-    return (doctorsQuery.data ?? []).filter((doctor) =>
-      normalizeVietnameseText(doctor.BS_HO_TEN).includes(keyword),
-    );
-  }, [doctorSearchDebounced, doctorsQuery.data]);
+    if (!keyword) return availableDoctorsQuery.data ?? [];
+    return (availableDoctorsQuery.data ?? []).filter((doctor) => getDoctorSearchableText(doctor).includes(keyword));
+  }, [availableDoctorsQuery.data, doctorCatalogQuery.data?.items, doctorSearchDebounced, entryMode]);
 
   const selectedDoctor = useMemo(
-    () => doctorList.find((item) => item.BS_MA === selectedDoctorId) || null,
-    [doctorList, selectedDoctorId],
+    () =>
+      doctorList.find((item) => item.BS_MA === selectedDoctorId) ||
+      (selectedDoctorSnapshot?.BS_MA === selectedDoctorId ? selectedDoctorSnapshot : null),
+    [doctorList, selectedDoctorId, selectedDoctorSnapshot],
+  );
+
+  const doctorBookableDatesQuery = useQuery({
+    queryKey: queryKeys.booking.doctorBookableDates(
+      selectedDoctorId,
+      bookingDateMin,
+      bookingDateMax,
+    ),
+    queryFn: () =>
+      bookingApi.getDoctorBookableDates(selectedDoctorId!, {
+        from: bookingDateMin,
+        to: bookingDateMax,
+      }),
+    enabled: Boolean(selectedProfile && selectedDoctorId),
+  });
+
+  const doctorSelectableDates = useMemo(
+    () => new Set(doctorBookableDatesQuery.data?.availableDates ?? []),
+    [doctorBookableDatesQuery.data?.availableDates],
+  );
+  const doctorFullDates = useMemo(
+    () => new Set(doctorBookableDatesQuery.data?.fullDates ?? []),
+    [doctorBookableDatesQuery.data?.fullDates],
   );
 
   useEffect(() => {
     if (!selectedDoctorId) return;
+    if (entryMode === 'BY_DOCTOR') return;
     const stillExists = doctorList.some((item) => item.BS_MA === selectedDoctorId);
     if (!stillExists) {
       setSelectedDoctorId(null);
+      setSelectedDoctorSnapshot(null);
       setSelectedSlotKey(null);
     }
-  }, [doctorList, selectedDoctorId]);
+  }, [doctorList, entryMode, selectedDoctorId]);
+
+  useEffect(() => {
+    if (!selectedDoctorId) return;
+    const availableDates = doctorBookableDatesQuery.data?.availableDates ?? [];
+    if (availableDates.length === 0) {
+      setSelectedSlotKey(null);
+      return;
+    }
+    if (availableDates.includes(selectedDate)) return;
+    setSelectedDate(availableDates[0]);
+    setSelectedSlotKey(null);
+  }, [doctorBookableDatesQuery.data?.availableDates, selectedDate, selectedDoctorId]);
 
   useEffect(() => {
     if (entryMode !== 'BY_DOCTOR' || !selectedDoctor) return;
@@ -575,9 +745,117 @@ export default function BookingPage() {
     (privateProvidersQuery.data ?? []).find((item) => item.id === privateInsuranceProvider)?.name ||
     privateInsuranceProvider;
   const availableProviders = privateProvidersQuery.data ?? [];
+  const activeDoctorQuery = entryMode === 'BY_DOCTOR' ? doctorCatalogQuery : availableDoctorsQuery;
+  const doctorCatalogFilters = doctorCatalogQuery.data?.filters;
+  const doctorCatalogTotalPages = doctorCatalogQuery.data?.totalPages ?? 1;
+  const doctorCatalogTotalItems = doctorCatalogQuery.data?.total ?? 0;
+  const canFilterByGender = Boolean(doctorCatalogFilters?.genderSupported);
+  const specialtyFilterOptions = useMemo<DoctorFilterOption[]>(
+    () => [
+      { value: 'all', label: 'Tất cả chuyên khoa' },
+      ...(doctorCatalogFilters?.specialties ?? []).map((item) => ({
+        value: String(item.CK_MA),
+        label: item.CK_TEN,
+      })),
+    ],
+    [doctorCatalogFilters?.specialties],
+  );
+  const degreeFilterOptions = useMemo<DoctorFilterOption[]>(
+    () => [
+      { value: 'all', label: 'Tất cả' },
+      ...(doctorCatalogFilters?.degrees ?? []).map((value) => ({
+        value,
+        label: value,
+      })),
+    ],
+    [doctorCatalogFilters?.degrees],
+  );
+  const genderFilterOptions = useMemo<DoctorFilterOption[]>(
+    () =>
+      canFilterByGender
+        ? [
+            { value: 'all', label: 'Tất cả' },
+            { value: 'male', label: 'Nam' },
+            { value: 'female', label: 'Nữ' },
+          ]
+        : [],
+    [canFilterByGender],
+  );
+  const activeDoctorFilterChips = useMemo(
+    () =>
+      [
+        doctorSearchDebounced
+          ? {
+              key: 'keyword' as DoctorFilterKey,
+              label: `Từ khóa: ${doctorSearchDebounced}`,
+            }
+          : null,
+        doctorCatalogSpecialtyFilter !== 'all'
+          ? {
+              key: 'specialty' as DoctorFilterKey,
+              label:
+                specialtyFilterOptions.find((item) => item.value === doctorCatalogSpecialtyFilter)?.label ||
+                'Chuyên khoa',
+            }
+          : null,
+        doctorCatalogDegreeFilter !== 'all'
+          ? {
+              key: 'degree' as DoctorFilterKey,
+              label:
+                degreeFilterOptions.find((item) => item.value === doctorCatalogDegreeFilter)?.label ||
+                'Học hàm/chức danh',
+            }
+          : null,
+        canFilterByGender && doctorCatalogGenderFilter !== 'all'
+          ? {
+              key: 'gender' as DoctorFilterKey,
+              label:
+                genderFilterOptions.find((item) => item.value === doctorCatalogGenderFilter)?.label ||
+                'Giới tính',
+            }
+          : null,
+      ].filter((item): item is { key: DoctorFilterKey; label: string } => Boolean(item)),
+    [
+      canFilterByGender,
+      degreeFilterOptions,
+      doctorCatalogDegreeFilter,
+      doctorCatalogGenderFilter,
+      doctorCatalogSpecialtyFilter,
+      doctorSearchDebounced,
+      genderFilterOptions,
+      specialtyFilterOptions,
+    ],
+  );
+  const specialtyFilterLabel =
+    specialtyFilterOptions.find((item) => item.value === doctorCatalogSpecialtyFilter)?.label ||
+    'Chuyên khoa';
+  const degreeFilterLabel =
+    degreeFilterOptions.find((item) => item.value === doctorCatalogDegreeFilter)?.label ||
+    'Học hàm/chức danh';
+  const genderFilterLabel =
+    genderFilterOptions.find((item) => item.value === doctorCatalogGenderFilter)?.label || 'Giới tính';
+  const sortFilterLabel =
+    DOCTOR_SORT_OPTIONS.find(
+      (item) => buildDoctorSortValue(item.sortBy, item.sortDirection) === doctorCatalogSortValue,
+    )?.label || 'Thứ tự';
+  const hasDoctorCatalogFiltersActive =
+    doctorCatalogSpecialtyFilter !== 'all' ||
+    doctorCatalogDegreeFilter !== 'all' ||
+    (canFilterByGender && doctorCatalogGenderFilter !== 'all') ||
+    Boolean(doctorSearchDebounced);
 
-  const doctorError = doctorsQuery.isError
-    ? getPatientSafeErrorMessage(doctorsQuery.error, 'Không tải được danh sách bác sĩ. Vui lòng thử lại.')
+  const doctorBookableDatesError = doctorBookableDatesQuery.isError
+    ? getPatientSafeErrorMessage(
+        doctorBookableDatesQuery.error,
+        'Khong tai duoc ngay kham kha dung cua bac si. Vui long thu lai.',
+      )
+    : null;
+  const hasSelectedDoctor = Boolean(selectedDoctorId);
+  const hasAnyBookableDateForDoctor =
+    (doctorBookableDatesQuery.data?.availableDates?.length ?? 0) > 0;
+
+  const doctorError = activeDoctorQuery.isError
+    ? getPatientSafeErrorMessage(activeDoctorQuery.error, 'Không tải được danh sách bác sĩ. Vui lòng thử lại.')
     : null;
   const slotsError = slotsQuery.isError
     ? getPatientSafeErrorMessage(slotsQuery.error, 'Không tải được danh sách khung giờ. Vui lòng thử lại.')
@@ -686,7 +964,16 @@ export default function BookingPage() {
     setSpecialtyId('');
     setSelectedServiceTypeId('');
     setSelectedDoctorId(null);
+    setSelectedDoctorSnapshot(null);
     setSelectedSlotKey(null);
+    setDoctorSearch('');
+    setDoctorSearchDebounced('');
+    setDoctorCatalogSpecialtyFilter('all');
+    setDoctorCatalogGenderFilter('all');
+    setDoctorCatalogDegreeFilter('all');
+    setDoctorCatalogSortValue(buildDoctorSortValue('name', 'asc'));
+    setDoctorCatalogPage(1);
+    setActiveDoctorFilterPanel(null);
     setSymptoms('');
     setPreVisitNote('');
     setHasBHYT(null);
@@ -736,14 +1023,50 @@ export default function BookingPage() {
     setSpecialtyId(value);
     setSelectedServiceTypeId('');
     setSelectedDoctorId(null);
+    setSelectedDoctorSnapshot(null);
     setSelectedSlotKey(null);
   };
 
   const handleChangeDoctor = (doctor: BookingDoctor) => {
+    const isDoctorChanged = selectedDoctorId !== doctor.BS_MA;
     setSelectedDoctorId(doctor.BS_MA);
+    setSelectedDoctorSnapshot(doctor);
     setSelectedSlotKey(null);
     if (entryMode === 'BY_DOCTOR') {
+      if (isDoctorChanged) {
+        setSelectedServiceTypeId('');
+      }
       setSpecialtyId(String(doctor.CK_MA));
+    }
+  };
+
+  const clearDoctorCatalogFilters = () => {
+    setDoctorSearch('');
+    setDoctorSearchDebounced('');
+    setDoctorCatalogSpecialtyFilter('all');
+    setDoctorCatalogGenderFilter('all');
+    setDoctorCatalogDegreeFilter('all');
+    setDoctorCatalogSortValue(buildDoctorSortValue('name', 'asc'));
+    setDoctorCatalogPage(1);
+    setActiveDoctorFilterPanel(null);
+  };
+
+  const removeDoctorFilterChip = (key: DoctorFilterKey) => {
+    if (key === 'keyword') {
+      setDoctorSearch('');
+      setDoctorSearchDebounced('');
+      return;
+    }
+    if (key === 'specialty') {
+      setDoctorCatalogSpecialtyFilter('all');
+      return;
+    }
+    if (key === 'degree') {
+      setDoctorCatalogDegreeFilter('all');
+      return;
+    }
+    if (key === 'gender') {
+      setDoctorCatalogGenderFilter('all');
     }
   };
 
@@ -1080,24 +1403,45 @@ export default function BookingPage() {
               <CardHeader>
                 <CardTitle>Chọn lịch khám</CardTitle>
                 <CardDescription>
-                  Trình tự theo cách đặt hiện tại: {clinicalOrder.map(sectionTitleForSelector).join(' -> ')}
+                  Trình tự theo cách đặt hiện tại: {clinicalOrder.map((key) => sectionTitleForSelector(key, entryMode)).join(' -> ')}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 {clinicalOrder.map((selectorKey, index) => (
                   <SectionCard
                     key={selectorKey}
-                    title={`${index + 1}. ${sectionTitleForSelector(selectorKey)}`}
+                    title={`${index + 1}. ${sectionTitleForSelector(selectorKey, entryMode)}`}
                     subtitle={selectorKey === 'slot' ? 'Chỉ hiển thị khung giờ còn trống.' : undefined}
                   >
                     {selectorKey === 'date' ? (
                       <div className="space-y-3">
                         <BookingCalendar
                           value={selectedDate}
-                          min={todayIso()}
-                          max={maxBookingDateIso()}
+                          min={bookingDateMin}
+                          max={bookingDateMax}
                           onChange={handleChangeDate}
+                          selectableDates={hasSelectedDoctor ? doctorSelectableDates : undefined}
+                          fullDates={hasSelectedDoctor ? doctorFullDates : undefined}
                         />
+                        {hasSelectedDoctor && doctorBookableDatesQuery.isLoading ? (
+                          <StateCard
+                            message="Đang tải ngày khám khả dụng theo lịch trực của bác sĩ..."
+                            compact
+                          />
+                        ) : null}
+                        {hasSelectedDoctor && doctorBookableDatesError ? (
+                          <InlineError message={doctorBookableDatesError} />
+                        ) : null}
+                        {hasSelectedDoctor &&
+                        !doctorBookableDatesQuery.isLoading &&
+                        !doctorBookableDatesError &&
+                        !hasAnyBookableDateForDoctor ? (
+                          <StateCard
+                            message="Bác sĩ chưa có ngày khả dụng để đặt khám trong khoảng 3 tháng tới."
+                            dashed
+                            compact
+                          />
+                        ) : null}
                         <p className="text-xs text-slate-500">
                           Hệ thống hỗ trợ đặt lịch tối đa 3 tháng tính từ hôm nay.
                         </p>
@@ -1105,34 +1449,51 @@ export default function BookingPage() {
                     ) : null}
 
                     {selectorKey === 'specialty' ? (
-                      <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
-                        <Label>Chuyên khoa</Label>
-                        <Select
-                          value={specialtyId || ''}
-                          onValueChange={handleChangeSpecialty}
-                          disabled={entryMode === 'BY_DOCTOR' && Boolean(selectedDoctor)}
-                        >
-                          <SelectTrigger className="bg-white">
-                            <SelectValue placeholder="Chọn chuyên khoa" />
-                          </SelectTrigger>
-                          <SelectContent className="z-[120] bg-white">
-                            {(specialties ?? []).map((item) => (
-                              <SelectItem key={item.CK_MA} value={String(item.CK_MA)}>
-                                {item.CK_TEN}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {entryMode === 'BY_DOCTOR' && selectedDoctor ? (
-                          <p className="text-xs text-slate-500">
-                            Chuyên khoa được tự động đồng bộ theo bác sĩ bạn đã chọn.
-                          </p>
-                        ) : null}
+                      <div className="space-y-3">
+                        {entryMode === 'BY_DOCTOR' ? (
+                          <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
+                            <Label>Chuyên khoa</Label>
+                            {selectedDoctor ? (
+                              <>
+                                <p className="text-sm font-medium text-slate-900">
+                                  {selectedDoctor.CHUYEN_KHOA || selectedSpecialty?.CK_TEN || 'Chưa cập nhật chuyên khoa'}
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                  Chuyên khoa được tự động đồng bộ theo bác sĩ bạn đã chọn.
+                                </p>
+                              </>
+                            ) : (
+                              <p className="text-xs text-slate-500">
+                                Vui lòng chọn bác sĩ trước để hệ thống tự xác định chuyên khoa và tải loại hình khám.
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
+                            <Label>Chuyên khoa</Label>
+                            <Select value={specialtyId || ''} onValueChange={handleChangeSpecialty}>
+                              <SelectTrigger className="bg-white">
+                                <SelectValue placeholder="Chọn chuyên khoa" />
+                              </SelectTrigger>
+                              <SelectContent className="z-[120] bg-white">
+                                {(specialties ?? []).map((item) => (
+                                  <SelectItem key={item.CK_MA} value={String(item.CK_MA)}>
+                                    {item.CK_TEN}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
 
-                        <div className="pt-2">
+                        <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
                           <Label>Loại hình khám</Label>
                           {!specialtyId ? (
-                            <p className="mt-2 text-xs text-slate-500">Chọn chuyên khoa trước để xem loại hình khám và chi phí.</p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              {entryMode === 'BY_DOCTOR'
+                                ? 'Vui lòng chọn bác sĩ trước để xem loại hình khám và chi phí.'
+                                : 'Chọn chuyên khoa trước để xem loại hình khám và chi phí.'}
+                            </p>
                           ) : serviceTypesQuery.isLoading ? (
                             <div className="mt-2">
                               <StateCard message="Đang tải loại hình khám..." compact />
@@ -1177,56 +1538,184 @@ export default function BookingPage() {
                     ) : null}
 
                     {selectorKey === 'doctor' ? (
-                      <div className="space-y-3">
-                        <Label htmlFor="doctor-search">Tìm bác sĩ</Label>
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                          <Input
-                            id="doctor-search"
-                            value={doctorSearch}
-                            onChange={(event) => setDoctorSearch(event.target.value)}
-                            className="pl-9"
-                            placeholder="Nhập tên bác sĩ"
-                          />
+                      <div className="space-y-4">
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                          <p className="text-sm font-medium text-slate-800">
+                            Chọn bác sĩ phù hợp với nhu cầu khám của bạn.
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Xem thông tin chuyên khoa, đối tượng khám và chọn bác sĩ bạn muốn đồng hành.
+                          </p>
                         </div>
 
-                        {doctorError ? <InlineError message={doctorError} /> : null}
+                        <DoctorSearchBox
+                          id="doctor-search"
+                          label="Tìm bác sĩ"
+                          value={doctorSearch}
+                          placeholder="Nhập tên bác sĩ, học hàm/chức danh hoặc chuyên khoa"
+                          onChange={setDoctorSearch}
+                          onClear={() => setDoctorSearch('')}
+                        />
 
-                        {doctorsQuery.isLoading ? (
-                          <StateCard message="Đang tải danh sách bác sĩ..." />
+                        {entryMode === 'BY_DOCTOR' ? (
+                          <DoctorCompactFilterBar
+                            specialtyLabel={specialtyFilterLabel}
+                            degreeLabel={degreeFilterLabel}
+                            genderLabel={genderFilterLabel}
+                            sortLabel={sortFilterLabel}
+                            specialtyValue={doctorCatalogSpecialtyFilter}
+                            degreeValue={doctorCatalogDegreeFilter}
+                            genderValue={doctorCatalogGenderFilter}
+                            sortValue={doctorCatalogSortValue}
+                            specialtyOptions={specialtyFilterOptions}
+                            degreeOptions={degreeFilterOptions}
+                            genderOptions={genderFilterOptions}
+                            canFilterByGender={canFilterByGender}
+                            activePanel={activeDoctorFilterPanel}
+                            onPanelChange={setActiveDoctorFilterPanel}
+                            onSpecialtyChange={setDoctorCatalogSpecialtyFilter}
+                            onDegreeChange={setDoctorCatalogDegreeFilter}
+                            onGenderChange={setDoctorCatalogGenderFilter}
+                            onSortChange={setDoctorCatalogSortValue}
+                            onReset={clearDoctorCatalogFilters}
+                            hasActiveFilters={hasDoctorCatalogFiltersActive}
+                          />
+                        ) : null}
+
+                        {entryMode === 'BY_DOCTOR' ? (
+                          <ActiveDoctorFilters
+                            chips={activeDoctorFilterChips}
+                            onRemove={removeDoctorFilterChip}
+                            onReset={clearDoctorCatalogFilters}
+                          />
+                        ) : null}
+
+                        {doctorError ? (
+                          <div className="space-y-2">
+                            <InlineError message={doctorError} />
+                            <div className="flex justify-end">
+                              <Button type="button" variant="outline" size="sm" onClick={() => void activeDoctorQuery.refetch()}>
+                                Thử tải lại
+                              </Button>
+                            </div>
+                          </div>
+                        ) : activeDoctorQuery.isLoading ? (
+                          <DoctorCardSkeletonList count={entryMode === 'BY_DOCTOR' ? 4 : 3} />
                         ) : doctorList.length === 0 ? (
-                          <StateCard message="Không có bác sĩ phù hợp với điều kiện đã chọn." dashed />
+                          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center">
+                            <p className="text-base font-semibold text-slate-900">Không tìm thấy bác sĩ phù hợp</p>
+                            <p className="mt-2 text-sm text-slate-600">
+                              Hãy thử đổi chuyên khoa hoặc điều chỉnh từ khóa tìm kiếm.
+                            </p>
+                            {entryMode === 'BY_DOCTOR' && hasDoctorCatalogFiltersActive ? (
+                              <Button type="button" variant="outline" size="sm" className="mt-3" onClick={clearDoctorCatalogFilters}>
+                                Xóa bộ lọc và xem lại toàn bộ bác sĩ
+                              </Button>
+                            ) : null}
+                          </div>
                         ) : (
-                          <div className="grid max-h-72 gap-3 overflow-auto rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
-                            {doctorList.map((doctor) => {
-                              const isSelected = selectedDoctorId === doctor.BS_MA;
-                              return (
-                                <button
-                                  key={doctor.BS_MA}
+                          <div className="space-y-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                              <p className="text-sm font-medium text-slate-700">
+                                {entryMode === 'BY_DOCTOR'
+                                  ? `${doctorCatalogTotalItems} bác sĩ phù hợp`
+                                  : `${doctorList.length} bác sĩ khả dụng`}
+                              </p>
+                              {entryMode === 'BY_DOCTOR' ? (
+                                <p className="text-xs text-slate-500">
+                                  Trang {doctorCatalogQuery.data?.page ?? doctorCatalogPage}/{doctorCatalogTotalPages}
+                                </p>
+                              ) : null}
+                            </div>
+
+                            <div className="grid max-h-[32rem] gap-3 overflow-auto rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
+                              {doctorList.map((doctor) => {
+                                const isSelected = selectedDoctorId === doctor.BS_MA;
+                                const doctorName = getDoctorDisplayName(doctor);
+                                const specialtyName = doctor.CHUYEN_KHOA || 'Chưa cập nhật chuyên khoa';
+                                return (
+                                  <button
+                                    key={doctor.BS_MA}
+                                    type="button"
+                                    aria-pressed={isSelected}
+                                    onClick={() => handleChangeDoctor(doctor)}
+                                    className={`w-full rounded-2xl border-2 p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                                      isSelected
+                                        ? 'border-blue-400 bg-blue-50'
+                                        : 'border-slate-200 bg-white hover:border-blue-300 hover:bg-slate-50 hover:shadow-sm'
+                                    }`}
+                                  >
+                                    <div className="flex items-start gap-4">
+                                      <Avatar className="h-16 w-16 border border-slate-200 md:h-20 md:w-20">
+                                        <AvatarImage src={doctor.BS_ANH || ''} alt={doctorName} className="object-cover" />
+                                        <AvatarFallback className="bg-blue-100 text-base font-semibold text-blue-700">
+                                          {getInitials(doctor.BS_HO_TEN)}
+                                        </AvatarFallback>
+                                      </Avatar>
+
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex flex-wrap items-start justify-between gap-2">
+                                          <p className="truncate text-base font-semibold text-slate-900">{doctorName}</p>
+                                          {isSelected ? (
+                                            <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                                              <CheckCircle2 className="h-3.5 w-3.5" /> Đã chọn bác sĩ
+                                            </span>
+                                          ) : null}
+                                        </div>
+
+                                        <p className="mt-1 text-sm font-medium text-slate-700">{specialtyName}</p>
+
+                                        <div className="mt-2 flex flex-wrap gap-2">
+                                          {doctor.CHUYEN_KHOA_DOI_TUONG_KHAM ? (
+                                            <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600">
+                                              {doctor.CHUYEN_KHOA_DOI_TUONG_KHAM}
+                                            </span>
+                                          ) : null}
+                                          {!isSelected ? (
+                                            <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-500">
+                                              Nhấn để chọn bác sĩ này
+                                            </span>
+                                          ) : null}
+                                        </div>
+
+                                        {doctor.CHUYEN_KHOA_MO_TA ? (
+                                          <p className="mt-2 line-clamp-2 text-sm text-slate-600">{doctor.CHUYEN_KHOA_MO_TA}</p>
+                                        ) : null}
+                                      </div>
+                                    </div>
+
+                                    {isSelected ? (
+                                      <div className="mt-3 inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">
+                                        <CheckCircle2 className="h-3.5 w-3.5" /> Bác sĩ đang được chọn
+                                      </div>
+                                    ) : null}
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            {entryMode === 'BY_DOCTOR' && doctorCatalogTotalPages > 1 ? (
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
                                   type="button"
-                                  onClick={() => handleChangeDoctor(doctor)}
-                                  className={`rounded-xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-                                    isSelected
-                                      ? 'border-blue-400 bg-blue-50'
-                                      : 'border-slate-200 bg-white hover:border-blue-200'
-                                  }`}
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setDoctorCatalogPage((prev) => Math.max(prev - 1, 1))}
+                                  disabled={(doctorCatalogQuery.data?.page ?? doctorCatalogPage) <= 1}
                                 >
-                                  <p className="font-semibold text-slate-900">
-                                    {doctor.BS_HOC_HAM
-                                      ? `${doctor.BS_HOC_HAM} ${doctor.BS_HO_TEN}`
-                                      : doctor.BS_HO_TEN}
-                                  </p>
-                                  <p className="text-sm text-slate-500">
-                                    {doctor.CHUYEN_KHOA || 'Chưa cập nhật chuyên khoa'}
-                                  </p>
-                                  {isSelected ? (
-                                    <p className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-blue-700">
-                                      <CheckCircle2 className="h-3.5 w-3.5" /> Đã chọn bác sĩ
-                                    </p>
-                                  ) : null}
-                                </button>
-                              );
-                            })}
+                                  Trang trước
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setDoctorCatalogPage((prev) => Math.min(prev + 1, doctorCatalogTotalPages))}
+                                  disabled={(doctorCatalogQuery.data?.page ?? doctorCatalogPage) >= doctorCatalogTotalPages}
+                                >
+                                  Trang sau
+                                </Button>
+                              </div>
+                            ) : null}
                           </div>
                         )}
                       </div>
@@ -2329,6 +2818,7 @@ type BookingCalendarDayStatus =
   | 'today'
   | 'outsideRange'
   | 'outsideMonth'
+  | 'unavailable'
   | 'holiday'
   | 'full';
 
@@ -2368,10 +2858,19 @@ function buildMonthMatrix(params: {
   selectedIso: string;
   minIso: string;
   maxIso: string;
+  selectableDates?: Set<string>;
   holidayDates?: Set<string>;
   fullDates?: Set<string>;
 }) {
-  const { monthDate, selectedIso, minIso, maxIso, holidayDates, fullDates } = params;
+  const {
+    monthDate,
+    selectedIso,
+    minIso,
+    maxIso,
+    selectableDates,
+    holidayDates,
+    fullDates,
+  } = params;
   const first = startOfMonth(monthDate);
   const startOffset = first.getDay();
   const gridStart = new Date(first);
@@ -2391,6 +2890,7 @@ function buildMonthMatrix(params: {
     else if (holidayDates?.has(iso)) status = 'holiday';
     else if (fullDates?.has(iso)) status = 'full';
     else if (iso === selectedIso) status = 'selected';
+    else if (selectableDates && !selectableDates.has(iso)) status = 'unavailable';
     else if (iso === today) status = 'today';
 
     cells.push({
@@ -2408,6 +2908,7 @@ function BookingCalendar({
   min,
   max,
   onChange,
+  selectableDates,
   holidayDates,
   fullDates,
 }: {
@@ -2415,6 +2916,7 @@ function BookingCalendar({
   min: string;
   max: string;
   onChange: (value: string) => void;
+  selectableDates?: Set<string>;
   holidayDates?: Set<string>;
   fullDates?: Set<string>;
 }) {
@@ -2427,10 +2929,11 @@ function BookingCalendar({
         selectedIso: value,
         minIso: min,
         maxIso: max,
+        selectableDates,
         holidayDates,
         fullDates,
       }),
-    [fullDates, holidayDates, max, min, value, visibleMonth],
+    [fullDates, holidayDates, max, min, selectableDates, value, visibleMonth],
   );
 
   const minMonth = startOfMonth(parseIsoDate(min));
@@ -2495,6 +2998,8 @@ function BookingCalendar({
               ? 'border-rose-200 bg-rose-50 text-rose-600'
               : cell.status === 'full'
               ? 'border-amber-200 bg-amber-50 text-amber-700'
+              : cell.status === 'unavailable'
+              ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
               : cell.status === 'outsideRange'
               ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
               : cell.status === 'outsideMonth'
@@ -2522,12 +3027,15 @@ function BookingCalendar({
       </p>
 
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-600">
-        <LegendDot className="border-blue-600 bg-blue-600" label="Ngày có thể chọn" />
-        <LegendDot className="border-blue-200 bg-blue-50" label="Ngày đã chọn" />
-        <LegendDot className="border-blue-300 bg-blue-50" label="Hôm nay" />
-        <LegendDot className="border-slate-200 bg-slate-100" label="Ngoài phạm vi đặt khám" />
-        <LegendDot className="border-rose-200 bg-rose-50" label="Ngày nghỉ / lễ / tết" />
-        <LegendDot className="border-amber-200 bg-amber-50" label="Đã đầy lịch" />
+        <LegendDot className="border-blue-600 bg-blue-600" label="Ngay co the chon" />
+        <LegendDot className="border-blue-200 bg-blue-50" label="Ngay da chon" />
+        <LegendDot className="border-blue-300 bg-blue-50" label="Hom nay" />
+        <LegendDot className="border-slate-200 bg-slate-100" label="Ngoai pham vi dat kham" />
+        {selectableDates ? (
+          <LegendDot className="border-slate-200 bg-slate-100" label="Bac si khong truc ngay nay" />
+        ) : null}
+        <LegendDot className="border-rose-200 bg-rose-50" label="Ngay nghi / le / tet" />
+        <LegendDot className="border-amber-200 bg-amber-50" label="Da day lich" />
       </div>
     </div>
   );
@@ -2581,6 +3089,381 @@ function InlineError({ message }: { message: string }) {
         <AlertCircle className="mt-0.5 h-4 w-4" />
         <p>{message}</p>
       </div>
+    </div>
+  );
+}
+
+function DoctorSearchBox({
+  id,
+  label,
+  value,
+  placeholder,
+  onChange,
+  onClear,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  placeholder: string;
+  onChange: (value: string) => void;
+  onClear: () => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <Input
+          id={id}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className="h-11 rounded-xl border-slate-300 bg-white pl-9 pr-10"
+          placeholder={placeholder}
+        />
+        {value ? (
+          <button
+            type="button"
+            onClick={onClear}
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+            aria-label="Xóa từ khóa tìm kiếm"
+          >
+            <XCircle className="h-4 w-4" />
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function DoctorCompactFilterBar({
+  specialtyLabel,
+  degreeLabel,
+  genderLabel,
+  sortLabel,
+  specialtyValue,
+  degreeValue,
+  genderValue,
+  sortValue,
+  specialtyOptions,
+  degreeOptions,
+  genderOptions,
+  canFilterByGender,
+  activePanel,
+  onPanelChange,
+  onSpecialtyChange,
+  onDegreeChange,
+  onGenderChange,
+  onSortChange,
+  onReset,
+  hasActiveFilters,
+}: {
+  specialtyLabel: string;
+  degreeLabel: string;
+  genderLabel: string;
+  sortLabel: string;
+  specialtyValue: string;
+  degreeValue: string;
+  genderValue: string;
+  sortValue: string;
+  specialtyOptions: DoctorFilterOption[];
+  degreeOptions: DoctorFilterOption[];
+  genderOptions: DoctorFilterOption[];
+  canFilterByGender: boolean;
+  activePanel: DoctorFilterPanelKey | null;
+  onPanelChange: (next: DoctorFilterPanelKey | null) => void;
+  onSpecialtyChange: (value: string) => void;
+  onDegreeChange: (value: string) => void;
+  onGenderChange: (value: string) => void;
+  onSortChange: (value: string) => void;
+  onReset: () => void;
+  hasActiveFilters: boolean;
+}) {
+  const panelBaseClass =
+    'z-[130] rounded-2xl border border-[#E0ECFF] bg-white p-3 shadow-[0_8px_24px_rgba(0,0,0,0.06)] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-1 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-1';
+  const headerClass = 'mb-2 px-1 text-[13px] font-semibold text-slate-500';
+  const listScrollClass =
+    'max-h-[360px] space-y-2 overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:#E0ECFF_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#E0ECFF] [&::-webkit-scrollbar-track]:bg-transparent';
+  const optionBaseClass =
+    'rounded-[10px] border border-transparent bg-white px-3 py-2.5 text-sm text-slate-700 transition hover:bg-[#F5F9FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500';
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-2">
+        <DropdownMenu
+          open={activePanel === 'specialty'}
+          onOpenChange={(open) => onPanelChange(open ? 'specialty' : null)}
+        >
+          <DropdownMenuTrigger asChild>
+            <DoctorFilterTrigger
+              label={specialtyValue !== 'all' ? specialtyLabel : 'Chuyên khoa'}
+              active={activePanel === 'specialty'}
+              selected={specialtyValue !== 'all'}
+            />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="start"
+            sideOffset={8}
+            collisionPadding={16}
+            className={`!w-[min(36rem,94vw)] ${panelBaseClass}`}
+          >
+            <p className={headerClass}>Danh mục chuyên khoa</p>
+            <div className={`grid gap-2 sm:grid-cols-2 ${listScrollClass}`}>
+              {specialtyOptions.map((option) => {
+                const isSelected = specialtyValue === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => {
+                      onSpecialtyChange(option.value);
+                      onPanelChange(null);
+                    }}
+                    className={`flex items-center gap-2 text-left ${optionBaseClass} ${
+                      isSelected
+                        ? 'border-[#BBD3FF] bg-[#EAF2FF] text-blue-700'
+                        : 'border-transparent'
+                    }`}
+                    aria-pressed={isSelected}
+                  >
+                    <span
+                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${
+                        isSelected ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'
+                      }`}
+                    >
+                      <Stethoscope className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">{option.label}</span>
+                    {isSelected ? <CheckCircle2 className="h-4 w-4 text-blue-600" /> : null}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-3 border-t border-[#F0F4FF] pt-2 text-xs text-blue-600">
+              Chọn chuyên khoa để lọc nhanh bác sĩ
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <DropdownMenu
+          open={activePanel === 'degree'}
+          onOpenChange={(open) => onPanelChange(open ? 'degree' : null)}
+        >
+          <DropdownMenuTrigger asChild>
+            <DoctorFilterTrigger
+              label={degreeValue !== 'all' ? degreeLabel : 'Học hàm/chức danh'}
+              active={activePanel === 'degree'}
+              selected={degreeValue !== 'all'}
+            />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="start"
+            sideOffset={8}
+            collisionPadding={16}
+            className={`!w-[min(24rem,92vw)] ${panelBaseClass}`}
+          >
+            <p className={headerClass}>Học hàm/chức danh</p>
+            <div className={listScrollClass}>
+              {degreeOptions.map((option) => {
+                const isSelected = degreeValue === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => {
+                      onDegreeChange(option.value);
+                      onPanelChange(null);
+                    }}
+                    className={`flex w-full items-center justify-between ${optionBaseClass} ${
+                      isSelected ? 'border-[#BBD3FF] bg-[#EAF2FF] text-blue-700' : 'border-transparent'
+                    }`}
+                  >
+                    {option.label}
+                    {isSelected ? <CheckCircle2 className="h-4 w-4" /> : null}
+                  </button>
+                );
+              })}
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {canFilterByGender ? (
+          <DropdownMenu
+            open={activePanel === 'gender'}
+            onOpenChange={(open) => onPanelChange(open ? 'gender' : null)}
+          >
+            <DropdownMenuTrigger asChild>
+              <DoctorFilterTrigger
+                label={genderValue !== 'all' ? genderLabel : 'Giới tính'}
+                active={activePanel === 'gender'}
+                selected={genderValue !== 'all'}
+              />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="start"
+              sideOffset={8}
+              collisionPadding={16}
+              className={`!w-[min(18rem,88vw)] ${panelBaseClass}`}
+            >
+              <p className={headerClass}>Giới tính</p>
+              <div className={listScrollClass}>
+                {genderOptions.map((option) => {
+                  const isSelected = genderValue === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => {
+                        onGenderChange(option.value);
+                        onPanelChange(null);
+                      }}
+                      className={`flex w-full items-center justify-between ${optionBaseClass} ${
+                        isSelected ? 'border-[#BBD3FF] bg-[#EAF2FF] text-blue-700' : 'border-transparent'
+                      }`}
+                    >
+                      {option.label}
+                      {isSelected ? <CheckCircle2 className="h-4 w-4" /> : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
+
+        <DropdownMenu
+          open={activePanel === 'sort'}
+          onOpenChange={(open) => onPanelChange(open ? 'sort' : null)}
+        >
+          <DropdownMenuTrigger asChild>
+            <DoctorFilterTrigger
+              label={sortLabel || 'Thứ tự'}
+              active={activePanel === 'sort'}
+              selected={sortValue !== buildDoctorSortValue('name', 'asc')}
+            />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="start"
+            sideOffset={8}
+            collisionPadding={16}
+            className={`!w-[min(18rem,88vw)] ${panelBaseClass}`}
+          >
+            <p className={headerClass}>Thứ tự</p>
+            <div className={listScrollClass}>
+              {DOCTOR_SORT_OPTIONS.map((option) => {
+                const value = buildDoctorSortValue(option.sortBy, option.sortDirection);
+                const isSelected = sortValue === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => {
+                      onSortChange(value);
+                      onPanelChange(null);
+                    }}
+                    className={`flex w-full items-center justify-between ${optionBaseClass} ${
+                      isSelected ? 'border-[#BBD3FF] bg-[#EAF2FF] text-blue-700' : 'border-transparent'
+                    }`}
+                  >
+                    {option.label}
+                    {isSelected ? <CheckCircle2 className="h-4 w-4" /> : null}
+                  </button>
+                );
+              })}
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs text-slate-500">Danh sách bác sĩ đang hoạt động trong hệ thống.</p>
+        {hasActiveFilters ? (
+          <Button type="button" variant="outline" size="sm" onClick={onReset}>
+            Xóa bộ lọc
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+type DoctorFilterTriggerProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+  label: string;
+  active?: boolean;
+  selected?: boolean;
+};
+
+const DoctorFilterTrigger = forwardRef<HTMLButtonElement, DoctorFilterTriggerProps>(
+  ({ label, active, selected, className = '', ...props }, ref) => (
+    <button
+      ref={ref}
+      type="button"
+      className={`inline-flex h-10 items-center gap-2 rounded-full border px-3 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+        active || selected
+          ? 'border-blue-300 bg-blue-50 text-blue-700'
+          : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-slate-50'
+      } ${className}`}
+      {...props}
+    >
+      <span className="max-w-[180px] truncate">{label}</span>
+      <ChevronDown className={`h-4 w-4 transition-transform ${active ? 'rotate-180' : ''}`} />
+    </button>
+  ),
+);
+
+DoctorFilterTrigger.displayName = 'DoctorFilterTrigger';
+
+function ActiveDoctorFilters({
+  chips,
+  onRemove,
+  onReset,
+}: {
+  chips: Array<{ key: DoctorFilterKey; label: string }>;
+  onRemove: (key: DoctorFilterKey) => void;
+  onReset: () => void;
+}) {
+  if (chips.length === 0) return null;
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-500">Đang lọc theo</p>
+        <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={onReset}>
+          Xóa bộ lọc
+        </Button>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {chips.map((chip) => (
+          <button
+            key={`${chip.key}-${chip.label}`}
+            type="button"
+            onClick={() => onRemove(chip.key)}
+            className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 transition hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          >
+            {chip.label}
+            <X className="h-3.5 w-3.5" />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DoctorCardSkeletonList({ count = 4 }: { count?: number }) {
+  return (
+    <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
+      {Array.from({ length: count }).map((_, idx) => (
+        <div key={`doctor-skeleton-${idx}`} className="animate-pulse rounded-2xl border border-slate-200 bg-white p-4">
+          <div className="flex items-start gap-4">
+            <div className="h-16 w-16 rounded-full bg-slate-200 md:h-20 md:w-20" />
+            <div className="flex-1 space-y-2">
+              <div className="h-4 w-2/3 rounded bg-slate-200" />
+              <div className="h-3 w-1/2 rounded bg-slate-200" />
+              <div className="h-3 w-5/6 rounded bg-slate-200" />
+              <div className="h-3 w-4/5 rounded bg-slate-200" />
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -2702,6 +3585,7 @@ function StatusBanner({
     </div>
   );
 }
+
 
 
 

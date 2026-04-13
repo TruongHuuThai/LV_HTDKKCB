@@ -18,6 +18,9 @@ const ALLOWED_PRE_VISIT_MIME = ['application/pdf', 'image/jpeg', 'image/png'];
 const MAX_PRE_VISIT_ATTACHMENT_SIZE = 10 * 1024 * 1024;
 const DEFAULT_PAYMENT_METHOD = 'VNPAY';
 const SUPPORTED_PAYMENT_METHODS = new Set(['VNPAY', 'QR_BANKING']);
+type DoctorCatalogSortBy = 'name' | 'specialty' | 'degree';
+type DoctorCatalogSortDirection = 'asc' | 'desc';
+type DoctorCatalogGender = 'male' | 'female';
 
 const BHYT_TYPE_OPTIONS = [
   {
@@ -139,6 +142,26 @@ export class BookingService {
     if (date > horizonEnd) {
       throw new BadRequestException('Chi ho tro dat lich toi da 3 thang toi');
     }
+  }
+
+  private resolveDoctorDateRange(fromRaw?: string, toRaw?: string) {
+    const now = new Date();
+    const todayUtc = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    );
+    const horizonEnd = new Date(todayUtc);
+    horizonEnd.setUTCMonth(horizonEnd.getUTCMonth() + 3);
+
+    const fromDate = fromRaw ? this.parseDateOnlyOrThrow(fromRaw) : todayUtc;
+    const toDate = toRaw ? this.parseDateOnlyOrThrow(toRaw) : horizonEnd;
+
+    this.assertDateWithinBookingHorizon(fromDate);
+    this.assertDateWithinBookingHorizon(toDate);
+    if (toDate.getTime() < fromDate.getTime()) {
+      throw new BadRequestException('Khoang ngay khong hop le');
+    }
+
+    return { fromDate, toDate };
   }
 
   private async ensureOwnedPatientProfileOrThrow(
@@ -380,8 +403,72 @@ export class BookingService {
       BS_HOC_HAM: d.BS_HOC_HAM,
       BS_ANH: d.BS_ANH,
       CHUYEN_KHOA: d.CHUYEN_KHOA ? d.CHUYEN_KHOA.CK_TEN : null,
+      CHUYEN_KHOA_MO_TA: d.CHUYEN_KHOA ? d.CHUYEN_KHOA.CK_MO_TA : null,
+      CHUYEN_KHOA_DOI_TUONG_KHAM: d.CHUYEN_KHOA ? d.CHUYEN_KHOA.CK_DOI_TUONG_KHAM : null,
       CK_MA: d.CK_MA,
     }));
+  }
+
+  async getDoctorCatalog(params?: {
+    q?: string;
+    specialtyId?: number;
+    degree?: string;
+    gender?: string;
+    sortBy?: string;
+    sortDirection?: string;
+    page?: number;
+    pageSize?: number;
+  }) {
+    const sortBy: DoctorCatalogSortBy =
+      params?.sortBy === 'specialty' || params?.sortBy === 'degree'
+        ? params.sortBy
+        : 'name';
+    const sortDirection: DoctorCatalogSortDirection =
+      params?.sortDirection === 'desc' ? 'desc' : 'asc';
+    const page = Number.isFinite(params?.page) ? Number(params?.page) : 1;
+    const pageSize = Number.isFinite(params?.pageSize) ? Number(params?.pageSize) : 10;
+    const genderRaw = String(params?.gender || '')
+      .trim()
+      .toLowerCase();
+    const gender: DoctorCatalogGender | undefined =
+      genderRaw === 'male' || genderRaw === 'nam'
+        ? 'male'
+        : genderRaw === 'female' || genderRaw === 'nu' || genderRaw === 'nữ'
+          ? 'female'
+          : undefined;
+
+    const catalog = await this.repo.listDoctorCatalog({
+      page,
+      pageSize,
+      q: params?.q,
+      specialtyId: params?.specialtyId,
+      degree: params?.degree,
+      gender,
+      sortBy,
+      sortDirection,
+    });
+
+    return {
+      items: catalog.items.map((d) => ({
+        BS_MA: d.BS_MA,
+        BS_HO_TEN: d.BS_HO_TEN,
+        BS_HOC_HAM: d.BS_HOC_HAM,
+        BS_ANH: d.BS_ANH,
+        CHUYEN_KHOA: d.CHUYEN_KHOA ? d.CHUYEN_KHOA.CK_TEN : null,
+        CHUYEN_KHOA_MO_TA: d.CHUYEN_KHOA ? d.CHUYEN_KHOA.CK_MO_TA : null,
+        CHUYEN_KHOA_DOI_TUONG_KHAM: d.CHUYEN_KHOA ? d.CHUYEN_KHOA.CK_DOI_TUONG_KHAM : null,
+        CK_MA: d.CK_MA,
+      })),
+      page: catalog.page,
+      pageSize: catalog.pageSize,
+      total: catalog.total,
+      totalPages: catalog.totalPages,
+      filters: {
+        specialties: catalog.filters.specialties,
+        degrees: catalog.filters.degrees,
+        genderSupported: catalog.filters.genderSupported,
+      },
+    };
   }
 
   async getBHYTTypes() {
@@ -500,6 +587,14 @@ export class BookingService {
         slots,
       };
     });
+  }
+
+  async getDoctorBookableDates(BS_MA: number, options?: { from?: string; to?: string }) {
+    const { fromDate, toDate } = this.resolveDoctorDateRange(
+      options?.from,
+      options?.to,
+    );
+    return this.repo.listDoctorBookableDates(BS_MA, fromDate, toDate);
   }
 
   async createByUser(

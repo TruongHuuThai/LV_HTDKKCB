@@ -10,7 +10,28 @@ export interface BookingDoctor {
   BS_HOC_HAM: string | null;
   BS_ANH: string | null;
   CHUYEN_KHOA: string | null;
+  CHUYEN_KHOA_MO_TA: string | null;
+  CHUYEN_KHOA_DOI_TUONG_KHAM: string | null;
   CK_MA: number;
+}
+
+export type DoctorCatalogSortBy = 'name' | 'specialty' | 'degree';
+export type DoctorCatalogSortDirection = 'asc' | 'desc';
+
+export interface BookingDoctorCatalogResponse {
+  items: BookingDoctor[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  filters: {
+    specialties: Array<{
+      CK_MA: number;
+      CK_TEN: string;
+    }>;
+    degrees: string[];
+    genderSupported: boolean;
+  };
 }
 
 export interface DoctorSlotSession {
@@ -94,6 +115,11 @@ export interface BookingAvailabilityDebugResponse {
   doctors: BookingAvailabilityDebugDoctor[];
 }
 
+export interface DoctorBookableDatesResponse {
+  availableDates: string[];
+  fullDates: string[];
+}
+
 export const bookingApi = {
   getAvailableDoctors: async (params?: {
     date?: string;
@@ -116,6 +142,38 @@ export const bookingApi = {
         },
       },
     );
+    return res.data;
+  },
+
+  getDoctorBookableDates: async (
+    doctorId: number,
+    params?: {
+      from?: string;
+      to?: string;
+    },
+  ) => {
+    const res = await axiosClient.get<DoctorBookableDatesResponse>(
+      `/booking/doctors/${doctorId}/bookable-dates`,
+      {
+        params,
+      },
+    );
+    return res.data;
+  },
+
+  getDoctorCatalog: async (params?: {
+    q?: string;
+    specialtyId?: number;
+    degree?: string;
+    gender?: string;
+    sortBy?: DoctorCatalogSortBy;
+    sortDirection?: DoctorCatalogSortDirection;
+    page?: number;
+    pageSize?: number;
+  }) => {
+    const res = await axiosClient.get<BookingDoctorCatalogResponse>('/booking/doctor-catalog', {
+      params,
+    });
     return res.data;
   },
 

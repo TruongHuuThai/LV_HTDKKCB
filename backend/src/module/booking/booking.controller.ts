@@ -55,6 +55,35 @@ export class BookingController {
   }
 
   // @ts-ignore
+  @Get('doctor-catalog')
+  @Roles(ROLE.BENH_NHAN, ROLE.ADMIN)
+  async getDoctorCatalog(
+    @Query('q') q?: string,
+    @Query('specialtyId') specialtyId?: string,
+    @Query('degree') degree?: string,
+    @Query('gender') gender?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortDirection') sortDirection?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ): Promise<any> {
+    const specId = specialtyId ? Number.parseInt(specialtyId, 10) : undefined;
+    const pageNumber = page ? Number.parseInt(page, 10) : undefined;
+    const pageSizeNumber = pageSize ? Number.parseInt(pageSize, 10) : undefined;
+
+    return this.booking.getDoctorCatalog({
+      q,
+      specialtyId: Number.isFinite(specId ?? NaN) ? specId : undefined,
+      degree: degree?.trim() || undefined,
+      gender: gender?.trim() || undefined,
+      sortBy: sortBy?.trim() || undefined,
+      sortDirection: sortDirection?.trim() || undefined,
+      page: Number.isFinite(pageNumber ?? NaN) ? pageNumber : undefined,
+      pageSize: Number.isFinite(pageSizeNumber ?? NaN) ? pageSizeNumber : undefined,
+    });
+  }
+
+  // @ts-ignore
   @Get('debug-availability')
   @Roles(ROLE.BENH_NHAN, ROLE.ADMIN)
   async debugAvailability(
@@ -80,6 +109,17 @@ export class BookingController {
       user,
       BN_MA: Number.isFinite(profileId ?? NaN) ? profileId : undefined,
     });
+  }
+
+  // @ts-ignore
+  @Get('doctors/:bsMa/bookable-dates')
+  @Roles(ROLE.BENH_NHAN, ROLE.ADMIN)
+  async getDoctorBookableDates(
+    @Param('bsMa', ParseIntPipe) bsMa: number,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ): Promise<any> {
+    return this.booking.getDoctorBookableDates(bsMa, { from, to });
   }
 
   // @ts-ignore

@@ -37,6 +37,7 @@ model BAC_SI {
   BS_EMAIL         String?
   BS_SDT           String?
   BS_HOC_HAM       String?
+  BS_LANAM         Boolean?    @default(true)
   BS_NGAY_CAP_NHAT DateTime?   @default(now()) @db.Timestamp(6)
   BS_DA_XOA        Boolean?    @default(false)
   BS_HO_TEN        String
@@ -50,6 +51,7 @@ model BAC_SI {
   YEU_CAU_BS_GOI_Y YEU_CAU_LICH_BSK[] @relation("YCL_BACSI_GOI_Y")
 
   @@index([CK_MA], map: "idx_bs_ck")
+  @@index([BS_LANAM], map: "idx_bs_lanam")
 }
 
 model BENH {
