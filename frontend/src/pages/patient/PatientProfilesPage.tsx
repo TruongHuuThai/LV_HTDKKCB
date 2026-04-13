@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarPlus2, FileText, Pencil, Plus, Trash2, UserRound } from 'lucide-react';
+import { CalendarDays, CalendarPlus2, FileText, Pencil, Plus, Trash2, UserRound } from 'lucide-react';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -164,6 +164,12 @@ export default function PatientProfilesPage() {
               </Link>
             </Button>
             <Button asChild size="sm" variant="outline">
+              <Link to={`/appointments/my?profileId=${profile.BN_MA}`}>
+                <CalendarDays className="mr-1 h-4 w-4" />
+                Lịch đã đặt
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
               <Link to={`/patient-profiles/${profile.BN_MA}?tab=appointments`}>
                 <FileText className="mr-1 h-4 w-4" />
                 Dữ liệu y khoa
@@ -312,6 +318,11 @@ export default function PatientProfilesPage() {
               <Button asChild variant="outline" className="w-full justify-start">
                 <Link to={selectedProfileId ? `/patient-profiles/${selectedProfileId}` : '/profile'}>
                   Xem hồ sơ đang chọn
+                </Link>
+              </Button>
+              <Button asChild variant="outline" className="w-full justify-start">
+                <Link to={selectedProfileId ? `/appointments/my?profileId=${selectedProfileId}` : '/appointments/my'}>
+                  Xem lịch đã đặt
                 </Link>
               </Button>
             </CardContent>

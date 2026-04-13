@@ -279,6 +279,12 @@ export class PatientAppointmentListQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  profileId?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
   page?: number;
 
   @IsOptional()

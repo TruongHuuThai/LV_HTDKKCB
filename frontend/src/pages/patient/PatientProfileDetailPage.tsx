@@ -97,6 +97,7 @@ export default function PatientProfileDetailPage() {
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline"><Link to="/profile">Quay lại danh sách hồ sơ</Link></Button>
             <Button asChild className="bg-blue-600 hover:bg-blue-700" disabled={!profile.canBook}><Link to="/booking">Đặt lịch khám</Link></Button>
+            <Button asChild variant="outline"><Link to={`/appointments/my?profileId=${profile.BN_MA}`}>Xem lịch đã đặt</Link></Button>
           </div>
         </div>
 

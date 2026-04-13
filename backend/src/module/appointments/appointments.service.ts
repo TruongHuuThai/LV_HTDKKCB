@@ -594,6 +594,7 @@ export class AppointmentsService {
     const statusWhere = this.mapStatusGroupToWhere(query.statusGroup);
     const where: Prisma.DANG_KYWhereInput = {
       BENH_NHAN: { TK_SDT: user.TK_SDT },
+      ...(query.profileId ? { BN_MA: query.profileId } : {}),
       ...(fromDate || toDate
         ? {
             N_NGAY: {
@@ -635,6 +636,7 @@ export class AppointmentsService {
             ? [{ N_NGAY: 'asc' }, { KG_MA: 'asc' }]
             : [{ N_NGAY: 'desc' }, { KG_MA: 'desc' }],
         include: {
+          BENH_NHAN: true,
           KHUNG_GIO: true,
           LICH_BSK: {
             include: {
@@ -666,11 +668,20 @@ export class AppointmentsService {
         return {
           appointmentId: row.DK_MA,
           DK_MA: row.DK_MA,
+          BN_MA: row.BN_MA,
           N_NGAY: row.N_NGAY,
           B_TEN: row.B_TEN,
           KG_MA: row.KG_MA,
           KG_BAT_DAU: row.KHUNG_GIO?.KG_BAT_DAU || null,
           KG_KET_THUC: row.KHUNG_GIO?.KG_KET_THUC || null,
+          profile: row.BENH_NHAN
+            ? {
+                BN_MA: row.BENH_NHAN.BN_MA,
+                fullName: `${row.BENH_NHAN.BN_HO_CHU_LOT || ''} ${row.BENH_NHAN.BN_TEN || ''}`
+                  .trim()
+                  .trim(),
+              }
+            : null,
           doctor: row.LICH_BSK?.BAC_SI
             ? {
                 BS_MA: row.LICH_BSK.BAC_SI.BS_MA,

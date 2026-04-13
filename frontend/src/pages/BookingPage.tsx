@@ -1,4 +1,4 @@
-import { forwardRef, type ButtonHTMLAttributes, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+﻿import { forwardRef, type ButtonHTMLAttributes, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -33,13 +33,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useSpecialties } from '@/hooks/useSpecialties';
 import { canOpenPaymentUrl } from '@/lib/appointments';
@@ -355,6 +348,7 @@ export default function BookingPage() {
   );
   const [doctorCatalogPage, setDoctorCatalogPage] = useState<number>(1);
   const [activeDoctorFilterPanel, setActiveDoctorFilterPanel] = useState<DoctorFilterPanelKey | null>(null);
+  const [clinicalSpecialtyPanelOpen, setClinicalSpecialtyPanelOpen] = useState(false);
 
   const [symptoms, setSymptoms] = useState('');
   const [preVisitNote, setPreVisitNote] = useState('');
@@ -1020,6 +1014,7 @@ export default function BookingPage() {
   };
 
   const handleChangeSpecialty = (value: string) => {
+    if (specialtyId === value) return;
     setSpecialtyId(value);
     setSelectedServiceTypeId('');
     setSelectedDoctorId(null);
@@ -1471,18 +1466,66 @@ export default function BookingPage() {
                         ) : (
                           <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
                             <Label>Chuyên khoa</Label>
-                            <Select value={specialtyId || ''} onValueChange={handleChangeSpecialty}>
-                              <SelectTrigger className="bg-white">
-                                <SelectValue placeholder="Chọn chuyên khoa" />
-                              </SelectTrigger>
-                              <SelectContent className="z-[120] bg-white">
-                                {(specialties ?? []).map((item) => (
-                                  <SelectItem key={item.CK_MA} value={String(item.CK_MA)}>
-                                    {item.CK_TEN}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <DropdownMenu
+                              open={clinicalSpecialtyPanelOpen}
+                              onOpenChange={setClinicalSpecialtyPanelOpen}
+                            >
+                              <DropdownMenuTrigger asChild>
+                                <DoctorFilterTrigger
+                                  label={selectedSpecialty?.CK_TEN || 'Chọn chuyên khoa'}
+                                  active={clinicalSpecialtyPanelOpen}
+                                  selected={Boolean(specialtyId)}
+                                  className="h-11 w-full justify-between rounded-xl border-slate-300 px-3"
+                                />
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent
+                                align="start"
+                                sideOffset={8}
+                                collisionPadding={16}
+                                className="z-[130] !w-[min(36rem,94vw)] rounded-2xl border border-[#E0ECFF] bg-white p-3 shadow-[0_8px_24px_rgba(0,0,0,0.06)]"
+                              >
+                                <p className="mb-2 px-1 text-[13px] font-semibold text-slate-500">Danh mục chuyên khoa</p>
+                                {(specialties ?? []).length === 0 ? (
+                                  <p className="px-2 py-4 text-sm text-slate-500">Chưa có dữ liệu chuyên khoa khả dụng.</p>
+                                ) : (
+                                  <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:#E0ECFF_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#E0ECFF] [&::-webkit-scrollbar-track]:bg-transparent">
+                                    {(specialties ?? []).map((item) => {
+                                      const optionValue = String(item.CK_MA);
+                                      const isSelected = specialtyId === optionValue;
+                                      return (
+                                        <button
+                                          key={item.CK_MA}
+                                          type="button"
+                                          onClick={() => {
+                                            handleChangeSpecialty(optionValue);
+                                            setClinicalSpecialtyPanelOpen(false);
+                                          }}
+                                          className={`flex w-full items-center gap-2 rounded-[10px] border bg-white px-3 py-2.5 text-left text-sm text-slate-700 transition hover:bg-[#F5F9FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                                            isSelected
+                                              ? 'border-[#BBD3FF] bg-[#EAF2FF] text-blue-700'
+                                              : 'border-transparent'
+                                          }`}
+                                          aria-pressed={isSelected}
+                                        >
+                                          <span
+                                            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${
+                                              isSelected ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'
+                                            }`}
+                                          >
+                                            <Stethoscope className="h-3.5 w-3.5" />
+                                          </span>
+                                          <span className="min-w-0 flex-1 truncate text-sm font-medium">{item.CK_TEN}</span>
+                                          {isSelected ? <CheckCircle2 className="h-4 w-4 text-blue-600" /> : null}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                                <div className="mt-3 border-t border-[#F0F4FF] pt-2 text-xs text-blue-600">
+                                  Chọn chuyên khoa để lọc nhanh bác sĩ
+                                </div>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         )}
 
@@ -3027,15 +3070,15 @@ function BookingCalendar({
       </p>
 
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-600">
-        <LegendDot className="border-blue-600 bg-blue-600" label="Ngay co the chon" />
-        <LegendDot className="border-blue-200 bg-blue-50" label="Ngay da chon" />
-        <LegendDot className="border-blue-300 bg-blue-50" label="Hom nay" />
-        <LegendDot className="border-slate-200 bg-slate-100" label="Ngoai pham vi dat kham" />
+        <LegendDot className="border-blue-600 bg-blue-600" label="Ngày có thể chọn" />
+        <LegendDot className="border-blue-200 bg-blue-50" label="Ngày đã chọn" />
+        <LegendDot className="border-blue-300 bg-blue-50" label="Hôm nay" />
+        <LegendDot className="border-slate-200 bg-slate-100" label="Ngoài phạm vi đặt khám" />
         {selectableDates ? (
-          <LegendDot className="border-slate-200 bg-slate-100" label="Bac si khong truc ngay nay" />
+          <LegendDot className="border-slate-200 bg-slate-100" label="Bác sĩ không trực ngày này" />
         ) : null}
-        <LegendDot className="border-rose-200 bg-rose-50" label="Ngay nghi / le / tet" />
-        <LegendDot className="border-amber-200 bg-amber-50" label="Da day lich" />
+        <LegendDot className="border-rose-200 bg-rose-50" label="Ngày nghỉ / lễ / tết" />
+        <LegendDot className="border-amber-200 bg-amber-50" label="Đã đầy lịch" />
       </div>
     </div>
   );
@@ -3585,7 +3628,6 @@ function StatusBanner({
     </div>
   );
 }
-
 
 
 

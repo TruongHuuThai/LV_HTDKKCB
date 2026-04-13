@@ -43,6 +43,15 @@ export default function AppointmentDetailPage() {
   const params = useParams<{ id: string }>();
   const appointmentId = Number.parseInt(params.id || '', 10) || 0;
   const [searchParams] = useSearchParams();
+  const backToListHref = useMemo(() => {
+    const keepKeys = ['statusGroup', 'page', 'keyword', 'profileId', 'fromDate', 'toDate'];
+    const next = new URLSearchParams();
+    keepKeys.forEach((key) => {
+      const value = searchParams.get(key);
+      if (value) next.set(key, value);
+    });
+    return `/appointments/my${next.toString() ? `?${next.toString()}` : ''}`;
+  }, [searchParams]);
 
   const detailQuery = useAppointmentDetail(appointmentId);
   const paymentStatusQuery = useAppointmentPaymentStatus(appointmentId);
@@ -177,7 +186,7 @@ export default function AppointmentDetailPage() {
             <p>{getPatientFlowErrorMessage(detailQuery.error, 'Không th? t?i chi ti?t l?ch h?n.')}</p>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => detailQuery.refetch()}>Th? l?i</Button>
-              <Button asChild variant="outline"><Link to="/appointments/my">Quay v? danh sách</Link></Button>
+              <Button asChild variant="outline"><Link to={backToListHref}>Quay v? danh sách</Link></Button>
             </div>
           </CardContent>
         </Card>
@@ -189,6 +198,11 @@ export default function AppointmentDetailPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mb-4">
+        <Button asChild variant="outline" size="sm">
+          <Link to={backToListHref}>Quay về danh sách lịch hẹn</Link>
+        </Button>
+      </div>
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <Card className="border-slate-200">
           <CardHeader>

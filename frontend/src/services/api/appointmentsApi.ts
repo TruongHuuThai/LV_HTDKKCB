@@ -8,16 +8,19 @@ export interface AppointmentListQuery {
   fromDate?: string;
   toDate?: string;
   keyword?: string;
+  profileId?: number;
 }
 
 export interface AppointmentListItem {
   appointmentId: number;
   DK_MA: number;
+  BN_MA?: number;
   N_NGAY: string;
   B_TEN: string;
   KG_MA: number;
   KG_BAT_DAU?: string | null;
   KG_KET_THUC?: string | null;
+  profile?: { BN_MA: number; fullName?: string } | null;
   doctor?: { BS_MA: number; BS_HO_TEN: string } | null;
   specialty?: { CK_MA?: number; CK_TEN?: string } | null;
   room?: { P_MA?: number; P_TEN?: string } | null;
