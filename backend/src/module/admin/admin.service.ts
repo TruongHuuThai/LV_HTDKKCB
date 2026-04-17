@@ -27,6 +27,7 @@ import { UpdateMedicineBrandInfoDto } from './dto/update-medicine-brand-info.dto
 import { CreateRoomDto } from './dto/create-room.dto';
 import { UpdateRoomDto } from './dto/update-room.dto';
 import { SERVICE_TYPE_SET } from './constants/service-type.constants';
+import { PdfService } from '../pdf/pdf.service';
 import {
   SHIFT_STATUS,
   WEEK_STATUS,
@@ -73,7 +74,10 @@ const BOOKING_CANCELLED_STATUSES = new Set(['HUY', 'HUY_BS_NGHI']);
 @Injectable()
 export class AdminService {
   private readonly logger = new Logger(AdminService.name);
-  constructor(private prisma: PrismaService) { }
+  constructor(
+    private prisma: PrismaService,
+    private readonly pdfService: PdfService,
+  ) {}
 
   async getDashboardSummary() {
     try {
@@ -4286,6 +4290,356 @@ export class AdminService {
     }
   }
 
+  async exportWeeklySchedulePdf(
+    params: {
+      weekStart?: string;
+      specialtyId?: string;
+      doctorId?: string;
+      roomId?: string;
+      status?: string;
+      session?: string;
+      weekday?: string;
+      date?: string;
+      search?: string;
+      source?: string;
+    },
+    exportedBy: string,
+  ) {
+    const [overview, list] = await Promise.all([
+      this.getScheduleCycleOverview(params.weekStart),
+      this.getWeeklySchedules({
+        ...params,
+        page: '1',
+        limit: '200',
+      }),
+    ]);
+
+    const rows = (list as any)?.items || [];
+    const tableRows = rows.map((item: any) => [
+      this.toDateOnlyIso(new Date(item.N_NGAY)),
+      item.B_TEN || '-',
+      item.doctor?.BS_HO_TEN || `BS #${item.BS_MA}`,
+      item.room?.P_TEN || `Phong #${item.P_MA}`,
+      item.status || '-',
+      String(item.bookingCount ?? 0),
+      String(item.slotCount ?? 0),
+    ]);
+
+    const report = await this.pdfService.buildReport({
+      title: 'BAO CAO LICH KHAM TUAN (ADMIN)',
+      subtitle: `Tuan ${overview.weekStartDate} -> ${overview.weekEndDate}`,
+      metadataLines: [`Exported by: ${exportedBy}`],
+      sections: [
+        {
+          heading: 'Tong quan tuan',
+          keyValues: [
+            { label: 'Trang thai chu ky', value: overview.workflowStatus || '-' },
+            { label: 'Tong ca', value: String(overview.summary?.total ?? 0) },
+            { label: 'Generated', value: String(overview.summary?.generated ?? 0) },
+            { label: 'Confirmed', value: String(overview.summary?.confirmed ?? 0) },
+            { label: 'Adjusted', value: String(overview.summary?.adjusted ?? 0) },
+            { label: 'Finalized', value: String(overview.summary?.finalized ?? 0) },
+            { label: 'Pending requests', value: String(overview.summary?.pendingExceptions ?? 0) },
+          ],
+        },
+        {
+          heading: 'Danh sach ca truc trong tuan',
+          table: {
+            headers: ['Ngay', 'Buoi', 'Bac si', 'Phong', 'Trang thai', 'Booking', 'Slots'],
+            rows:
+              tableRows.length > 0
+                ? tableRows
+                : [['-', '-', '-', '-', '-', '0', '0']],
+          },
+        },
+      ],
+    });
+
+    await this.writePdfAuditLog('ADMIN_WEEKLY_SCHEDULE_PDF_EXPORTED', exportedBy, {
+      weekStart: overview.weekStartDate,
+      weekEnd: overview.weekEndDate,
+      count: rows.length,
+    });
+
+    return {
+      filename: `admin-weekly-schedule-${overview.weekStartDate}.pdf`,
+      buffer: report,
+    };
+  }
+
+  async exportPatientsPdf(
+    params: {
+      search?: string;
+      sortBy?: string;
+      sortOrder?: string;
+      gender?: string;
+      nationality?: string;
+      ethnicity?: string;
+      patientType?: string;
+      accountPhone?: string;
+    },
+    exportedBy: string,
+  ) {
+    const result = (await this.getPatients({
+      ...params,
+      page: '1',
+      limit: '100',
+    })) as any;
+    const rows = result?.items || [];
+
+    const report = await this.pdfService.buildReport({
+      title: 'BAO CAO DANH SACH BENH NHAN',
+      subtitle: 'Danh sach benh nhan theo bo loc hien tai',
+      metadataLines: [
+        `Exported by: ${exportedBy}`,
+        `Total exported rows: ${rows.length}`,
+      ],
+      sections: [
+        {
+          heading: 'Thong tin bo loc',
+          keyValues: [
+            { label: 'Search', value: params.search || '-' },
+            { label: 'Gender', value: params.gender || 'all' },
+            { label: 'Nationality', value: params.nationality || '-' },
+            { label: 'Ethnicity', value: params.ethnicity || '-' },
+            { label: 'Patient type', value: params.patientType || 'all' },
+            { label: 'Account phone', value: params.accountPhone || '-' },
+          ],
+        },
+        {
+          heading: 'Danh sach benh nhan',
+          table: {
+            headers: ['BN_MA', 'Ho ten', 'Gioi tinh', 'SDT', 'Quoc gia', 'Dan toc', 'Loai'],
+            rows:
+              rows.length > 0
+                ? rows.map((item: any) => [
+                    String(item.BN_MA),
+                    this.toFullPatientName(item) || '-',
+                    this.genderLabel(item.BN_LA_NAM),
+                    item.BN_SDT_DANG_KY || '-',
+                    item.BN_QUOC_GIA || '-',
+                    item.BN_DAN_TOC || '-',
+                    item.BN_MOI === true ? 'new' : item.BN_MOI === false ? 'returning' : '-',
+                  ])
+                : [['-', '-', '-', '-', '-', '-', '-']],
+          },
+        },
+      ],
+    });
+
+    await this.writePdfAuditLog('PATIENTS_LIST_PDF_EXPORTED', exportedBy, {
+      count: rows.length,
+      filters: params,
+    });
+
+    return {
+      filename: `patients-list-${this.toDateOnlyIso(new Date())}.pdf`,
+      buffer: report,
+    };
+  }
+
+  async exportPatientProfilePdf(patientId: number, exportedBy: string) {
+    const patient = (await this.getPatientById(patientId)) as any;
+    const report = await this.pdfService.buildReport({
+      title: 'HO SO BENH NHAN',
+      subtitle: `Benh nhan #${patient.BN_MA}`,
+      metadataLines: [`Exported by: ${exportedBy}`],
+      sections: [
+        {
+          heading: 'Thong tin co ban',
+          keyValues: [
+            { label: 'Ma benh nhan', value: String(patient.BN_MA) },
+            { label: 'Ho ten', value: this.toFullPatientName(patient) || '-' },
+            { label: 'Gioi tinh', value: this.genderLabel(patient.BN_LA_NAM) },
+            { label: 'SDT dang ky', value: patient.BN_SDT_DANG_KY || '-' },
+            { label: 'Email', value: patient.BN_EMAIL || '-' },
+            { label: 'CCCD', value: patient.BN_CCCD || '-' },
+            { label: 'Quoc gia', value: patient.BN_QUOC_GIA || '-' },
+            { label: 'Dan toc', value: patient.BN_DAN_TOC || '-' },
+            { label: 'So dia chi', value: patient.BN_SO_DDCN || '-' },
+            { label: 'So tai khoan', value: patient.TK_SDT || '-' },
+          ],
+        },
+      ],
+    });
+
+    await this.writePdfAuditLog('PATIENT_PROFILE_PDF_EXPORTED', exportedBy, {
+      patientId,
+    });
+
+    return {
+      filename: `patient-${patientId}.pdf`,
+      buffer: report,
+    };
+  }
+
+  async exportDoctorsPdf(
+    params: {
+      search?: string;
+      sortBy?: string;
+      sortOrder?: string;
+      specialtyId?: string;
+      academicTitle?: string;
+    },
+    exportedBy: string,
+  ) {
+    const result = (await this.getDoctors({
+      ...params,
+      page: '1',
+      limit: '100',
+    })) as any;
+    const rows = result?.items || [];
+
+    const report = await this.pdfService.buildReport({
+      title: 'BAO CAO DANH SACH BAC SI',
+      subtitle: 'Danh sach bac si theo bo loc hien tai',
+      metadataLines: [
+        `Exported by: ${exportedBy}`,
+        `Total exported rows: ${rows.length}`,
+      ],
+      sections: [
+        {
+          heading: 'Thong tin bo loc',
+          keyValues: [
+            { label: 'Search', value: params.search || '-' },
+            { label: 'Specialty ID', value: params.specialtyId || '-' },
+            { label: 'Academic title', value: params.academicTitle || '-' },
+          ],
+        },
+        {
+          heading: 'Danh sach bac si',
+          table: {
+            headers: ['BS_MA', 'Ho ten', 'SDT', 'Email', 'Hoc ham', 'Chuyen khoa'],
+            rows:
+              rows.length > 0
+                ? rows.map((item: any) => [
+                    String(item.BS_MA),
+                    item.BS_HO_TEN || '-',
+                    item.BS_SDT || '-',
+                    item.BS_EMAIL || '-',
+                    item.BS_HOC_HAM || '-',
+                    item.CHUYEN_KHOA?.CK_TEN || '-',
+                  ])
+                : [['-', '-', '-', '-', '-', '-']],
+          },
+        },
+      ],
+    });
+
+    await this.writePdfAuditLog('DOCTORS_LIST_PDF_EXPORTED', exportedBy, {
+      count: rows.length,
+      filters: params,
+    });
+
+    return {
+      filename: `doctors-list-${this.toDateOnlyIso(new Date())}.pdf`,
+      buffer: report,
+    };
+  }
+
+  async exportDoctorProfilePdf(doctorId: number, exportedBy: string) {
+    const doctor = (await this.getDoctorById(doctorId)) as any;
+    const report = await this.pdfService.buildReport({
+      title: 'HO SO BAC SI',
+      subtitle: `Bac si #${doctor.BS_MA}`,
+      metadataLines: [`Exported by: ${exportedBy}`],
+      sections: [
+        {
+          heading: 'Thong tin co ban',
+          keyValues: [
+            { label: 'Ma bac si', value: String(doctor.BS_MA) },
+            { label: 'Ho ten', value: doctor.BS_HO_TEN || '-' },
+            { label: 'So dien thoai', value: doctor.BS_SDT || '-' },
+            { label: 'Email', value: doctor.BS_EMAIL || '-' },
+            { label: 'Hoc ham', value: doctor.BS_HOC_HAM || '-' },
+            { label: 'Chuyen khoa', value: doctor.CHUYEN_KHOA?.CK_TEN || '-' },
+            { label: 'Tai khoan SDT', value: doctor.TK_SDT || '-' },
+          ],
+        },
+      ],
+    });
+
+    await this.writePdfAuditLog('DOCTOR_PROFILE_PDF_EXPORTED', exportedBy, {
+      doctorId,
+    });
+
+    return {
+      filename: `doctor-${doctorId}.pdf`,
+      buffer: report,
+    };
+  }
+
+  async exportSupportCatalogPdf(exportedBy: string) {
+    const [specialties, roomsResult, servicesResult] = await Promise.all([
+      this.getSpecialties(),
+      this.getRooms({ page: '1', limit: '100', sortBy: 'name', sortOrder: 'asc' }),
+      this.getServices({ page: '1', limit: '100', sortBy: 'name', sortOrder: 'asc' }),
+    ]);
+
+    const rooms = (roomsResult as any)?.items || [];
+    const services = (servicesResult as any)?.items || [];
+    const specialtyRows = Array.isArray(specialties) ? specialties : (specialties as any)?.items || [];
+
+    const report = await this.pdfService.buildReport({
+      title: 'TAI LIEU THONG TIN HO TRO NGUOI DUNG',
+      subtitle: 'Tong hop chuyen khoa, phong kham, dich vu',
+      metadataLines: [`Exported by: ${exportedBy}`],
+      sections: [
+        {
+          heading: 'Danh muc chuyen khoa',
+          table: {
+            headers: ['CK_MA', 'Ten chuyen khoa'],
+            rows:
+              specialtyRows.length > 0
+                ? specialtyRows.map((item: any) => [String(item.CK_MA), item.CK_TEN || '-'])
+                : [['-', '-']],
+          },
+        },
+        {
+          heading: 'Danh muc phong kham',
+          table: {
+            headers: ['P_MA', 'Ten phong', 'Chuyen khoa', 'Vi tri'],
+            rows:
+              rooms.length > 0
+                ? rooms.map((item: any) => [
+                    String(item.P_MA),
+                    item.P_TEN || '-',
+                    item.CHUYEN_KHOA?.CK_TEN || '-',
+                    item.P_VI_TRI || '-',
+                  ])
+                : [['-', '-', '-', '-']],
+          },
+        },
+        {
+          heading: 'Danh muc dich vu',
+          table: {
+            headers: ['DVCLS_MA', 'Ten dich vu', 'Loai', 'Gia'],
+            rows:
+              services.length > 0
+                ? services.map((item: any) => [
+                    String(item.DVCLS_MA),
+                    item.DVCLS_TEN || '-',
+                    item.DVCLS_LOAI || '-',
+                    String(item.DVCLS_GIA_DV ?? 0),
+                  ])
+                : [['-', '-', '-', '-']],
+          },
+        },
+      ],
+    });
+
+    await this.writePdfAuditLog('SUPPORT_CATALOG_PDF_EXPORTED', exportedBy, {
+      specialties: specialtyRows.length,
+      rooms: rooms.length,
+      services: services.length,
+    });
+
+    return {
+      filename: `support-catalog-${this.toDateOnlyIso(new Date())}.pdf`,
+      buffer: report,
+    };
+  }
+
   async getScheduleRegistrations(params?: {
     weekStart?: string;
     page?: string;
@@ -5864,6 +6218,7 @@ export class AdminService {
       registrationCloseAt: registrationCloseAt.toISOString(),
       adminReviewWindowEndAt: adminReviewWindowEndAt.toISOString(),
       status: cycleStatus,
+      workflowStatus: cycleStatus,
       finalizedAt: finalizedLog?.AL_CHANGED_AT || null,
       slotGeneratedAt: generatedLog?.AL_CHANGED_AT || null,
       summary: {
@@ -5872,6 +6227,15 @@ export class AdminService {
         approved,
         rejected,
         official,
+        generated: 0,
+        confirmed: approved,
+        changeRequested: 0,
+        adjusted: 0,
+        finalized: official,
+        cancelled: rejected,
+        pendingExceptions: 0,
+        approvedExceptions: 0,
+        rejectedExceptions: 0,
       },
       missingShifts,
     };
@@ -8046,6 +8410,36 @@ export class AdminService {
     const month = String(date.getUTCMonth() + 1).padStart(2, '0');
     const day = String(date.getUTCDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  }
+
+  private toFullPatientName(patient: {
+    BN_HO_CHU_LOT?: string | null;
+    BN_TEN?: string | null;
+  }) {
+    return [patient.BN_HO_CHU_LOT, patient.BN_TEN]
+      .map((part) => (part || '').trim())
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+  }
+
+  private genderLabel(value?: boolean | null) {
+    if (value === true) return 'Nam';
+    if (value === false) return 'Nu';
+    return '-';
+  }
+
+  private async writePdfAuditLog(action: string, by: string, metadata?: any) {
+    await this.prisma.aUDIT_LOG.create({
+      data: {
+        AL_TABLE: 'PDF_EXPORT',
+        AL_ACTION: action,
+        AL_PK: metadata ?? Prisma.JsonNull,
+        AL_OLD: Prisma.JsonNull,
+        AL_NEW: metadata ?? Prisma.JsonNull,
+        AL_CHANGED_BY: by,
+      },
+    });
   }
 
   private getWeekdayFromDate(date: Date) {

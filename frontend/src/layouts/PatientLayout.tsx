@@ -1,20 +1,21 @@
-// src/layouts/PatientLayout.tsx
+﻿// src/layouts/PatientLayout.tsx
 import { Outlet } from 'react-router-dom';
 import { Heart } from 'lucide-react';
 import Header from '@/components/layout/Header';
+import PatientAiChatbox from '@/components/patient/PatientAiChatbox';
 
 export default function PatientLayout() {
     return (
         <div className="min-h-screen flex flex-col bg-[hsl(var(--background))]">
-            {/* ─── Header (Sticky, NavigationMenu) ──────────────── */}
+            {/* Header (Sticky, NavigationMenu) */}
             <Header />
 
-            {/* ─── Page Content ─────────────────────────────────── */}
+            {/* Page Content */}
             <main className="flex-1">
                 <Outlet />
             </main>
 
-            {/* ─── Footer ───────────────────────────────────────── */}
+            {/* Footer */}
             <footer className="bg-[hsl(var(--sidebar))] text-[hsl(var(--sidebar-foreground))] mt-auto">
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
@@ -40,8 +41,8 @@ export default function PatientLayout() {
                         <div>
                             <h4 className="font-semibold mb-3 text-[hsl(var(--sidebar-primary))]">Liên hệ</h4>
                             <ul className="space-y-2 text-sm text-[hsl(var(--sidebar-foreground))/0.7]">
-                                <li>📍 3/2 Xuân Khánh, Ninh Kiều, Cần Thơ, Vietnam</li>
-                                <li>📞 (084) 867 504 590</li>
+                                <li>📍 Khu II, Đ. 3 Tháng 2, Xuân Khánh, Ninh Kiều, Cần Thơ, Vietnam</li>
+                                <li>📞 0867504590</li>
                                 <li>✉️ thaib2203469@student.ctu.edu.vn</li>
                             </ul>
                         </div>
@@ -51,6 +52,8 @@ export default function PatientLayout() {
                     </div>
                 </div>
             </footer>
+
+            <PatientAiChatbox />
         </div>
     );
 }

@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Res,
   Param,
   ParseIntPipe,
   Post,
@@ -12,6 +13,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { AdminService } from './admin.service';
 import { CreateServiceDto } from './dto/create-service.dto';
 import { UpdateServiceDto } from './dto/update-service.dto';
@@ -327,10 +329,49 @@ export class AdminController {
     return this.adminService.getDoctorAcademicTitles();
   }
 
+  @Get('doctors/pdf')
+  @HttpCode(HttpStatus.OK)
+  async exportDoctorsPdf(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query('search') search?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: string,
+    @Query('specialtyId') specialtyId?: string,
+    @Query('academicTitle') academicTitle?: string,
+    @Res() res?: Response,
+  ) {
+    const result = await this.adminService.exportDoctorsPdf(
+      {
+        search,
+        sortBy,
+        sortOrder,
+        specialtyId,
+        academicTitle,
+      },
+      user.TK_SDT,
+    );
+    res?.setHeader('Content-Type', 'application/pdf');
+    res?.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+    res?.send(result.buffer);
+  }
+
   @Get('doctors/:id')
   @HttpCode(HttpStatus.OK)
   async getDoctorById(@Param('id', ParseIntPipe) id: number) {
     return this.adminService.getDoctorById(id);
+  }
+
+  @Get('doctors/:id/pdf')
+  @HttpCode(HttpStatus.OK)
+  async exportDoctorProfilePdf(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('id', ParseIntPipe) id: number,
+    @Res() res?: Response,
+  ) {
+    const result = await this.adminService.exportDoctorProfilePdf(id, user.TK_SDT);
+    res?.setHeader('Content-Type', 'application/pdf');
+    res?.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+    res?.send(result.buffer);
   }
 
   @Post('doctors')
@@ -388,10 +429,55 @@ export class AdminController {
     return this.adminService.getPatientFilterOptions();
   }
 
+  @Get('patients/pdf')
+  @HttpCode(HttpStatus.OK)
+  async exportPatientsPdf(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query('search') search?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: string,
+    @Query('gender') gender?: string,
+    @Query('nationality') nationality?: string,
+    @Query('ethnicity') ethnicity?: string,
+    @Query('patientType') patientType?: string,
+    @Query('accountPhone') accountPhone?: string,
+    @Res() res?: Response,
+  ) {
+    const result = await this.adminService.exportPatientsPdf(
+      {
+        search,
+        sortBy,
+        sortOrder,
+        gender,
+        nationality,
+        ethnicity,
+        patientType,
+        accountPhone,
+      },
+      user.TK_SDT,
+    );
+    res?.setHeader('Content-Type', 'application/pdf');
+    res?.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+    res?.send(result.buffer);
+  }
+
   @Get('patients/:id')
   @HttpCode(HttpStatus.OK)
   async getPatientById(@Param('id', ParseIntPipe) id: number) {
     return this.adminService.getPatientById(id);
+  }
+
+  @Get('patients/:id/pdf')
+  @HttpCode(HttpStatus.OK)
+  async exportPatientProfilePdf(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('id', ParseIntPipe) id: number,
+    @Res() res?: Response,
+  ) {
+    const result = await this.adminService.exportPatientProfilePdf(id, user.TK_SDT);
+    res?.setHeader('Content-Type', 'application/pdf');
+    res?.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+    res?.send(result.buffer);
   }
 
   @Post('patients')
@@ -730,6 +816,42 @@ export class AdminController {
     });
   }
 
+  @Get('schedule-management/weekly-shifts/pdf')
+  @HttpCode(HttpStatus.OK)
+  async exportWeeklySchedulesPdf(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query('weekStart') weekStart?: string,
+    @Query('specialtyId') specialtyId?: string,
+    @Query('doctorId') doctorId?: string,
+    @Query('roomId') roomId?: string,
+    @Query('status') status?: string,
+    @Query('session') session?: string,
+    @Query('weekday') weekday?: string,
+    @Query('date') date?: string,
+    @Query('search') search?: string,
+    @Query('source') source?: string,
+    @Res() res?: Response,
+  ) {
+    const result = await this.adminService.exportWeeklySchedulePdf(
+      {
+        weekStart,
+        specialtyId,
+        doctorId,
+        roomId,
+        status,
+        session,
+        weekday,
+        date,
+        search,
+        source,
+      },
+      user.TK_SDT,
+    );
+    res?.setHeader('Content-Type', 'application/pdf');
+    res?.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+    res?.send(result.buffer);
+  }
+
   @Get('schedule-management/exception-requests')
   @HttpCode(HttpStatus.OK)
   async getScheduleExceptionRequests(
@@ -884,5 +1006,17 @@ export class AdminController {
   @HttpCode(HttpStatus.OK)
   async runScheduleAutomation(@CurrentUser() user: CurrentUserPayload) {
     return this.adminService.runScheduleAutomation(user.TK_SDT);
+  }
+
+  @Get('reports/support-catalog/pdf')
+  @HttpCode(HttpStatus.OK)
+  async exportSupportCatalogPdf(
+    @CurrentUser() user: CurrentUserPayload,
+    @Res() res?: Response,
+  ) {
+    const result = await this.adminService.exportSupportCatalogPdf(user.TK_SDT);
+    res?.setHeader('Content-Type', 'application/pdf');
+    res?.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+    res?.send(result.buffer);
   }
 }

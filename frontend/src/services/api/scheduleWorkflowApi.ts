@@ -1,4 +1,5 @@
 import axiosClient from './axiosClient';
+import { downloadPdf } from './pdfApi';
 import type { ShiftStatus, WeekStatus } from '@/contracts/scheduleStatusContract';
 
 export type TemplateStatus = 'active' | 'inactive';
@@ -696,6 +697,24 @@ export const adminScheduleWorkflowApi = {
       data,
     );
     return res.data;
+  },
+
+  downloadWeeklySchedulesPdf: async (params?: {
+    weekStart?: string;
+    specialtyId?: number | string;
+    doctorId?: number | string;
+    roomId?: number | string;
+    status?: string;
+    session?: string;
+    weekday?: number | string;
+    date?: string;
+    search?: string;
+    source?: string;
+  }) => {
+    await downloadPdf('/admin/schedule-management/weekly-shifts/pdf', {
+      params: params as Record<string, string | number | boolean | undefined>,
+      fallbackFilename: 'admin-weekly-schedule.pdf',
+    });
   },
 };
 

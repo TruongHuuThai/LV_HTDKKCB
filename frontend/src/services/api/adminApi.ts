@@ -1,5 +1,6 @@
 // src/services/api/adminApi.ts
 import axiosClient from './axiosClient';
+import { downloadPdf } from './pdfApi';
 
 // Tạm thời định nghĩa types ở đây, có thể chuyển ra file types/ riêng sau
 export interface AdminDoctor {
@@ -921,6 +922,53 @@ export const adminApi = {
     getDashboardRevenue: async (year: string, month: string) => {
         const res = await axiosClient.get(`/admin/dashboard/revenue`, { params: { year, month } });
         return res.data;
+    },
+
+    downloadDoctorsPdf: async (params?: {
+        search?: string;
+        sortBy?: string;
+        sortOrder?: string;
+        specialtyId?: string | number;
+        academicTitle?: string;
+    }) => {
+        await downloadPdf('/admin/doctors/pdf', {
+            params: params as Record<string, string | number | boolean | undefined>,
+            fallbackFilename: 'doctors-list.pdf',
+        });
+    },
+
+    downloadDoctorProfilePdf: async (doctorId: number) => {
+        await downloadPdf(`/admin/doctors/${doctorId}/pdf`, {
+            fallbackFilename: `doctor-${doctorId}.pdf`,
+        });
+    },
+
+    downloadPatientsPdf: async (params?: {
+        search?: string;
+        sortBy?: string;
+        sortOrder?: string;
+        gender?: string;
+        nationality?: string;
+        ethnicity?: string;
+        patientType?: string;
+        accountPhone?: string;
+    }) => {
+        await downloadPdf('/admin/patients/pdf', {
+            params: params as Record<string, string | number | boolean | undefined>,
+            fallbackFilename: 'patients-list.pdf',
+        });
+    },
+
+    downloadPatientProfilePdf: async (patientId: number) => {
+        await downloadPdf(`/admin/patients/${patientId}/pdf`, {
+            fallbackFilename: `patient-${patientId}.pdf`,
+        });
+    },
+
+    downloadSupportCatalogPdf: async () => {
+        await downloadPdf('/admin/reports/support-catalog/pdf', {
+            fallbackFilename: 'support-catalog.pdf',
+        });
     },
 
     getSpecialties: async () => {

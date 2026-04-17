@@ -14,3 +14,8 @@ npm run dev
 git add .
 git commit -m "tự động"
 git push
+
+AI chatbox setup (backend):
+
+cd backend
+npm run ai:seed-knowledge

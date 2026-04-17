@@ -1,7 +1,7 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, ArrowUpDown, Edit, Filter, Plus, Search, Trash2, UserRound } from 'lucide-react';
+import { AlertTriangle, ArrowUpDown, Download, Edit, Filter, Plus, Search, Trash2, UserRound } from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -156,6 +156,29 @@ export default function DoctorListPage() {
                         Thêm bác s?
                     </Button>
                 </Link>
+                <Button
+                    variant="outline"
+                    onClick={() => {
+                        void (async () => {
+                            try {
+                                await adminApi.downloadDoctorsPdf({
+                                    search: debouncedSearch || undefined,
+                                    sortBy,
+                                    sortOrder,
+                                    specialtyId: selectedSpecialtyId,
+                                    academicTitle: selectedAcademicTitle,
+                                });
+                                toast.success('Da xuat danh sach bac si PDF.');
+                            } catch (error: any) {
+                                const message = error?.response?.data?.message || 'Khong the xuat danh sach bac si PDF.';
+                                toast.error(Array.isArray(message) ? message.join(', ') : message);
+                            }
+                        })();
+                    }}
+                >
+                    <Download className="mr-2 h-4 w-4" />
+                    Xuat danh sach PDF
+                </Button>
             </div>
 
             <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
@@ -286,6 +309,24 @@ export default function DoctorListPage() {
                                                     <Edit className="w-4 h-4" />
                                                 </Button>
                                             </Link>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50"
+                                                onClick={() => {
+                                                    void (async () => {
+                                                        try {
+                                                            await adminApi.downloadDoctorProfilePdf(doctor.BS_MA);
+                                                            toast.success(`Da xuat ho so bac si #${doctor.BS_MA}.`);
+                                                        } catch (error: any) {
+                                                            const message = error?.response?.data?.message || 'Khong the xuat ho so bac si.';
+                                                            toast.error(Array.isArray(message) ? message.join(', ') : message);
+                                                        }
+                                                    })();
+                                                }}
+                                            >
+                                                <Download className="w-4 h-4" />
+                                            </Button>
                                             <Button
                                                 variant="ghost"
                                                 size="icon"

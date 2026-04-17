@@ -1,8 +1,12 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { json, urlencoded } from 'express';
+import * as dotenv from 'dotenv';
+import { join } from 'path';
 import { AppModule } from './app.module';
 import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter';
+
+dotenv.config({ path: join(process.cwd(), '.env'), override: true });
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);

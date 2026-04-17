@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Clock3,
   CreditCard,
+  FileText,
   LoaderCircle,
   Search,
   Stethoscope,
@@ -362,6 +363,7 @@ function AppointmentCard({
   buildAppointmentHref,
   onRetryPayment,
   onCancel,
+  onDownloadConfirmation,
   retryPending,
   cancelPending,
 }: {
@@ -371,6 +373,7 @@ function AppointmentCard({
   buildAppointmentHref: (appointmentId: number, action?: 'reschedule') => string;
   onRetryPayment: (appointmentId: number) => void;
   onCancel: (appointmentId: number) => void;
+  onDownloadConfirmation: (appointmentId: number) => void;
   retryPending: boolean;
   cancelPending: boolean;
 }) {
@@ -452,6 +455,15 @@ function AppointmentCard({
             <Link to={buildAppointmentHref(item.appointmentId)}>{TEXT.viewDetail}</Link>
           </Button>
         ) : null}
+
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => onDownloadConfirmation(item.appointmentId)}
+        >
+          <FileText className="mr-1 h-3.5 w-3.5" />
+          In xac nhan PDF
+        </Button>
 
         {item.canReschedule ? (
           <Button asChild size="sm" variant="outline">
@@ -805,6 +817,18 @@ export default function MyAppointmentsPage() {
                     buildAppointmentHref={buildAppointmentHref}
                     onRetryPayment={(appointmentId) => retryMutation.mutate(appointmentId)}
                     onCancel={(appointmentId) => cancelMutation.mutate(appointmentId)}
+                    onDownloadConfirmation={(appointmentId) => {
+                      void (async () => {
+                        try {
+                          await appointmentsApi.downloadConfirmationPdf(appointmentId);
+                        } catch (error) {
+                          logFrontendError('my-appointments-download-confirmation', error, {
+                            appointmentId,
+                          });
+                          toast.error('Khong the tai phieu xac nhan luc nay.');
+                        }
+                      })();
+                    }}
                     retryPending={retryMutation.isPending && retryMutation.variables === item.appointmentId}
                     cancelPending={cancelMutation.isPending && cancelMutation.variables === item.appointmentId}
                   />

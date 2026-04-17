@@ -17,6 +17,7 @@ import {
   useRetryPayment,
 } from '@/hooks/usePatientAppointments';
 import { queryKeys } from '@/services/api/queryKeys';
+import { appointmentsApi } from '@/services/api/appointmentsApi';
 import {
   canOpenPaymentUrl,
   getAppointmentStatusLabel,
@@ -268,6 +269,24 @@ export default function AppointmentDetailPage() {
               </div>
 
               <div className="flex flex-col gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    void (async () => {
+                      try {
+                        await appointmentsApi.downloadConfirmationPdf(appointmentId);
+                      } catch (error) {
+                        logFrontendError('appointment-detail-download-confirmation', error, {
+                          appointmentId,
+                        });
+                        toast.error('Khong the tai phieu xac nhan luc nay.');
+                      }
+                    })();
+                  }}
+                >
+                  In xac nhan PDF
+                </Button>
+
                 {isRetryPaymentAllowed(paymentStatus) ? (
                   <Button onClick={handleRetryPayment} disabled={retryMutation.isPending}>
                     {retryMutation.isPending ? 'Đang t?o thanh toán l?i...' : 'Thanh toán l?i'}

@@ -1,5 +1,6 @@
 import axiosClient from './axiosClient';
 import { normalizePaymentStatus, type AppointmentStatusGroup, type PaymentStatus } from '@/lib/appointments';
+import { downloadPdf } from './pdfApi';
 
 export interface AppointmentListQuery {
   statusGroup?: AppointmentStatusGroup;
@@ -180,5 +181,11 @@ export const appointmentsApi = {
       message?: string;
       appointment?: { DK_MA: number; DK_TRANG_THAI?: string };
     };
+  },
+
+  downloadConfirmationPdf: async (appointmentId: number) => {
+    await downloadPdf(`/appointments/${appointmentId}/confirmation.pdf`, {
+      fallbackFilename: `appointment-confirmation-${appointmentId}.pdf`,
+    });
   },
 };

@@ -19,6 +19,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Copy,
+  Download,
   Eraser,
   FileClock,
   GripVertical,
@@ -614,6 +615,7 @@ export default function AdminScheduleWorkflowPage() {
   const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [generatedPage, setGeneratedPage] = useState(1);
   const [generatedPageSize, setGeneratedPageSize] = useState(20);
+  const [exportingWeeklyPdf, setExportingWeeklyPdf] = useState(false);
 
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [templateBuilderOpen, setTemplateBuilderOpen] = useState(false);
@@ -1334,6 +1336,30 @@ export default function AdminScheduleWorkflowPage() {
     input.focus();
   };
 
+  const handleExportWeeklyPdf = async () => {
+    try {
+      setExportingWeeklyPdf(true);
+      await adminScheduleWorkflowApi.downloadWeeklySchedulesPdf({
+        weekStart,
+        specialtyId: specialtyFilter === 'all' ? undefined : specialtyFilter,
+        doctorId: doctorFilter === 'all' ? undefined : doctorFilter,
+        roomId: roomFilter === 'all' ? undefined : roomFilter,
+        status: scheduleStatusFilter === 'all' ? undefined : scheduleStatusFilter,
+        session: undefined,
+        weekday: undefined,
+        date: undefined,
+        search: search.trim() || undefined,
+        source: sourceFilter === 'all' ? undefined : sourceFilter,
+      });
+      toast.success('Da xuat lich kham tuan PDF.');
+    } catch (error: any) {
+      const message = error?.response?.data?.message || 'Khong the xuat lich kham tuan PDF.';
+      toast.error(Array.isArray(message) ? message.join(', ') : message);
+    } finally {
+      setExportingWeeklyPdf(false);
+    }
+  };
+
   const openManualShiftDatePicker = () => {
     const input = manualShiftDatePickerRef.current;
     if (!input) return;
@@ -1516,6 +1542,18 @@ export default function AdminScheduleWorkflowPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={handleExportWeeklyPdf}
+            disabled={exportingWeeklyPdf}
+          >
+            {exportingWeeklyPdf ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="mr-2 h-4 w-4" />
+            )}
+            Xuat lich tuan PDF
+          </Button>
           <Button
             variant="outline"
             onClick={() => generateMutation.mutate()}

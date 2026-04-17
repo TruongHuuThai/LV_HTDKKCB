@@ -13,6 +13,7 @@ import { PatientProfilesModule } from './module/patient-profiles/patient-profile
 import { AppointmentsModule } from './module/appointments/appointments.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { AiAssistantModule } from './module/ai-assistant/ai-assistant.module';
 
 
 
@@ -29,6 +30,7 @@ import { APP_GUARD } from '@nestjs/core';
     AdminModule,
     PatientProfilesModule,
     AppointmentsModule,
+    AiAssistantModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],

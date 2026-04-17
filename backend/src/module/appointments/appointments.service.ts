@@ -53,6 +53,7 @@ import { mapAppointmentStatusToGroup } from './appointment-status-group.util';
 import { AttachmentStorageService } from './attachment-storage.service';
 import { AttachmentScanService } from './attachment-scan.service';
 import { SHIFT_STATUS, WEEK_STATUS } from '../schedules/schedule-status';
+import { PdfService } from '../pdf/pdf.service';
 
 const ACTIVE_BOOKING_STATUS = ['CHO_THANH_TOAN', 'CHO_KHAM', 'DA_CHECKIN'];
 const REFUND_STATUSES = ['REFUND_PENDING', 'REFUNDED', 'REFUND_FAILED', 'REFUND_REJECTED'];
@@ -73,6 +74,7 @@ export class AppointmentsService {
     private readonly config: ConfigService,
     private readonly attachmentStorage: AttachmentStorageService,
     private readonly attachmentScan: AttachmentScanService,
+    private readonly pdfService: PdfService,
   ) {}
 
   private parseStatusList(raw?: string) {
@@ -178,6 +180,35 @@ export class AppointmentsService {
     const iso = value.toISOString();
     if (groupBy === 'month') return iso.slice(0, 7);
     return iso.slice(0, 10);
+  }
+
+  private formatDateOnly(value?: Date | string | null) {
+    if (!value) return '-';
+    if (value instanceof Date) return value.toISOString().slice(0, 10);
+    return String(value).slice(0, 10);
+  }
+
+  private formatTimeOnly(value?: Date | string | null) {
+    if (!value) return '-';
+    if (value instanceof Date) return value.toISOString().slice(11, 16);
+    const normalized = String(value);
+    if (normalized.includes('T')) return normalized.slice(11, 16);
+    return normalized.slice(0, 5);
+  }
+
+  private formatDatetime(value?: Date | string | null) {
+    if (!value) return '-';
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return '-';
+    return date.toISOString().replace('T', ' ').slice(0, 19);
+  }
+
+  private toDisplayName(parts: Array<string | null | undefined>) {
+    return parts
+      .map((part) => (part || '').trim())
+      .filter(Boolean)
+      .join(' ')
+      .trim();
   }
 
   private buildAdvisoryLockKey(raw: string) {
@@ -762,6 +793,82 @@ export class AppointmentsService {
       notifications,
       waitlist: waitlistItems,
     };
+  }
+
+  private async buildAppointmentConfirmationPdfBuffer(appointment: any, exportedBy: string) {
+    const patientName =
+      this.toDisplayName([appointment.BENH_NHAN?.BN_HO_CHU_LOT, appointment.BENH_NHAN?.BN_TEN]) ||
+      `BENH_NHAN #${appointment.BN_MA}`;
+    const doctorName = appointment.LICH_BSK?.BAC_SI?.BS_HO_TEN || `BAC_SI #${appointment.BS_MA}`;
+    const specialtyName = appointment.LICH_BSK?.BAC_SI?.CHUYEN_KHOA?.CK_TEN || '-';
+    const roomName = appointment.LICH_BSK?.PHONG?.P_TEN || '-';
+    const status = appointment.DK_TRANG_THAI || 'CHO_KHAM';
+
+    const report = await this.pdfService.buildReport({
+      title: 'PHIEU XAC NHAN DANG KY KHAM BENH',
+      subtitle: `Ma lich hen: #${appointment.DK_MA}`,
+      metadataLines: [`Exported by: ${exportedBy}`],
+      sections: [
+        {
+          heading: 'Thong tin benh nhan',
+          keyValues: [
+            { label: 'Ma benh nhan', value: String(appointment.BN_MA || '-') },
+            { label: 'Ho ten', value: patientName },
+            { label: 'So dien thoai', value: appointment.BENH_NHAN?.BN_SDT_DANG_KY || '-' },
+            { label: 'So tai khoan', value: appointment.BENH_NHAN?.TK_SDT || '-' },
+          ],
+        },
+        {
+          heading: 'Thong tin lich kham',
+          keyValues: [
+            { label: 'Ma lich hen', value: String(appointment.DK_MA) },
+            { label: 'Ngay kham', value: this.formatDateOnly(appointment.N_NGAY) },
+            { label: 'Buoi', value: appointment.B_TEN || '-' },
+            {
+              label: 'Khung gio',
+              value: `${this.formatTimeOnly(appointment.KHUNG_GIO?.KG_BAT_DAU)} - ${this.formatTimeOnly(appointment.KHUNG_GIO?.KG_KET_THUC)}`,
+            },
+            { label: 'Bac si', value: doctorName },
+            { label: 'Chuyen khoa', value: specialtyName },
+            { label: 'Phong kham', value: roomName },
+            { label: 'Trang thai', value: status },
+            { label: 'Trieu chung ban dau', value: appointment.DK_TRIEU_CHUNG || '-' },
+            { label: 'Ghi chu tien kham', value: appointment.DK_GHI_CHU_TIEN_KHAM || '-' },
+            { label: 'Thoi gian tao', value: this.formatDatetime(appointment.DK_THOI_GIAN_TAO) },
+          ],
+        },
+      ],
+    });
+
+    await this.writeAuditLog({
+      table: 'DANG_KY',
+      action: 'APPOINTMENT_CONFIRMATION_PDF_EXPORTED',
+      actor: exportedBy,
+      pk: { DK_MA: appointment.DK_MA },
+      next: { exportedAt: new Date().toISOString() },
+    });
+
+    return {
+      filename: `appointment-confirmation-${appointment.DK_MA}.pdf`,
+      buffer: report,
+    };
+  }
+
+  async exportAppointmentConfirmationPdfForPatient(
+    user: CurrentUserPayload,
+    appointmentId: number,
+  ) {
+    const appointment = await this.getAppointmentOrThrow(appointmentId);
+    this.validateAppointmentOwner(user, appointment.BENH_NHAN?.TK_SDT);
+    return this.buildAppointmentConfirmationPdfBuffer(appointment, user.TK_SDT);
+  }
+
+  async exportAppointmentConfirmationPdfForAdmin(
+    user: CurrentUserPayload,
+    appointmentId: number,
+  ) {
+    const appointment = await this.getAppointmentOrThrow(appointmentId);
+    return this.buildAppointmentConfirmationPdfBuffer(appointment, user.TK_SDT);
   }
 
   async getPreVisitInfoForPatient(user: CurrentUserPayload, appointmentId: number) {
@@ -2446,6 +2553,80 @@ export class AppointmentsService {
         canceled: Number(row.canceled || 0),
         noShow: Number(row.no_show || 0),
       })),
+    };
+  }
+
+  async exportDoctorStatsPdf(user: CurrentUserPayload, query: DoctorStatsQueryDto) {
+    if (!user.bsMa) throw new ForbiddenException('Tai khoan hien tai khong phai bac si');
+
+    const [summary, trends, doctor] = await Promise.all([
+      this.getDoctorStatsSummary(user, query),
+      this.getDoctorStatsTrends(user, query),
+      this.prisma.bAC_SI.findUnique({
+        where: { BS_MA: user.bsMa },
+        include: { CHUYEN_KHOA: true },
+      }),
+    ]);
+
+    const trendTableRows = (trends.items || []).map((item: any) => [
+      String(item.label || '-'),
+      String(item.total ?? 0),
+      String(item.completed ?? 0),
+      String(item.canceled ?? 0),
+      String(item.noShow ?? 0),
+    ]);
+
+    const report = await this.pdfService.buildReport({
+      title: 'BAO CAO THONG KE PHUC VU BAC SI',
+      subtitle: `Bac si: ${doctor?.BS_HO_TEN || `#${user.bsMa}`}`,
+      metadataLines: [
+        `Doctor ID: ${user.bsMa}`,
+        `Specialty: ${doctor?.CHUYEN_KHOA?.CK_TEN || '-'}`,
+        `Exported by: ${user.TK_SDT}`,
+      ],
+      sections: [
+        {
+          heading: 'Tong quan',
+          keyValues: [
+            { label: 'Khoang ngay', value: `${summary.fromDate} -> ${summary.toDate}` },
+            { label: 'Tong lich hen', value: String(summary.totalAppointments ?? 0) },
+            { label: 'Da kham', value: String(summary.completedAppointments ?? 0) },
+            { label: 'Da huy', value: String(summary.canceledAppointments ?? 0) },
+            { label: 'No-show', value: String(summary.noShowAppointments ?? 0) },
+            { label: 'Da check-in', value: String(summary.totalCheckedIn ?? 0) },
+            { label: 'Sap toi', value: String(summary.upcomingAppointments ?? 0) },
+            { label: 'Lich hom nay', value: String(summary.todayAppointments ?? 0) },
+            { label: 'Lich tuan nay', value: String(summary.thisWeekAppointments ?? 0) },
+            { label: 'Ty le huy (%)', value: String(summary.cancellationRate ?? 0) },
+            { label: 'Ty le no-show (%)', value: String(summary.noShowRate ?? 0) },
+          ],
+        },
+        {
+          heading: 'Xu huong theo thoi gian',
+          paragraphs: [`Group by: ${trends.groupBy || 'day'}`],
+          table: {
+            headers: ['Moc thoi gian', 'Tong', 'Da kham', 'Huy', 'No-show'],
+            rows: trendTableRows.length > 0 ? trendTableRows : [['-', '0', '0', '0', '0']],
+          },
+        },
+      ],
+    });
+
+    await this.writeAuditLog({
+      table: 'DANG_KY',
+      action: 'DOCTOR_STATS_PDF_EXPORTED',
+      actor: user.TK_SDT,
+      pk: { BS_MA: user.bsMa },
+      next: {
+        fromDate: summary.fromDate,
+        toDate: summary.toDate,
+        groupBy: trends.groupBy,
+      },
+    });
+
+    return {
+      filename: `doctor-stats-${user.bsMa}-${summary.fromDate}-${summary.toDate}.pdf`,
+      buffer: report,
     };
   }
 

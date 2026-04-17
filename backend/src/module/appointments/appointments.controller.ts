@@ -73,6 +73,21 @@ export class AdminAppointmentsController {
     return this.appointments.getDetailForAdmin(appointmentId);
   }
 
+  @Get(':appointmentId/confirmation.pdf')
+  async confirmationPdf(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('appointmentId', ParseIntPipe) appointmentId: number,
+    @Res() res: Response,
+  ) {
+    const result = await this.appointments.exportAppointmentConfirmationPdfForAdmin(
+      user,
+      appointmentId,
+    );
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+    res.send(result.buffer);
+  }
+
   @Get(':appointmentId/pre-visit-info')
   async preVisitDetail(@Param('appointmentId', ParseIntPipe) appointmentId: number) {
     return this.appointments.getPreVisitInfoForAdmin(appointmentId);
@@ -203,6 +218,21 @@ export class AppointmentsController {
     @Param('appointmentId', ParseIntPipe) appointmentId: number,
   ) {
     return this.appointments.getAppointmentDetailForPatient(user, appointmentId);
+  }
+
+  @Get(':appointmentId/confirmation.pdf')
+  async myAppointmentConfirmationPdf(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('appointmentId', ParseIntPipe) appointmentId: number,
+    @Res() res: Response,
+  ) {
+    const result = await this.appointments.exportAppointmentConfirmationPdfForPatient(
+      user,
+      appointmentId,
+    );
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+    res.send(result.buffer);
   }
 
   @Patch(':appointmentId/reschedule')
@@ -416,6 +446,18 @@ export class DoctorStatsController {
     @Query() query: DoctorStatsQueryDto,
   ) {
     return this.appointments.getDoctorStatsTrends(user, query);
+  }
+
+  @Get('report.pdf')
+  async reportPdf(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query() query: DoctorStatsQueryDto,
+    @Res() res: Response,
+  ) {
+    const result = await this.appointments.exportDoctorStatsPdf(user, query);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+    res.send(result.buffer);
   }
 }
 

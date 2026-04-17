@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { BookingModule } from '../booking/booking.module';
 import { PaymentModule } from '../payment/payment.module';
+import { PdfModule } from '../pdf/pdf.module';
 import {
   AdminOpsController,
   AdminReportsController,
@@ -23,7 +24,7 @@ import { AttachmentScanService } from './attachment-scan.service';
 import { AppointmentsBackgroundWorkerService } from './appointments.background-worker.service';
 
 @Module({
-  imports: [PrismaModule, BookingModule, PaymentModule],
+  imports: [PrismaModule, BookingModule, PaymentModule, PdfModule],
   controllers: [
     AdminAppointmentsController,
     AdminRefundsController,
