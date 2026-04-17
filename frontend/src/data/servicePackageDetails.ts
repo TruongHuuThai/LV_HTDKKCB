@@ -25,7 +25,7 @@ export const SERVICE_PACKAGE_DETAILS: ServicePackageDetail[] = [
         slug: 'kham-tong-quat-va-tam-soat-ung-thu',
         title: 'Khám sức khỏe tổng quát và Tầm soát ung thư',
         publishedAt: '10/03/2025',
-        coverImage: ph(1200, 480, '1d4ed8', 'ffffff', 'Kham+Tong+Quat+Tam+Soat+Ung+Thu'),
+        coverImage: ph(1200, 480, '1d4ed8', 'ffffff', 'Khám tổng quát và tầm soát ung thư'),
         htmlContent: `
             <h2>Khám Sức Khỏe Tổng Quát &amp; Tầm Soát Ung Thư tại UMC Clinic</h2>
             <p>
@@ -33,7 +33,7 @@ export const SERVICE_PACKAGE_DETAILS: ServicePackageDetail[] = [
                 Với đội ngũ bác sĩ chuyên khoa giàu kinh nghiệm và trang thiết bị hiện đại, kết quả xét nghiệm được trả trong vòng <strong>24–48 giờ</strong>, kèm tư vấn cá nhân hóa từ bác sĩ.
             </p>
 
-            <img src="${ph(900, 380, 'dbeafe', '1e40af', 'Kham+suc+khoe+tong+quat+UMC+Clinic')}" alt="Khám sức khỏe tổng quát tại UMC Clinic" />
+            <img src="${ph(900, 380, 'dbeafe', '1e40af', 'Khám sức khỏe tổng quát UMC Clinic')}" alt="Khám sức khỏe tổng quát tại UMC Clinic" />
 
             <h2>Đối tượng nên khám định kỳ</h2>
             <ul>
@@ -112,12 +112,12 @@ export const SERVICE_PACKAGE_DETAILS: ServicePackageDetail[] = [
         slug: 'co-ban',
         title: 'Gói Khám Sức Khỏe Tổng Quát Cơ Bản',
         publishedAt: '05/03/2025',
-        coverImage: ph(1200, 480, '1e40af', 'ffffff', 'Goi+Co+Ban+Cover'),
+        coverImage: ph(1200, 480, '1e40af', 'ffffff', 'Gói cơ bản+Cover'),
         htmlContent: `
             <h2>Giới Thiệu Gói Khám Cơ Bản</h2>
             <p>Gói <strong>Cơ Bản</strong> là lựa chọn lý tưởng cho những ai lần đầu thực hiện khám sức khỏe tổng quát hoặc muốn kiểm tra định kỳ với chi phí hợp lý. Bao gồm các xét nghiệm thiết yếu nhất để phát hiện sớm các vấn đề sức khỏe phổ biến.</p>
 
-            <img src="${ph(900, 360, 'dbeafe', '1e40af', 'Goi+Co+Ban+UMC+Clinic')}" alt="Gói Cơ Bản tại UMC Clinic" />
+            <img src="${ph(900, 360, 'dbeafe', '1e40af', 'Gói cơ bản+UMC+Clinic')}" alt="Gói Cơ Bản tại UMC Clinic" />
 
             <h2>Đối Tượng Phù Hợp</h2>
             <ul>

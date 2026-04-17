@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
     Heart, Menu, ChevronDown, LogOut, User,
     Stethoscope, Calendar, Phone, Home, Info,
-    Briefcase, Newspaper, BookOpen
+    Briefcase, Newspaper, BookOpen, Bell
 } from 'lucide-react';
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -422,6 +422,13 @@ export default function Header() {
                                     </div>
                                     <span className="font-medium max-w-[100px] truncate">{user.TK_SDT}</span>
                                 </Link>
+                                <Link
+                                    to="/notifications"
+                                    className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-gray-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
+                                >
+                                    <Bell className="w-4 h-4" />
+                                    Thong bao
+                                </Link>
                                 <Button variant="ghost" size="sm" onClick={handleLogout} className="text-gray-400 hover:text-red-500 px-2">
                                     <LogOut className="w-4 h-4" />
                                 </Button>
@@ -499,6 +506,14 @@ export default function Header() {
                                                         <User className="w-4 h-4 text-white" />
                                                     </div>
                                                     <span className="truncate">{user.TK_SDT}</span>
+                                                </Link>
+                                                <Link
+                                                    to="/notifications"
+                                                    onClick={() => setMobileOpen(false)}
+                                                    className="mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700"
+                                                >
+                                                    <Bell className="w-4 h-4" />
+                                                    Thong bao
                                                 </Link>
                                                 <button
                                                     onClick={() => { setMobileOpen(false); handleLogout(); }}

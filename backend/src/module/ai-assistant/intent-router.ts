@@ -69,32 +69,127 @@ function scoreKeywords(tokens: Set<string>, keywords: string[]): number {
 // Entity extractors
 // ---------------------------------------------------------------------------
 
-function extractDate(normalized: string): string | null {
-  // YYYY-MM-DD
-  const isoMatch = normalized.match(/\b(\d{4}-\d{2}-\d{2})\b/);
-  if (isoMatch) return isoMatch[1];
+function formatIsoUtcDate(value: Date) {
+  const year = value.getUTCFullYear();
+  const month = String(value.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(value.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
-  // DD/MM/YYYY or D/M/YYYY
-  const dmyMatch = normalized.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/);
-  if (dmyMatch) {
-    const d = dmyMatch[1].padStart(2, '0');
-    const m = dmyMatch[2].padStart(2, '0');
-    return `${dmyMatch[3]}-${m}-${d}`;
+function createUtcDateSafe(year: number, month: number, day: number): Date | null {
+  const candidate = new Date(Date.UTC(year, month - 1, day));
+  if (
+    candidate.getUTCFullYear() !== year ||
+    candidate.getUTCMonth() + 1 !== month ||
+    candidate.getUTCDate() !== day
+  ) {
+    return null;
   }
+  return candidate;
+}
+
+function resolveFutureDateByMonthDay(baseDate: Date, month: number, day: number): Date | null {
+  const year = baseDate.getUTCFullYear();
+  const thisYear = createUtcDateSafe(year, month, day);
+  if (!thisYear) return null;
+  if (thisYear.getTime() >= baseDate.getTime()) return thisYear;
+  return createUtcDateSafe(year + 1, month, day);
+}
+
+function resolveFutureDateByDayOnly(baseDate: Date, day: number): Date | null {
+  for (let offset = 0; offset < 12; offset += 1) {
+    const baseMonthIndex = baseDate.getUTCMonth() + offset;
+    const year = baseDate.getUTCFullYear() + Math.floor(baseMonthIndex / 12);
+    const month = (baseMonthIndex % 12) + 1;
+    const candidate = createUtcDateSafe(year, month, day);
+    if (candidate && candidate.getTime() >= baseDate.getTime()) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function extractDate(rawMessage: string): string | null {
+  const raw = String(rawMessage || '').trim();
+  const normalized = normalizeText(raw);
 
   const now = new Date();
-  if (/\b(ngay mai|tomorrow)\b/.test(normalized)) {
-    const tomorrow = new Date(now);
-    tomorrow.setDate(now.getDate() + 1);
-    return tomorrow.toISOString().slice(0, 10);
+  const todayUtc = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+  );
+
+  // YYYY-MM-DD, YYYY/MM/DD, YYYY.MM.DD
+  const ymdMatch = raw.match(/\b(\d{4})[/.-](\d{1,2})[/.-](\d{1,2})\b/);
+  if (ymdMatch) {
+    const year = Number.parseInt(ymdMatch[1], 10);
+    const month = Number.parseInt(ymdMatch[2], 10);
+    const day = Number.parseInt(ymdMatch[3], 10);
+    const parsed = createUtcDateSafe(year, month, day);
+    return parsed ? formatIsoUtcDate(parsed) : null;
   }
-  if (/\b(hom nay|today|hôm nay)\b/.test(normalized)) {
-    return now.toISOString().slice(0, 10);
+
+  // DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY
+  const dmyWithYearMatch = raw.match(/\b(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})\b/);
+  if (dmyWithYearMatch) {
+    const day = Number.parseInt(dmyWithYearMatch[1], 10);
+    const month = Number.parseInt(dmyWithYearMatch[2], 10);
+    const year = Number.parseInt(dmyWithYearMatch[3], 10);
+    const parsed = createUtcDateSafe(year, month, day);
+    return parsed ? formatIsoUtcDate(parsed) : null;
+  }
+
+  // DD/MM or DD-MM or DD.MM (khong co nam)
+  const dmyNoYearMatch = raw.match(/\b(\d{1,2})[/.-](\d{1,2})(?!\s*[/.-]\s*\d)\b/);
+  if (dmyNoYearMatch) {
+    const day = Number.parseInt(dmyNoYearMatch[1], 10);
+    const month = Number.parseInt(dmyNoYearMatch[2], 10);
+    const parsed = resolveFutureDateByMonthDay(todayUtc, month, day);
+    return parsed ? formatIsoUtcDate(parsed) : null;
+  }
+
+  // "ngay 23 thang 4" hoac "23 thang 4 nam 2026"
+  const dayMonthTextMatch = normalized.match(
+    /\b(?:ngay\s+)?(\d{1,2})\s+thang\s+(\d{1,2})(?:\s+nam\s+(\d{4}))?\b/,
+  );
+  if (dayMonthTextMatch) {
+    const day = Number.parseInt(dayMonthTextMatch[1], 10);
+    const month = Number.parseInt(dayMonthTextMatch[2], 10);
+    const explicitYear = dayMonthTextMatch[3]
+      ? Number.parseInt(dayMonthTextMatch[3], 10)
+      : null;
+
+    const parsed = explicitYear
+      ? createUtcDateSafe(explicitYear, month, day)
+      : resolveFutureDateByMonthDay(todayUtc, month, day);
+    return parsed ? formatIsoUtcDate(parsed) : null;
+  }
+
+  // "ngay 23"
+  const dayOnlyMatch = normalized.match(/\bngay\s+(\d{1,2})\b/);
+  if (dayOnlyMatch) {
+    const day = Number.parseInt(dayOnlyMatch[1], 10);
+    const parsed = resolveFutureDateByDayOnly(todayUtc, day);
+    return parsed ? formatIsoUtcDate(parsed) : null;
+  }
+
+  if (/\b(ngay kia|day after tomorrow)\b/.test(normalized)) {
+    const dayAfterTomorrow = new Date(todayUtc);
+    dayAfterTomorrow.setUTCDate(dayAfterTomorrow.getUTCDate() + 2);
+    return formatIsoUtcDate(dayAfterTomorrow);
+  }
+
+  if (/\b(ngay mai|tomorrow)\b/.test(normalized)) {
+    const tomorrow = new Date(todayUtc);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    return formatIsoUtcDate(tomorrow);
+  }
+
+  if (/\b(hom nay|today)\b/.test(normalized)) {
+    return formatIsoUtcDate(todayUtc);
   }
 
   return null;
 }
-
 function extractAppointmentId(normalized: string): number | null {
   // "lịch hẹn 123", "đăng ký 456", "mã DK 789", "appointment 101"
   const match = normalized.match(
@@ -105,31 +200,42 @@ function extractAppointmentId(normalized: string): number | null {
 }
 
 function extractSearchKeyword(raw: string): string | null {
-  // Ưu tiên: bác sĩ chuyên khoa <Tên> → bắt Tên là từ sau "chuyên khoa"
+  const cleanKeyword = (value: string) =>
+    value
+      .replace(/\s*[-/]\s*/g, ' ')
+      .replace(/\s{2,}/g, ' ')
+      .replace(/\s+(co|có)\s+(lich|lịch|slot).*/i, '')
+      .replace(/\s+(nào|nao|gì|gi|khong|không|có|co)\s*$/i, '')
+      .trim();
+
+  // Ưu tiên: bác sĩ chuyên khoa <Tên> -> bắt phần sau "chuyên khoa"
   const specialtyAfterDoctor = raw.match(
-    /(?:bac si|bác sĩ|bs|doctor|dr\.?)\s+(?:chuyen khoa|chuyên khoa)\s+([a-zA-ZÀ-ỹ][a-zA-ZÀ-ỹ\s]{1,30})/i,
+    /(?:bac si|bác sĩ|bs|doctor|dr\.?)\s+(?:chuyen khoa|chuyên khoa)\s+([a-zA-ZÀ-ỹ][a-zA-ZÀ-ỹ\s\-]{1,40}?)(?=\s+(?:co|có|nao|nào|khong|không|ngay|ngày|vao|vào)\b|$)/i,
   );
   if (specialtyAfterDoctor) {
-    return specialtyAfterDoctor[1].replace(/\s+(nào|nao|gi|gì|khong|không|có|co)\s*$/i, '').trim();
+    const cleaned = cleanKeyword(specialtyAfterDoctor[1]);
+    if (cleaned.length >= 2) return cleaned;
   }
 
-  // Bắt chuyên khoa đơn (không có "’bác sĩ" trước)
+  // Bắt chuyên khoa đơn (không có "bác sĩ" phía trước)
   const specialtyOnly = raw.match(
-    /(?:chuyen khoa|chuyên khoa|specialty)\s+([a-zA-ZÀ-ỹ][a-zA-ZÀ-ỹ\s]{1,30})/i,
+    /(?:chuyen khoa|chuyên khoa|specialty)\s+([a-zA-ZÀ-ỹ][a-zA-ZÀ-ỹ\s\-]{1,40}?)(?=\s+(?:co|có|nao|nào|khong|không|ngay|ngày|vao|vào)\b|$)/i,
   );
   if (specialtyOnly) {
-    return specialtyOnly[1].replace(/\s+(nào|nao|gi|gì|khong|không|có|co)\s*$/i, '').trim();
+    const cleaned = cleanKeyword(specialtyOnly[1]);
+    if (cleaned.length >= 2) return cleaned;
   }
 
   // Bắt tên bác sĩ sau "bác sĩ"
   const doctorName = raw.match(
-    /(?:bac si|bác sĩ|bs|doctor|dr\.?)\s+([a-zA-ZÀ-ỹ][a-zA-ZÀ-ỹ\s]{1,39})/i,
+    /(?:bac si|bác sĩ|bs|doctor|dr\.?)\s+([a-zA-ZÀ-ỹ][a-zA-ZÀ-ỹ\s\-]{1,45})/i,
   );
   if (doctorName) {
-    const cleaned = doctorName[1]
-      .replace(/(?:chuyen khoa|chuyên khoa|khoa|specialty).*$/i, '')
-      .replace(/\s+(nào|nao|gi|gì|khong|không|có|co|ở|o)\s*$/i, '')
-      .trim();
+    const cleaned = cleanKeyword(
+      doctorName[1]
+        .replace(/(?:chuyen khoa|chuyên khoa|khoa|specialty).*$/i, '')
+        .replace(/\s+(ở|o)\s*$/i, ''),
+    );
     if (cleaned.length >= 2) return cleaned;
   }
 
@@ -158,6 +264,7 @@ const INTENT_KEYWORDS: Record<IntentCode, string[]> = {
     'con cho', 'con trong', 'buoi sang', 'buoi chieu',
     'kham luc may gio', 'dat duoc khong', 'available slot',
     'time slot', 'gio trong',
+    'lich trong', 'lich ranh', 'co lich trong', 'lich trong nao',
   ],
   [INTENT.SPECIALTY_INFO]: [
     'chuyen khoa',
@@ -209,6 +316,25 @@ export function routeIntent(rawMessage: string): IntentRouterResult {
 
   scores.sort((a, b) => b.score - a.score);
   let topIntent = scores[0].score > 0 ? scores[0].intent : INTENT.GENERAL_INFO;
+
+  // Nếu câu chứa tín hiệu mạnh về "slot/lịch trống", ưu tiên DOCTOR_SLOTS
+  const hasStrongSlotSignal =
+    scoreKeywords(
+      tokens,
+      [
+        'con slot',
+        'slot',
+        'khung gio',
+        'gio trong',
+        'lich trong',
+        'lich ranh',
+        'time slot',
+        'available slot',
+      ].map(normalizeText),
+    ) > 0;
+  if (hasStrongSlotSignal) {
+    topIntent = INTENT.DOCTOR_SLOTS;
+  }
 
   // Tiebreak: nếu score bằng nhau giữa DOCTOR_SLOTS và GENERAL_INFO,
   // ưu tiên GENERAL_INFO khi câu hỏi không có từ chỉ slot cụ thể

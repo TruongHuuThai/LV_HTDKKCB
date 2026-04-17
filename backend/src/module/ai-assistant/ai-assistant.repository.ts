@@ -253,43 +253,192 @@ export class AiAssistantRepository {
   // ──────────────────────────────────────────────────────────────────────────
 
   async getDoctorSlotsForDate(targetDate: string, doctorKeyword?: string | null) {
-    // Tìm bác sĩ phù hợp nếu có keyword
-    let doctorFilter: { BS_MA: number; BS_HO_TEN: string; BS_HOC_HAM: string | null } | null =
-      null;
+    const normalizeLoose = (value: string) =>
+      value
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/\u0111/g, 'd')
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
 
-    if (doctorKeyword) {
-      const found = await this.prisma.bAC_SI.findFirst({
-        where: {
-          BS_DA_XOA: false,
-          BS_HO_TEN: { contains: doctorKeyword, mode: 'insensitive' },
-        },
-        select: { BS_MA: true, BS_HO_TEN: true, BS_HOC_HAM: true },
-      });
-      if (found) doctorFilter = found;
+    const keyword = String(doctorKeyword ?? '')
+      .trim()
+      .replace(/\s*[-/]\s*/g, ' ')
+      .replace(/\s{2,}/g, ' ');
+
+    let doctorFilter:
+      | { BS_MA: number; BS_HO_TEN: string; BS_HOC_HAM: string | null; CK_MA: number | null }
+      | null = null;
+    let specialtyFilter: { CK_MA: number; CK_TEN: string } | null = null;
+    let searchResolution:
+      | { type: 'doctor'; keyword: string; doctorId: number; doctorName: string }
+      | { type: 'specialty'; keyword: string; specialtyId: number; specialtyName: string }
+      | { type: 'keyword'; keyword: string }
+      | null = null;
+
+    if (keyword) {
+      const [foundDoctorByName, foundSpecialtyByName] = await Promise.all([
+        this.prisma.bAC_SI.findFirst({
+          where: {
+            BS_DA_XOA: false,
+            BS_HO_TEN: { contains: keyword, mode: 'insensitive' },
+          },
+          select: { BS_MA: true, BS_HO_TEN: true, BS_HOC_HAM: true, CK_MA: true },
+        }),
+        this.prisma.cHUYEN_KHOA.findFirst({
+          where: {
+            CK_TEN: { contains: keyword, mode: 'insensitive' },
+          },
+          select: { CK_MA: true, CK_TEN: true },
+        }),
+      ]);
+
+      if (foundDoctorByName) {
+        doctorFilter = foundDoctorByName;
+        searchResolution = {
+          type: 'doctor',
+          keyword,
+          doctorId: foundDoctorByName.BS_MA,
+          doctorName: foundDoctorByName.BS_HO_TEN,
+        };
+      } else if (foundSpecialtyByName) {
+        specialtyFilter = foundSpecialtyByName;
+        searchResolution = {
+          type: 'specialty',
+          keyword,
+          specialtyId: foundSpecialtyByName.CK_MA,
+          specialtyName: foundSpecialtyByName.CK_TEN,
+        };
+      } else {
+        const normalizedKeyword = normalizeLoose(keyword);
+        if (normalizedKeyword) {
+          const [doctorCandidates, specialtyCandidates] = await Promise.all([
+            this.prisma.bAC_SI.findMany({
+              where: { BS_DA_XOA: false },
+              select: { BS_MA: true, BS_HO_TEN: true, BS_HOC_HAM: true, CK_MA: true },
+              take: 150,
+            }),
+            this.prisma.cHUYEN_KHOA.findMany({
+              select: { CK_MA: true, CK_TEN: true },
+              take: 80,
+            }),
+          ]);
+
+          const doctorByNormalized = doctorCandidates.find((doc) => {
+            const normalizedDoctorName = normalizeLoose(String(doc.BS_HO_TEN || ''));
+            if (!normalizedDoctorName) return false;
+            return (
+              normalizedDoctorName.includes(normalizedKeyword) ||
+              normalizedKeyword.includes(normalizedDoctorName)
+            );
+          });
+
+          if (doctorByNormalized) {
+            doctorFilter = doctorByNormalized;
+            searchResolution = {
+              type: 'doctor',
+              keyword,
+              doctorId: doctorByNormalized.BS_MA,
+              doctorName: doctorByNormalized.BS_HO_TEN,
+            };
+          } else {
+            const specialtyByNormalized = specialtyCandidates.find((spec) => {
+              const normalizedSpecialtyName = normalizeLoose(String(spec.CK_TEN || ''));
+              if (!normalizedSpecialtyName) return false;
+              return (
+                normalizedSpecialtyName.includes(normalizedKeyword) ||
+                normalizedKeyword.includes(normalizedSpecialtyName)
+              );
+            });
+
+            if (specialtyByNormalized) {
+              specialtyFilter = specialtyByNormalized;
+              searchResolution = {
+                type: 'specialty',
+                keyword,
+                specialtyId: specialtyByNormalized.CK_MA,
+                specialtyName: specialtyByNormalized.CK_TEN,
+              };
+            }
+          }
+        }
+
+        if (!searchResolution) {
+          searchResolution = { type: 'keyword', keyword };
+        }
+      }
     }
 
-    const result = await this.bookingService.getAvailableDoctors(targetDate);
-    const topList = (doctorFilter
+    const result = await this.bookingService.getAvailableDoctors(
+      targetDate,
+      specialtyFilter?.CK_MA ?? doctorFilter?.CK_MA ?? undefined,
+      searchResolution?.type === 'keyword' ? keyword : doctorFilter?.BS_HO_TEN,
+    );
+
+    const filteredResult = doctorFilter
       ? result.filter((d: any) => d.BS_MA === doctorFilter!.BS_MA)
-      : result
-    ).slice(0, 6);
+      : result;
+
+    const topList = filteredResult.slice(0, 6);
+    const doctorsWithSlots = await Promise.all(
+      topList.map(async (doctor: any) => {
+        try {
+          const doctorShifts = await this.bookingService.getDoctorSlotsForDay(
+            Number(doctor.BS_MA),
+            targetDate,
+          );
+
+          const availableSlots = (doctorShifts || []).flatMap((shift: any) =>
+            (shift?.slots || [])
+              .filter((slot: any) => slot?.available === true)
+              .map((slot: any) => ({
+                slotId: slot.KG_MA,
+                slotStart: toTimeHHMM(slot.KG_BAT_DAU),
+                slotEnd: toTimeHHMM(slot.KG_KET_THUC),
+                session: shift?.B_TEN ?? null,
+                room: shift?.PHONG ?? null,
+              })),
+          );
+
+          return {
+            doctorId: doctor.BS_MA,
+            doctorName: doctor.BS_HO_TEN,
+            degree: doctor.BS_HOC_HAM ?? null,
+            specialty: doctor.CHUYEN_KHOA ?? null,
+            availableSlotsCount: availableSlots.length,
+            availableSlots,
+          };
+        } catch {
+          return {
+            doctorId: doctor.BS_MA,
+            doctorName: doctor.BS_HO_TEN,
+            degree: doctor.BS_HOC_HAM ?? null,
+            specialty: doctor.CHUYEN_KHOA ?? null,
+            availableSlotsCount: 0,
+            availableSlots: [],
+          };
+        }
+      }),
+    );
+    const totalAvailableSlots = doctorsWithSlots.reduce(
+      (sum, item) => sum + (Number(item.availableSlotsCount) || 0),
+      0,
+    );
 
     return {
       targetDate,
-      totalAvailable: result.length,
-      doctors: topList.map((d: any) => ({
-        doctorId: d.BS_MA,
-        doctorName: d.BS_HO_TEN,
-        degree: d.BS_HOC_HAM ?? null,
-        specialty: d.CHUYEN_KHOA ?? null,
-      })),
+      totalAvailable: filteredResult.length,
+      totalAvailableSlots,
+      doctors: doctorsWithSlots,
+      searchResolution,
     };
   }
 
   // ──────────────────────────────────────────────────────────────────────────
   // [NEW] Danh sách chuyên khoa + loại khám + giá
   // ──────────────────────────────────────────────────────────────────────────
-
   async getSpecialtiesWithServiceTypes(keyword?: string | null) {
     const buildQuery = (kw: string | null | undefined) =>
       kw ? { CK_TEN: { contains: kw, mode: 'insensitive' as const } } : undefined;

@@ -54,6 +54,7 @@ import { AttachmentStorageService } from './attachment-storage.service';
 import { AttachmentScanService } from './attachment-scan.service';
 import { SHIFT_STATUS, WEEK_STATUS } from '../schedules/schedule-status';
 import { PdfService } from '../pdf/pdf.service';
+import { NotificationRecipientResolverService } from './notification-recipient-resolver.service';
 
 const ACTIVE_BOOKING_STATUS = ['CHO_THANH_TOAN', 'CHO_KHAM', 'DA_CHECKIN'];
 const REFUND_STATUSES = ['REFUND_PENDING', 'REFUNDED', 'REFUND_FAILED', 'REFUND_REJECTED'];
@@ -65,6 +66,7 @@ const SUPPORTED_PAYMENT_METHODS = new Set(['VNPAY', 'QR_BANKING']);
 @Injectable()
 export class AppointmentsService {
   private readonly optionalTableExistsCache = new Map<string, boolean>();
+  private thongBaoHasBatchColumn: boolean | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -75,6 +77,7 @@ export class AppointmentsService {
     private readonly attachmentStorage: AttachmentStorageService,
     private readonly attachmentScan: AttachmentScanService,
     private readonly pdfService: PdfService,
+    private readonly notificationRecipientResolver: NotificationRecipientResolverService,
   ) {}
 
   private parseStatusList(raw?: string) {
@@ -257,6 +260,27 @@ export class AppointmentsService {
       if (!exists) return false;
     }
     return true;
+  }
+
+  private async hasThongBaoBatchColumn() {
+    if (this.thongBaoHasBatchColumn !== null) return this.thongBaoHasBatchColumn;
+    try {
+      const rows = (await this.prisma
+        .getClient()
+        .$queryRawUnsafe(
+          `SELECT EXISTS (
+             SELECT 1
+             FROM information_schema.columns
+             WHERE table_schema = 'public'
+               AND table_name = 'THONG_BAO'
+               AND column_name = 'TB_BATCH_MA'
+           ) AS "exists"`,
+        )) as Array<{ exists: boolean }>;
+      this.thongBaoHasBatchColumn = Boolean(rows?.[0]?.exists);
+    } catch {
+      this.thongBaoHasBatchColumn = false;
+    }
+    return this.thongBaoHasBatchColumn;
   }
 
   private resolveReportingRange(query: ReportingQueryDto | ReconciliationQueryDto | OpsDashboardQueryDto) {
@@ -573,33 +597,95 @@ export class AppointmentsService {
     content: string;
     at?: Date;
   }) {
-    return this.prisma.tHONG_BAO.create({
-      data: {
-        TK_SDT: input.phone,
-        TB_TIEU_DE: input.title,
-        TB_LOAI: input.type,
-        TB_NOI_DUNG: input.content,
-        TB_TRANG_THAI: 'UNREAD',
-        TB_THOI_GIAN: input.at ?? new Date(),
-      },
-    });
+    const hasBatchColumn = await this.hasThongBaoBatchColumn();
+    if (hasBatchColumn) {
+      return this.prisma.tHONG_BAO.create({
+        data: {
+          TK_SDT: input.phone,
+          TB_TIEU_DE: input.title,
+          TB_LOAI: input.type,
+          TB_NOI_DUNG: input.content,
+          TB_TRANG_THAI: 'UNREAD',
+          TB_THOI_GIAN: input.at ?? new Date(),
+        },
+      });
+    }
+
+    const rows = (await this.prisma
+      .getClient()
+      .$queryRawUnsafe(
+        `INSERT INTO "THONG_BAO" (
+           "TK_SDT",
+           "TB_TIEU_DE",
+           "TB_LOAI",
+           "TB_NOI_DUNG",
+           "TB_TRANG_THAI",
+           "TB_THOI_GIAN"
+         ) VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING "TB_MA", "TK_SDT", "TB_TIEU_DE", "TB_LOAI", "TB_NOI_DUNG", "TB_TRANG_THAI", "TB_THOI_GIAN"`,
+        input.phone,
+        input.title,
+        input.type,
+        input.content,
+        'UNREAD',
+        input.at ?? new Date(),
+      )) as Array<any>;
+    return rows[0] || null;
+  }
+
+  private async findNotificationByDedupe(phone: string, type: string, dedupeKey: string) {
+    const hasBatchColumn = await this.hasThongBaoBatchColumn();
+    if (hasBatchColumn) {
+      return this.prisma.tHONG_BAO.findFirst({
+        where: {
+          TK_SDT: phone,
+          TB_LOAI: type,
+          TB_NOI_DUNG: { contains: dedupeKey, mode: 'insensitive' },
+        },
+      });
+    }
+
+    const rows = (await this.prisma
+      .getClient()
+      .$queryRawUnsafe(
+        `SELECT "TB_MA", "TK_SDT", "TB_TIEU_DE", "TB_LOAI", "TB_NOI_DUNG", "TB_TRANG_THAI", "TB_THOI_GIAN"
+         FROM "THONG_BAO"
+         WHERE "TK_SDT" = $1
+           AND "TB_LOAI" = $2
+           AND "TB_NOI_DUNG" ILIKE '%' || $3 || '%'
+         ORDER BY "TB_MA" DESC
+         LIMIT 1`,
+        phone,
+        type,
+        dedupeKey,
+      )) as Array<any>;
+    return rows[0] || null;
   }
 
   private async createAppointmentNotification(input: {
     appointmentId: number;
     phone: string;
-    type: 'reminder' | 'reschedule' | 'doctor_unavailable' | 'cancellation' | 'waitlist';
+    type:
+      | 'reminder'
+      | 'reschedule'
+      | 'doctor_unavailable'
+      | 'cancellation'
+      | 'waitlist'
+      | 'payment_success'
+      | 'payment_failed'
+      | 'payment_timeout'
+      | 'payment_pending'
+      | 'system_admin'
+      | 'system_auto';
     title: string;
     content: string;
     dedupeKey: string;
   }) {
-    const exists = await this.prisma.tHONG_BAO.findFirst({
-      where: {
-        TK_SDT: input.phone,
-        TB_LOAI: input.type,
-        TB_NOI_DUNG: { contains: input.dedupeKey, mode: 'insensitive' },
-      },
-    });
+    const exists = await this.findNotificationByDedupe(
+      input.phone,
+      input.type,
+      input.dedupeKey,
+    );
     if (exists) return exists;
 
     return this.createNotification({
@@ -607,6 +693,31 @@ export class AppointmentsService {
       title: input.title,
       type: input.type,
       content: `${input.content} (${input.dedupeKey})`,
+    });
+  }
+
+  private async createPaymentNotification(input: {
+    phone?: string | null;
+    type: 'payment_success' | 'payment_failed' | 'payment_timeout' | 'payment_pending';
+    title: string;
+    content: string;
+    dedupeKey: string;
+    at?: Date;
+  }) {
+    const phone = String(input.phone || '').trim();
+    if (!phone) return null;
+    const exists = await this.findNotificationByDedupe(
+      phone,
+      input.type,
+      input.dedupeKey,
+    );
+    if (exists) return exists;
+    return this.createNotification({
+      phone,
+      title: input.title,
+      type: input.type,
+      content: `${input.content} (${input.dedupeKey})`,
+      at: input.at,
     });
   }
 
@@ -1217,21 +1328,67 @@ export class AppointmentsService {
     const isRead =
       query.isRead === 'true' ? 'READ' : query.isRead === 'false' ? 'UNREAD' : undefined;
 
-    const where: Prisma.THONG_BAOWhereInput = {
-      TK_SDT: user.TK_SDT,
-      ...(query.type ? { TB_LOAI: query.type } : {}),
-      ...(isRead ? { TB_TRANG_THAI: isRead } : {}),
-    };
+    const hasBatchColumn = await this.hasThongBaoBatchColumn();
+    let total = 0;
+    let rows: any[] = [];
+    if (hasBatchColumn) {
+      const where: Prisma.THONG_BAOWhereInput = {
+        TK_SDT: user.TK_SDT,
+        ...(query.type ? { TB_LOAI: query.type } : {}),
+        ...(isRead ? { TB_TRANG_THAI: isRead } : {}),
+      };
+      const result = await this.prisma.$transaction([
+        this.prisma.tHONG_BAO.count({ where }),
+        this.prisma.tHONG_BAO.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: { TB_THOI_GIAN: 'desc' },
+        }),
+      ]);
+      total = result[0];
+      rows = result[1] as any[];
+    } else {
+      const conditions: string[] = [`"TK_SDT" = $1`];
+      const params: any[] = [user.TK_SDT];
+      if (query.type) {
+        params.push(query.type);
+        conditions.push(`"TB_LOAI" = $${params.length}`);
+      }
+      if (isRead) {
+        params.push(isRead);
+        conditions.push(`"TB_TRANG_THAI" = $${params.length}`);
+      }
+      const whereSql = conditions.join(' AND ');
+      const countRows = (await this.prisma
+        .getClient()
+        .$queryRawUnsafe(
+          `SELECT COUNT(*)::int AS total FROM "THONG_BAO" WHERE ${whereSql}`,
+          ...params,
+        )) as Array<{ total: number }>;
+      total = Number(countRows?.[0]?.total || 0);
 
-    const [total, rows] = await this.prisma.$transaction([
-      this.prisma.tHONG_BAO.count({ where }),
-      this.prisma.tHONG_BAO.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { TB_THOI_GIAN: 'desc' },
-      }),
-    ]);
+      const pageParams = [...params, skip, limit];
+      rows = (await this.prisma
+        .getClient()
+        .$queryRawUnsafe(
+          `SELECT
+             "TB_MA",
+             "TK_SDT",
+             NULL::int AS "TB_BATCH_MA",
+             "TB_TIEU_DE",
+             "TB_LOAI",
+             "TB_NOI_DUNG",
+             "TB_TRANG_THAI",
+             "TB_THOI_GIAN"
+           FROM "THONG_BAO"
+           WHERE ${whereSql}
+           ORDER BY "TB_THOI_GIAN" DESC
+           OFFSET $${params.length + 1}
+           LIMIT $${params.length + 2}`,
+          ...pageParams,
+        )) as any[];
+    }
 
     return {
       items: rows,
@@ -1245,24 +1402,64 @@ export class AppointmentsService {
   }
 
   async markNotificationRead(user: CurrentUserPayload, notificationId: number) {
-    const noti = await this.prisma.tHONG_BAO.findUnique({ where: { TB_MA: notificationId } });
-    if (!noti || noti.TK_SDT !== user.TK_SDT) {
-      throw new NotFoundException('Khong tim thay thong bao');
+    const hasBatchColumn = await this.hasThongBaoBatchColumn();
+    let updated: any = null;
+    if (hasBatchColumn) {
+      const noti = await this.prisma.tHONG_BAO.findUnique({ where: { TB_MA: notificationId } });
+      if (!noti || noti.TK_SDT !== user.TK_SDT) {
+        throw new NotFoundException('Khong tim thay thong bao');
+      }
+      updated = await this.prisma.tHONG_BAO.update({
+        where: { TB_MA: notificationId },
+        data: { TB_TRANG_THAI: 'READ' },
+      });
+    } else {
+      const rows = (await this.prisma
+        .getClient()
+        .$queryRawUnsafe(
+          `UPDATE "THONG_BAO"
+           SET "TB_TRANG_THAI" = 'READ'
+           WHERE "TB_MA" = $1
+             AND "TK_SDT" = $2
+           RETURNING "TB_MA", "TK_SDT", "TB_TIEU_DE", "TB_LOAI", "TB_NOI_DUNG", "TB_TRANG_THAI", "TB_THOI_GIAN"`,
+          notificationId,
+          user.TK_SDT,
+        )) as any[];
+      updated = rows[0] || null;
+      if (!updated) {
+        throw new NotFoundException('Khong tim thay thong bao');
+      }
     }
-
-    const updated = await this.prisma.tHONG_BAO.update({
-      where: { TB_MA: notificationId },
-      data: { TB_TRANG_THAI: 'READ' },
-    });
     return { message: 'Da danh dau da doc', notification: updated };
   }
 
   async markAllNotificationsRead(user: CurrentUserPayload) {
-    const result = await this.prisma.tHONG_BAO.updateMany({
-      where: { TK_SDT: user.TK_SDT, TB_TRANG_THAI: { not: 'READ' } },
-      data: { TB_TRANG_THAI: 'READ' },
-    });
-    return { message: 'Da danh dau tat ca la da doc', updatedCount: result.count };
+    const hasBatchColumn = await this.hasThongBaoBatchColumn();
+    if (hasBatchColumn) {
+      const result = await this.prisma.tHONG_BAO.updateMany({
+        where: { TK_SDT: user.TK_SDT, TB_TRANG_THAI: { not: 'READ' } },
+        data: { TB_TRANG_THAI: 'READ' },
+      });
+      return { message: 'Da danh dau tat ca la da doc', updatedCount: result.count };
+    }
+
+    const rows = (await this.prisma
+      .getClient()
+      .$queryRawUnsafe(
+        `WITH updated AS (
+           UPDATE "THONG_BAO"
+           SET "TB_TRANG_THAI" = 'READ'
+           WHERE "TK_SDT" = $1
+             AND COALESCE("TB_TRANG_THAI", '') <> 'READ'
+           RETURNING 1
+         )
+         SELECT COUNT(*)::int AS total FROM updated`,
+        user.TK_SDT,
+      )) as Array<{ total: number }>;
+    return {
+      message: 'Da danh dau tat ca la da doc',
+      updatedCount: Number(rows?.[0]?.total || 0),
+    };
   }
 
   async joinWaitlist(user: CurrentUserPayload, dto: JoinWaitlistDto) {
@@ -2131,12 +2328,18 @@ export class AppointmentsService {
       Number(appointment.LOAI_HINH_KHAM?.LHK_GIA ?? 0) ||
       10000;
 
+    const appointmentDate = this.formatDateOnly(appointment.N_NGAY);
+    const appointmentTime = this.formatTimeOnly(appointment.KHUNG_GIO?.KG_BAT_DAU || null);
+    const doctorName = String(appointment.LICH_BSK?.BAC_SI?.BS_HO_TEN || '').trim();
+    let expiredPreviousPaymentId: number | null = null;
+
     const created = await this.prisma.getClient().$transaction(async (tx) => {
       if (latest && latest.TT_TRANG_THAI === 'CHUA_THANH_TOAN') {
         await tx.tHANH_TOAN.update({
           where: { TT_MA: latest.TT_MA },
           data: { TT_TRANG_THAI: 'HET_HAN' },
         });
+        expiredPreviousPaymentId = latest.TT_MA;
       }
 
       const payment = await tx.tHANH_TOAN.create({
@@ -2172,6 +2375,35 @@ export class AppointmentsService {
       });
 
       return payment;
+    });
+
+    if (expiredPreviousPaymentId) {
+      await this.createPaymentNotification({
+        phone: appointment.BENH_NHAN?.TK_SDT || user.TK_SDT,
+        type: 'payment_timeout',
+        title: 'Thanh toan het han',
+        content:
+          `Giao dich thanh toan TT_MA=${expiredPreviousPaymentId} da het han` +
+          ` cho lich hen DK_MA=${appointment.DK_MA}` +
+          (appointmentDate !== '-' ? ` ngay ${appointmentDate}` : '') +
+          (appointmentTime !== '-' ? ` luc ${appointmentTime}` : '') +
+          (doctorName ? ` voi bac si ${doctorName}.` : '.'),
+        dedupeKey: `[PAYMENT_TIMEOUT_TT_MA=${expiredPreviousPaymentId}]`,
+      });
+    }
+
+    await this.createPaymentNotification({
+      phone: appointment.BENH_NHAN?.TK_SDT || user.TK_SDT,
+      type: 'payment_pending',
+      title: 'Da tao yeu cau thanh toan moi',
+      content:
+        `He thong da tao yeu cau thanh toan moi TT_MA=${created.TT_MA}` +
+        ` cho lich hen DK_MA=${appointment.DK_MA}` +
+        (appointmentDate !== '-' ? ` ngay ${appointmentDate}` : '') +
+        (appointmentTime !== '-' ? ` luc ${appointmentTime}` : '') +
+        (doctorName ? ` voi bac si ${doctorName}.` : '.') +
+        ' Vui long hoan tat thanh toan trong 15 phut.',
+      dedupeKey: `[PAYMENT_PENDING_TT_MA=${created.TT_MA}]`,
     });
 
     const paymentUrl =
@@ -2631,126 +2863,49 @@ export class AppointmentsService {
   }
 
   private async resolveBulkNotificationRecipients(dto: BulkNotificationDto) {
-    const hasAnyFilter =
-      (dto.appointmentIds?.length || 0) > 0 ||
-      Boolean(dto.doctorId) ||
-      Boolean(dto.date) ||
-      Boolean(dto.dateFrom) ||
-      Boolean(dto.dateTo) ||
-      Boolean(dto.scheduleId) ||
-      Boolean(dto.slotId) ||
-      Boolean(dto.specialtyId);
-    if (!hasAnyFilter) {
-      throw new BadRequestException('Bo loc nguoi nhan thong bao khong duoc de trong');
-    }
-
-    if (dto.date && (dto.dateFrom || dto.dateTo)) {
-      throw new BadRequestException('Chi duoc su dung date hoac dateFrom/dateTo');
-    }
-
-    const normalizedIds = Array.from(new Set((dto.appointmentIds || []).map((id) => Number(id))))
-      .filter((id) => Number.isFinite(id))
-      .sort((a, b) => a - b);
-
-    const dateFrom = dto.date ? parseDateOnly(dto.date) : dto.dateFrom ? parseDateOnly(dto.dateFrom) : undefined;
-    const dateTo = dto.date ? parseDateOnly(dto.date) : dto.dateTo ? parseDateOnly(dto.dateTo) : undefined;
-    if (dateFrom && dateTo && dateFrom.getTime() > dateTo.getTime()) {
-      throw new BadRequestException('dateFrom phai nho hon hoac bang dateTo');
-    }
-
-    const where: Prisma.DANG_KYWhereInput = {
-      DK_TRANG_THAI: { in: ['CHO_KHAM', 'DA_CHECKIN'] },
-      ...(normalizedIds.length > 0 ? { DK_MA: { in: normalizedIds } } : {}),
-      ...(dto.doctorId ? { BS_MA: dto.doctorId } : {}),
-      ...(dto.slotId ? { KG_MA: dto.slotId } : {}),
-      ...(dateFrom || dateTo
-        ? {
-            N_NGAY: {
-              ...(dateFrom ? { gte: dateFrom } : {}),
-              ...(dateTo ? { lte: dateTo } : {}),
-            },
-          }
-        : {}),
-      ...(dto.scheduleId
-        ? {
-            LICH_BSK: {
-              is: { LBM_ID: dto.scheduleId },
-            },
-          }
-        : {}),
-      ...(dto.specialtyId
-        ? {
-            LICH_BSK: {
-              is: { BAC_SI: { CK_MA: dto.specialtyId } },
-            },
-          }
-        : {}),
-    };
-
-    const rows = await this.prisma.dANG_KY.findMany({
-      where,
-      include: {
-        BENH_NHAN: true,
-        LICH_BSK: {
-          include: {
-            BAC_SI: true,
-            PHONG: true,
-          },
-        },
-        KHUNG_GIO: true,
-      },
-    });
-
-    const recipients = rows
-      .filter((item) => Boolean(item.BENH_NHAN?.TK_SDT))
-      .map((item) => ({
-        appointmentId: item.DK_MA,
-        phone: item.BENH_NHAN?.TK_SDT as string,
-        patientName: `${item.BENH_NHAN?.BN_HO_CHU_LOT || ''} ${item.BENH_NHAN?.BN_TEN || ''}`.trim(),
-        doctorName: item.LICH_BSK?.BAC_SI?.BS_HO_TEN || null,
-        roomName: item.LICH_BSK?.PHONG?.P_TEN || null,
-        date: item.N_NGAY,
-        shift: item.B_TEN,
-      }));
-
-    return {
-      where,
-      recipients,
-      normalizedIds,
-      dateFrom,
-      dateTo,
-    };
+    return this.notificationRecipientResolver.resolve(dto);
   }
 
   async previewBulkNotificationRecipients(dto: BulkNotificationDto) {
     const resolved = await this.resolveBulkNotificationRecipients(dto);
-    if (resolved.recipients.length === 0) {
-      throw new BadRequestException('Khong tim thay nguoi nhan phu hop voi tieu chi da chon');
-    }
+    const sample = resolved.recipients.slice(0, 20);
 
     return {
+      targetGroup: resolved.targetGroup,
+      recipientScope: resolved.recipientScope,
+      scopeSummary: resolved.scopeSummary,
+      filterSummary: resolved.filterSummary,
       totalRecipients: resolved.recipients.length,
-      sampleRecipients: resolved.recipients.slice(0, 20),
+      previewRecipients: sample,
+      sampleRecipients: sample,
+      warnings: resolved.warnings,
+      emptyReason: resolved.emptyReason,
     };
   }
 
   async createBulkNotificationBatch(user: CurrentUserPayload, dto: BulkNotificationDto) {
     const resolved = await this.resolveBulkNotificationRecipients(dto);
     if (resolved.recipients.length === 0) {
-      throw new BadRequestException('Danh sach nguoi nhan thong bao dang rong');
+      throw new BadRequestException(
+        resolved.emptyReason || 'Danh sách người nhận thông báo đang rỗng.',
+      );
     }
 
     const idempotencyPayload = {
       type: dto.type,
+      targetGroup: resolved.targetGroup,
+      recipientScope: resolved.recipientScope,
       title: dto.title || null,
       message: dto.message.trim(),
       appointmentIds: resolved.normalizedIds,
-      doctorId: dto.doctorId || null,
-      slotId: dto.slotId || null,
-      scheduleId: dto.scheduleId || null,
-      specialtyId: dto.specialtyId || null,
+      doctorIds: resolved.normalizedFilter.doctorIds,
+      slotId: resolved.normalizedFilter.slotId || null,
+      scheduleId: resolved.normalizedFilter.scheduleId || null,
+      specialtyIds: resolved.normalizedFilter.specialtyIds,
       dateFrom: resolved.dateFrom?.toISOString().slice(0, 10) || null,
       dateTo: resolved.dateTo?.toISOString().slice(0, 10) || null,
+      appointmentStatuses: resolved.normalizedFilter.appointmentStatuses,
+      filterSummary: resolved.filterSummary,
     };
     const idempotencyKey = createHash('sha1')
       .update(JSON.stringify(idempotencyPayload))
@@ -2767,7 +2922,7 @@ export class AppointmentsService {
     });
     if (existingBatch) {
       return {
-        message: 'Yeu cau gui thong bao giong nhau da duoc xu ly gan day',
+        message: 'Yêu cầu gửi thông báo tương tự đã được xử lý gần đây.',
         batchId: existingBatch.TBB_MA,
         duplicatedRequest: true,
       };
@@ -2784,6 +2939,12 @@ export class AppointmentsService {
           TBB_TONG_NGUOI_NHAN: resolved.recipients.length,
           TBB_TRANG_THAI: 'QUEUED',
           TBB_NGUOI_TAO: user.TK_SDT,
+          TBB_METADATA: {
+            targetGroup: resolved.targetGroup,
+            recipientScope: resolved.recipientScope,
+            warnings: resolved.warnings,
+            scopeSummary: resolved.scopeSummary,
+          },
         },
       });
 
@@ -2803,8 +2964,10 @@ export class AppointmentsService {
           AL_PK: { TBB_MA: batch.TBB_MA },
           AL_NEW: {
             type: dto.type,
+            targetGroup: resolved.targetGroup,
             recipientCount: resolved.recipients.length,
             criteria: idempotencyPayload,
+            warnings: resolved.warnings,
           },
           AL_CHANGED_BY: user.TK_SDT,
         },
@@ -2814,10 +2977,12 @@ export class AppointmentsService {
     });
 
     return {
-      message: 'Batch thong bao da duoc xep hang cho xu ly',
+      message: 'Batch thông báo đã được xếp hàng để xử lý.',
       batchId: created.TBB_MA,
       totalRecipients: resolved.recipients.length,
       status: 'QUEUED',
+      targetGroup: resolved.targetGroup,
+      warnings: resolved.warnings,
     };
   }
 
@@ -3075,11 +3240,15 @@ export class AppointmentsService {
           },
         });
         if (!alreadySent) {
+          const defaultTitle =
+            latestBatch.TBB_LOAI === 'system_admin' || latestBatch.TBB_LOAI === 'system_auto'
+              ? 'Thong bao he thong'
+              : 'Thong bao lich kham';
           await this.prisma.tHONG_BAO.create({
             data: {
               TK_SDT: recipient.TK_SDT,
               TB_BATCH_MA: latestBatch.TBB_MA,
-              TB_TIEU_DE: latestBatch.TBB_TIEU_DE || 'Thong bao lich kham',
+              TB_TIEU_DE: latestBatch.TBB_TIEU_DE || defaultTitle,
               TB_LOAI: latestBatch.TBB_LOAI,
               TB_NOI_DUNG: `${latestBatch.TBB_NOI_DUNG} ${dedupe}`,
               TB_TRANG_THAI: 'UNREAD',
@@ -3869,6 +4038,123 @@ export class AppointmentsService {
     }
 
     return { expired: expiredRows.length };
+  }
+
+  async processExpiredPendingPayments() {
+    const required = await this.hasOptionalTables([
+      'public."THANH_TOAN"',
+      'public."DANG_KY"',
+      'public."BENH_NHAN"',
+      'public."THONG_BAO"',
+      'public."AUDIT_LOG"',
+    ]);
+    if (!required) return { expired: 0, skippedByMissingTables: true };
+
+    const expiryThreshold = new Date(Date.now() - 15 * 60 * 1000);
+    const candidates = await this.prisma.tHANH_TOAN.findMany({
+      where: {
+        TT_LOAI: 'DAT_LICH',
+        TT_TRANG_THAI: 'CHUA_THANH_TOAN',
+        TT_THOI_GIAN: { lt: expiryThreshold },
+      },
+      orderBy: { TT_THOI_GIAN: 'asc' },
+      take: 100,
+      include: {
+        DANG_KY: {
+          include: {
+            BENH_NHAN: true,
+            KHUNG_GIO: true,
+            LICH_BSK: {
+              include: {
+                BAC_SI: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    if (candidates.length === 0) return { expired: 0 };
+
+    let expired = 0;
+    for (const candidate of candidates) {
+      const locked = await this.withAdvisoryLock(
+        `payment-timeout-${candidate.TT_MA}`,
+        async () =>
+          this.prisma.$transaction(async (tx) => {
+            const latest = await tx.tHANH_TOAN.findUnique({
+              where: { TT_MA: candidate.TT_MA },
+              include: {
+                DANG_KY: {
+                  include: {
+                    BENH_NHAN: true,
+                    KHUNG_GIO: true,
+                    LICH_BSK: {
+                      include: {
+                        BAC_SI: true,
+                      },
+                    },
+                  },
+                },
+              },
+            });
+            if (!latest) return null;
+            if ((latest.TT_TRANG_THAI || '').toUpperCase() !== 'CHUA_THANH_TOAN') return null;
+
+            const createdAt = latest.TT_THOI_GIAN ? new Date(latest.TT_THOI_GIAN).getTime() : 0;
+            if (!createdAt || Date.now() - createdAt <= 15 * 60 * 1000) return null;
+
+            await tx.tHANH_TOAN.update({
+              where: { TT_MA: latest.TT_MA },
+              data: {
+                TT_TRANG_THAI: 'HET_HAN',
+                TT_THOI_GIAN: new Date(),
+              },
+            });
+
+            await tx.aUDIT_LOG.create({
+              data: {
+                AL_TABLE: 'THANH_TOAN',
+                AL_ACTION: 'PAYMENT_EXPIRED_BY_TIMEOUT',
+                AL_PK: { TT_MA: latest.TT_MA, DK_MA: latest.DK_MA || null },
+                AL_OLD: { TT_TRANG_THAI: 'CHUA_THANH_TOAN' },
+                AL_NEW: { TT_TRANG_THAI: 'HET_HAN' },
+                AL_CHANGED_BY: 'SYSTEM',
+              },
+            });
+
+            return {
+              paymentId: latest.TT_MA,
+              appointmentId: latest.DK_MA || latest.DANG_KY?.DK_MA || null,
+              phone: latest.DANG_KY?.BENH_NHAN?.TK_SDT || null,
+              date: latest.DANG_KY?.N_NGAY || null,
+              time: latest.DANG_KY?.KHUNG_GIO?.KG_BAT_DAU || null,
+              doctorName: latest.DANG_KY?.LICH_BSK?.BAC_SI?.BS_HO_TEN || null,
+            };
+          }),
+      );
+      if (!locked) continue;
+
+      const dateLabel = this.formatDateOnly(locked.date);
+      const timeLabel = this.formatTimeOnly(locked.time);
+      const doctorName = String(locked.doctorName || '').trim();
+      await this.createPaymentNotification({
+        phone: locked.phone,
+        type: 'payment_timeout',
+        title: 'Thanh toan het han',
+        content:
+          `Giao dich thanh toan TT_MA=${locked.paymentId}` +
+          (locked.appointmentId ? ` cho lich hen DK_MA=${locked.appointmentId}` : '') +
+          ' da qua thoi gian thanh toan 15 phut.' +
+          (dateLabel !== '-' ? ` Ngay kham: ${dateLabel}.` : '') +
+          (timeLabel !== '-' ? ` Gio kham: ${timeLabel}.` : '') +
+          (doctorName ? ` Bac si: ${doctorName}.` : '') +
+          ' Vui long tao lan thanh toan moi neu ban van muon giu lich.',
+        dedupeKey: `[PAYMENT_TIMEOUT_TT_MA=${locked.paymentId}]`,
+      });
+      expired += 1;
+    }
+
+    return { expired };
   }
 
   async generateReminderNotifications() {

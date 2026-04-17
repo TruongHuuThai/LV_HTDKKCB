@@ -51,6 +51,7 @@ export default function AppSidebar({
 }: AppSidebarProps) {
     const menuGroups = groups ?? (items ? [{ title: 'CHÍNH', items }] : []);
     const isCollapsed = collapsed;
+    const isDoctor = variant === 'doctor';
     const roleTag =
         variant === 'admin' ? 'ADMIN PANEL' : 'BÁC SĨ';
 
@@ -71,7 +72,12 @@ export default function AppSidebar({
                 <div className="flex items-center gap-[var(--sidebar-menu-gap)]">
                     <Link to={brandTo} className="flex items-center gap-[var(--sidebar-menu-gap)]">
                         <div className="h-[var(--sidebar-icon-wrapper)] w-[var(--sidebar-icon-wrapper)] rounded-2xl bg-white/10 flex items-center justify-center">
-                            <Heart className="h-[var(--sidebar-icon-size)] w-[var(--sidebar-icon-size)] text-blue-300" />
+                            <Heart
+                                className={cn(
+                                    'h-[var(--sidebar-icon-size)] w-[var(--sidebar-icon-size)]',
+                                    isDoctor ? 'text-cyan-300' : 'text-blue-300',
+                                )}
+                            />
                         </div>
                         <div
                             className={cn(
@@ -143,7 +149,8 @@ export default function AppSidebar({
                     <div key={`${group.title}-${idx}`}>
                         <p
                             className={cn(
-                                'px-[var(--sidebar-menu-padding-x)] text-[11px] font-semibold text-slate-500 uppercase tracking-[0.2em] mb-2 transition-[opacity,transform] duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)]',
+                                'px-[var(--sidebar-menu-padding-x)] text-[11px] font-semibold uppercase tracking-[0.2em] mb-2 transition-[opacity,transform] duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)]',
+                                isDoctor ? 'text-cyan-300/70' : 'text-slate-500',
                                 isCollapsed
                                     ? 'opacity-0 -translate-x-2 pointer-events-none'
                                     : 'opacity-100 translate-x-0',
@@ -163,9 +170,18 @@ export default function AppSidebar({
                                         onClick={onNavigate}
                                         className={cn(
                                             'group relative flex items-center gap-[var(--sidebar-menu-gap)] rounded-xl h-[var(--sidebar-item-height)] px-[var(--sidebar-menu-padding-x)] text-sm transition-colors duration-150 overflow-hidden',
-                                            active
+                                            active && !isDoctor
                                                 ? 'bg-white/10 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]'
-                                                : 'text-slate-400 hover:bg-white/5 hover:text-slate-100',
+                                                : '',
+                                            !active && !isDoctor
+                                                ? 'text-slate-400 hover:bg-white/5 hover:text-slate-100'
+                                                : '',
+                                            active && isDoctor
+                                                ? 'bg-gradient-to-r from-blue-500/20 to-cyan-400/10 text-white shadow-[inset_0_0_0_1px_rgba(125,211,252,0.35)]'
+                                                : '',
+                                            !active && isDoctor
+                                                ? 'text-slate-300 hover:bg-cyan-400/10 hover:text-cyan-100'
+                                                : '',
                                         )}
                                         title={isCollapsed ? label : undefined}
                                     >
@@ -173,7 +189,9 @@ export default function AppSidebar({
                                             <Icon
                                                 className={cn(
                                                     'h-[var(--sidebar-icon-size)] w-[var(--sidebar-icon-size)] transition-colors duration-300',
-                                                    active ? 'text-blue-300' : 'text-slate-400',
+                                                    active
+                                                        ? (isDoctor ? 'text-cyan-300' : 'text-blue-300')
+                                                        : (isDoctor ? 'text-slate-300 group-hover:text-cyan-200' : 'text-slate-400'),
                                                 )}
                                             />
                                         </span>

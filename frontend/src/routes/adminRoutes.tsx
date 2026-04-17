@@ -22,6 +22,7 @@ import AdminDoctorSchedulePlanningPage from '@/pages/admin/schedules/AdminDoctor
 import AdminScheduleTemplateBuilderPage from '@/pages/admin/schedules/AdminScheduleTemplateBuilderPage';
 import RoomListPage from '@/pages/admin/facilities/RoomListPage';
 import RoomFormPage from '@/pages/admin/facilities/RoomFormPage';
+import AdminNotificationsPage from '@/pages/admin/notifications/AdminNotificationsPage';
 
 export const adminRoutes: RouteObject = {
     element: <AdminLayout />,
@@ -129,6 +130,10 @@ export const adminRoutes: RouteObject = {
         {
             path: '/admin/schedules/templates/new',
             element: <AdminScheduleTemplateBuilderPage />,
+        },
+        {
+            path: '/admin/notifications',
+            element: <AdminNotificationsPage />,
         },
         // Other admin routes to be added here
     ],

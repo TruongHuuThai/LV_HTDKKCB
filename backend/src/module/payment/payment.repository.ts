@@ -5,7 +5,28 @@ import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class PaymentRepository {
+    private thongBaoHasBatchColumn: boolean | null = null;
+
     constructor(private readonly prisma: PrismaService) { }
+
+    private async hasThongBaoBatchColumn() {
+        if (this.thongBaoHasBatchColumn !== null) return this.thongBaoHasBatchColumn;
+        try {
+            const rows = await this.prisma.getClient().$queryRawUnsafe<Array<{ exists: boolean }>>(
+                `SELECT EXISTS (
+                   SELECT 1
+                   FROM information_schema.columns
+                   WHERE table_schema = 'public'
+                     AND table_name = 'THONG_BAO'
+                     AND column_name = 'TB_BATCH_MA'
+                 ) AS "exists"`,
+            );
+            this.thongBaoHasBatchColumn = Boolean(rows?.[0]?.exists);
+        } catch {
+            this.thongBaoHasBatchColumn = false;
+        }
+        return this.thongBaoHasBatchColumn;
+    }
 
     createPayment(data: {
         DK_MA: number;
@@ -29,6 +50,25 @@ export class PaymentRepository {
 
     findPaymentByTtMa(TT_MA: number) {
         return this.prisma.tHANH_TOAN.findUnique({ where: { TT_MA } });
+    }
+
+    getPaymentNotificationContext(TT_MA: number) {
+        return this.prisma.tHANH_TOAN.findUnique({
+            where: { TT_MA },
+            include: {
+                DANG_KY: {
+                    include: {
+                        BENH_NHAN: true,
+                        LICH_BSK: {
+                            include: {
+                                BAC_SI: true,
+                            },
+                        },
+                        KHUNG_GIO: true,
+                    },
+                },
+            },
+        });
     }
 
     updatePaymentStatus(
@@ -117,5 +157,88 @@ export class PaymentRepository {
                 PWE_PROCESSED_AT: new Date(),
             },
         });
+    }
+
+    async createNotificationIfAbsent(input: {
+        phone?: string | null;
+        type: string;
+        title: string;
+        content: string;
+        dedupeKey: string;
+        at?: Date;
+        batchId?: number | null;
+    }) {
+        const phone = String(input.phone || '').trim();
+        if (!phone) return null;
+        const hasBatchColumn = await this.hasThongBaoBatchColumn();
+        if (hasBatchColumn) {
+            const exists = await this.prisma.tHONG_BAO.findFirst({
+                where: {
+                    TK_SDT: phone,
+                    TB_LOAI: input.type,
+                    TB_NOI_DUNG: { contains: input.dedupeKey },
+                },
+            });
+            if (exists) return exists;
+
+            return this.prisma.tHONG_BAO.create({
+                data: {
+                    TK_SDT: phone,
+                    TB_BATCH_MA: input.batchId || null,
+                    TB_TIEU_DE: input.title,
+                    TB_LOAI: input.type,
+                    TB_NOI_DUNG: `${input.content} ${input.dedupeKey}`.trim(),
+                    TB_TRANG_THAI: 'UNREAD',
+                    TB_THOI_GIAN: input.at || new Date(),
+                },
+            });
+        }
+
+        const legacyExists = await this.prisma
+            .getClient()
+            .$queryRawUnsafe<Array<{ TB_MA: number }>>(
+                `SELECT "TB_MA"
+                 FROM "THONG_BAO"
+                 WHERE "TK_SDT" = $1
+                   AND "TB_LOAI" = $2
+                   AND "TB_NOI_DUNG" ILIKE '%' || $3 || '%'
+                 ORDER BY "TB_MA" DESC
+                 LIMIT 1`,
+                phone,
+                input.type,
+                input.dedupeKey,
+            );
+        if (legacyExists.length > 0) {
+            return {
+                TB_MA: legacyExists[0].TB_MA,
+                TK_SDT: phone,
+                TB_TIEU_DE: input.title,
+                TB_LOAI: input.type,
+                TB_NOI_DUNG: `${input.content} ${input.dedupeKey}`.trim(),
+                TB_TRANG_THAI: 'UNREAD',
+                TB_THOI_GIAN: input.at || new Date(),
+            } as any;
+        }
+
+        const inserted = await this.prisma
+            .getClient()
+            .$queryRawUnsafe<Array<any>>(
+                `INSERT INTO "THONG_BAO" (
+                   "TK_SDT",
+                   "TB_TIEU_DE",
+                   "TB_LOAI",
+                   "TB_NOI_DUNG",
+                   "TB_TRANG_THAI",
+                   "TB_THOI_GIAN"
+                 ) VALUES ($1, $2, $3, $4, $5, $6)
+                 RETURNING "TB_MA", "TK_SDT", "TB_TIEU_DE", "TB_LOAI", "TB_NOI_DUNG", "TB_TRANG_THAI", "TB_THOI_GIAN"`,
+                phone,
+                input.title,
+                input.type,
+                `${input.content} ${input.dedupeKey}`.trim(),
+                'UNREAD',
+                input.at || new Date(),
+            );
+        return inserted[0] || null;
     }
 }

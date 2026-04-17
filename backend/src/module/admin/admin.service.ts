@@ -264,7 +264,7 @@ export class AdminService {
         });
 
         chartData.push({
-          name: `ThĂ¡ng ${month + 1}`,
+          name: `Th\u00e1ng ${month + 1}`,
           total: visits,
         });
       }
@@ -322,7 +322,7 @@ export class AdminService {
         }
 
         chartData.push({
-          date: `ThĂ¡ng ${month + 1}`,
+          date: `Th\u00e1ng ${month + 1}`,
           totalVisits,
           specialtyVisits,
         });
@@ -435,7 +435,7 @@ export class AdminService {
         const revenue = payments.reduce((sum, p) => sum + Number(p.TT_TONG_TIEN || 0), 0);
 
         chartData.push({
-          date: `ThĂ¡ng ${month + 1}`,
+          date: `Th\u00e1ng ${month + 1}`,
           revenue,
         });
       }

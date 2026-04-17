@@ -153,7 +153,7 @@ export default function DoctorListPage() {
                 <Link to="/admin/doctors/create">
                     <Button className="bg-blue-600 hover:bg-blue-700">
                         <Plus className="w-4 h-4 mr-2" />
-                        Thêm bác s?
+                        Thêm bác sĩ
                     </Button>
                 </Link>
                 <Button

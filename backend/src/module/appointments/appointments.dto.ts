@@ -13,6 +13,10 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { APPOINTMENT_STATUS } from './appointments.status';
+import {
+  BULK_NOTIFICATION_RECIPIENT_SCOPE_VALUES,
+  BULK_NOTIFICATION_TARGET_GROUP_VALUES,
+} from './notification-targeting.constants';
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -297,8 +301,31 @@ export class PatientAppointmentListQueryDto {
 
 export class NotificationListQueryDto {
   @IsOptional()
-  @IsIn(['reminder', 'reschedule', 'doctor_unavailable', 'cancellation', 'waitlist'])
-  type?: 'reminder' | 'reschedule' | 'doctor_unavailable' | 'cancellation' | 'waitlist';
+  @IsIn([
+    'reminder',
+    'reschedule',
+    'doctor_unavailable',
+    'cancellation',
+    'waitlist',
+    'payment_success',
+    'payment_failed',
+    'payment_timeout',
+    'payment_pending',
+    'system_admin',
+    'system_auto',
+  ])
+  type?:
+    | 'reminder'
+    | 'reschedule'
+    | 'doctor_unavailable'
+    | 'cancellation'
+    | 'waitlist'
+    | 'payment_success'
+    | 'payment_failed'
+    | 'payment_timeout'
+    | 'payment_pending'
+    | 'system_admin'
+    | 'system_auto';
 
   @IsOptional()
   @IsIn(['true', 'false'])
@@ -456,13 +483,84 @@ export class DoctorStatsQueryDto {
   groupBy?: 'day' | 'week' | 'month';
 }
 
+export class BulkNotificationFilterDto {
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(200)
+  @Type(() => Number)
+  @IsInt({ each: true })
+  specialtyIds?: number[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(500)
+  @Type(() => Number)
+  @IsInt({ each: true })
+  doctorIds?: number[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(1000)
+  @Type(() => Number)
+  @IsInt({ each: true })
+  appointmentIds?: number[];
+
+  @IsOptional()
+  @Matches(datePattern)
+  specificDate?: string;
+
+  @IsOptional()
+  @Matches(datePattern)
+  fromDate?: string;
+
+  @IsOptional()
+  @Matches(datePattern)
+  toDate?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  scheduleId?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  slotId?: number;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  appointmentStatuses?: string[];
+
+  @IsOptional()
+  @IsIn(BULK_NOTIFICATION_RECIPIENT_SCOPE_VALUES)
+  recipientScope?: string;
+}
+
 export class BulkNotificationDto {
+  @IsOptional()
+  @IsIn(BULK_NOTIFICATION_TARGET_GROUP_VALUES)
+  targetGroup?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => BulkNotificationFilterDto)
+  filters?: BulkNotificationFilterDto;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  quickPreset?: string;
+
   @IsIn([
     'rescheduled',
     'canceled_session',
     'doctor_changed',
     'room_changed',
     'doctor_unavailable',
+    'system_admin',
+    'system_auto',
     'custom',
   ])
   type!: string;
@@ -524,6 +622,8 @@ export class BulkNotificationListQueryDto {
     'doctor_changed',
     'room_changed',
     'doctor_unavailable',
+    'system_admin',
+    'system_auto',
     'custom',
   ])
   type?: string;

@@ -40,9 +40,9 @@ export class AppointmentsBackgroundWorkerService implements OnModuleInit, OnModu
     try {
       await this.appointments.processQueuedBulkNotificationBatches();
       await this.appointments.processExpiredWaitlistHolds();
+      await this.appointments.processExpiredPendingPayments();
     } catch (e) {
       this.logger.error(`Background worker tick failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 }
-

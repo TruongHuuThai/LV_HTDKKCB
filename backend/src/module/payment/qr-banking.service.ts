@@ -50,6 +50,47 @@ export class QrBankingService {
     this.cassoRecentLimit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 10;
   }
 
+  private formatDate(value?: Date | string | null) {
+    if (!value) return '';
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toISOString().slice(0, 10);
+  }
+
+  private formatTime(value?: Date | string | null) {
+    if (!value) return '';
+    if (value instanceof Date) return value.toISOString().slice(11, 16);
+    const normalized = String(value);
+    if (normalized.includes('T')) return normalized.slice(11, 16);
+    return normalized.slice(0, 5);
+  }
+
+  private async createPaymentSuccessNotification(TT_MA: number) {
+    const context = await this.paymentRepo.getPaymentNotificationContext(TT_MA);
+    const appointment = context?.DANG_KY;
+    const phone = appointment?.BENH_NHAN?.TK_SDT || null;
+    if (!phone) return;
+
+    const appointmentId = Number(context?.DK_MA || appointment?.DK_MA || 0) || null;
+    const doctorName = String(appointment?.LICH_BSK?.BAC_SI?.BS_HO_TEN || '').trim();
+    const dateLabel = this.formatDate(appointment?.N_NGAY);
+    const timeLabel = this.formatTime(appointment?.KHUNG_GIO?.KG_BAT_DAU);
+    const dedupeKey = `[PAYMENT_SUCCESS_TT_MA=${TT_MA}]`;
+
+    await this.paymentRepo.createNotificationIfAbsent({
+      phone,
+      type: 'payment_success',
+      title: 'Thanh toan thanh cong',
+      content:
+        `He thong da xac nhan thanh toan thanh cong cho giao dich TT_MA=${TT_MA}` +
+        (appointmentId ? ` (DK_MA=${appointmentId})` : '') +
+        (dateLabel ? `, ngay kham ${dateLabel}` : '') +
+        (timeLabel ? ` luc ${timeLabel}` : '') +
+        (doctorName ? ` voi bac si ${doctorName}.` : '.'),
+      dedupeKey,
+    });
+  }
+
   isQrBankingMethod(method?: string | null) {
     return String(method || '')
       .trim()
@@ -177,6 +218,7 @@ export class QrBankingService {
       if (updated?.DK_MA) {
         await this.paymentRepo.confirmAppointmentAfterPayment(updated.DK_MA);
       }
+      await this.createPaymentSuccessNotification(targetPaymentId);
       return updated;
     } catch (error) {
       this.logger.warn(

@@ -17,6 +17,7 @@ import {
     PackageSearch,
     CalendarClock,
     Pill,
+    BellRing,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { authService } from '@/services/authService';
@@ -52,6 +53,7 @@ const sidebarGroups = [
     {
         title: 'HỆ THỐNG',
         items: [
+            { label: 'thông báo hệ thống', to: '/admin/notifications', icon: BellRing },
             { label: 'Tài khoản & Phân quyền', to: '/admin/accounts', icon: UserCircle },
             { label: 'Cài đặt web', to: '/admin/settings', icon: Settings },
         ],

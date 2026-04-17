@@ -373,14 +373,42 @@ export class AiAssistantService {
             extracted.date,
             extracted.searchKeyword,
           );
+          const slotSummary = slots as {
+            totalAvailableSlots?: number;
+          };
+          const slotSearch = (slots as {
+            searchResolution?:
+              | { type: 'doctor'; doctorName: string; keyword: string }
+              | { type: 'specialty'; specialtyName: string; keyword: string }
+              | { type: 'keyword'; keyword: string }
+              | null;
+          }).searchResolution;
+          const slotSummaryNote =
+            Number(slotSummary.totalAvailableSlots || 0) > 0
+              ? `Found ${slotSummary.totalAvailableSlots} available time slot(s) in total for ${extracted.date}.`
+              : `No bookable time slots found for ${extracted.date}.`;
+          const slotSearchContext = (() => {
+            if (!extracted.searchKeyword) {
+              return `Searching all available slots on ${extracted.date}.`;
+            }
+            if (slotSearch?.type === 'doctor') {
+              return `Searching slots on ${extracted.date} for doctor keyword "${slotSearch.keyword}". Matched doctor "${slotSearch.doctorName}".`;
+            }
+            if (slotSearch?.type === 'specialty') {
+              return `Searching slots on ${extracted.date} for specialty keyword "${slotSearch.keyword}". Matched specialty "${slotSearch.specialtyName}".`;
+            }
+            if (slotSearch?.type === 'keyword') {
+              return `Searching slots on ${extracted.date} with doctor keyword "${slotSearch.keyword}".`;
+            }
+            return `Searching slots for specialty/doctor: "${extracted.searchKeyword}" on ${extracted.date}.`;
+          })();
           return {
             realtimeData: {
               doctorSlots: {
                 ...slots,
                 _isPastDate: false,
-                _searchContext: extracted.searchKeyword
-                  ? `Searching slots for specialty/doctor: "${extracted.searchKeyword}" on ${extracted.date}.`
-                  : `Searching all available slots on ${extracted.date}.`,
+                _searchContext: slotSearchContext,
+                _note: slotSummaryNote,
               },
             },
             clarificationNeeded: null,
@@ -486,6 +514,8 @@ export class AiAssistantService {
       'DATA RULES: If _searchContext says "fallback", it means the exact search failed; explain this clearly and list the fallback data.',
       'DATA RULES: When realtimeData.paymentStatus is null but appointmentDetail exists, use appointmentDetail.statusLabel to answer the payment question.',
       'DATA RULES: If doctorSlots._isPastDate is true, tell the user that date has already passed and no schedule exists for it.',
+      'DATA RULES: If doctorSlots.doctors[].availableSlots is present, list those concrete time ranges (slotStart-slotEnd) and do not claim missing slot-detail data.',
+      'DATA RULES: For slot questions, prioritize doctorSlots.totalAvailableSlots and doctorSlots.doctors[].availableSlots over generic clinic working hours.',
       'Keep responses friendly, concise (under 200 words), and practical.',
       localeInstruction,
     ].join('\n');

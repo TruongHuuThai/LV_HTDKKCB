@@ -12,6 +12,62 @@ export class PaymentReliabilityService {
     private readonly vnpay: VnpayService,
   ) {}
 
+  private formatDate(value?: Date | string | null) {
+    if (!value) return '';
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toISOString().slice(0, 10);
+  }
+
+  private formatTime(value?: Date | string | null) {
+    if (!value) return '';
+    if (value instanceof Date) return value.toISOString().slice(11, 16);
+    const normalized = String(value);
+    if (normalized.includes('T')) return normalized.slice(11, 16);
+    return normalized.slice(0, 5);
+  }
+
+  private async notifyPaymentStatusChanged(TT_MA: number, status: 'success' | 'failed') {
+    const context = await this.paymentRepo.getPaymentNotificationContext(TT_MA);
+    const appointment = context?.DANG_KY;
+    const phone = appointment?.BENH_NHAN?.TK_SDT || null;
+    if (!phone) return;
+
+    const appointmentId = Number(context?.DK_MA || appointment?.DK_MA || 0) || null;
+    const doctorName = String(appointment?.LICH_BSK?.BAC_SI?.BS_HO_TEN || '').trim();
+    const dateLabel = this.formatDate(appointment?.N_NGAY);
+    const timeLabel = this.formatTime(appointment?.KHUNG_GIO?.KG_BAT_DAU);
+
+    if (status === 'success') {
+      const dedupeKey = `[PAYMENT_SUCCESS_TT_MA=${TT_MA}]`;
+      await this.paymentRepo.createNotificationIfAbsent({
+        phone,
+        type: 'payment_success',
+        title: 'Thanh toan thanh cong',
+        content:
+          `He thong da xac nhan thanh toan thanh cong cho giao dich TT_MA=${TT_MA}` +
+          (appointmentId ? ` (DK_MA=${appointmentId})` : '') +
+          (dateLabel ? `, ngay kham ${dateLabel}` : '') +
+          (timeLabel ? ` luc ${timeLabel}` : '') +
+          (doctorName ? ` voi bac si ${doctorName}.` : '.'),
+        dedupeKey,
+      });
+      return;
+    }
+
+    const dedupeKey = `[PAYMENT_FAILED_TT_MA=${TT_MA}]`;
+    await this.paymentRepo.createNotificationIfAbsent({
+      phone,
+      type: 'payment_failed',
+      title: 'Thanh toan khong thanh cong',
+      content:
+        `Giao dich thanh toan TT_MA=${TT_MA}` +
+        (appointmentId ? ` (DK_MA=${appointmentId})` : '') +
+        ' khong thanh cong. Vui long thu lai thanh toan hoac tao giao dich moi.',
+      dedupeKey,
+    });
+  }
+
   async handleVnpayWebhook(query: Record<string, string>) {
     const verify = this.vnpay.verifyIpn(query);
     const payloadForHash = JSON.stringify(
@@ -74,8 +130,10 @@ export class PaymentReliabilityService {
         if (updatedPayment?.DK_MA) {
           await this.paymentRepo.confirmAppointmentAfterPayment(updatedPayment.DK_MA);
         }
+        await this.notifyPaymentStatusChanged(TT_MA, 'success');
       } else {
         await this.paymentRepo.updatePaymentStatus(TT_MA, 'THAT_BAI');
+        await this.notifyPaymentStatusChanged(TT_MA, 'failed');
       }
       await this.paymentRepo.updateWebhookEventResult(event.PWE_MA, 'PROCESSED');
       return { RspCode: '00', Message: 'Confirm Success' };

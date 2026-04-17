@@ -331,6 +331,20 @@ export class BookingService {
             clientIp,
           );
 
+    const patientProfile = await this.repo.findPatientProfileById(BN_MA);
+    const patientPhone = String(patientProfile?.TK_SDT || '').trim();
+    if (patientPhone) {
+      await this.paymentRepo.createNotificationIfAbsent({
+        phone: patientPhone,
+        type: 'payment_pending',
+        title: 'Yeu cau thanh toan da duoc tao',
+        content:
+          `Lich hen DK_MA=${booking.DK_MA} da duoc tao. ` +
+          `Vui long hoan tat thanh toan giao dich TT_MA=${payment.TT_MA} trong 15 phut de xac nhan lich kham.`,
+        dedupeKey: `[PAYMENT_PENDING_TT_MA=${payment.TT_MA}]`,
+      });
+    }
+
     const hasPreVisit =
       Boolean(dto.symptoms?.trim()) ||
       Boolean(dto.preVisitNote?.trim()) ||

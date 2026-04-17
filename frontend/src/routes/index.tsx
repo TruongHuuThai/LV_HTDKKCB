@@ -19,6 +19,7 @@ import PatientProfileDetailPage from '@/pages/patient/PatientProfileDetailPage';
 import PaymentResultPage from '@/pages/patient/PaymentResultPage';
 import MyAppointmentsPage from '@/pages/patient/MyAppointmentsPage';
 import AppointmentDetailPage from '@/pages/patient/AppointmentDetailPage';
+import PatientNotificationsPage from '@/pages/patient/PatientNotificationsPage';
 
 // Pages – Specialty
 import SpecialtyListPage from '@/pages/specialty/SpecialtyListPage';
@@ -97,6 +98,7 @@ const router = createBrowserRouter([
                     { path: '/payment-result', element: <PaymentResultPage /> },
                     { path: '/appointments/my', element: <MyAppointmentsPage /> },
                     { path: '/appointments/:id', element: <AppointmentDetailPage /> },
+                    { path: '/notifications', element: <PatientNotificationsPage /> },
                     { path: '/profile', element: <ProfilePage /> },
                     { path: '/patient-profiles', element: <ProfilePage /> },
                     { path: '/patient-profiles/create', element: <PatientProfileFormPage /> },

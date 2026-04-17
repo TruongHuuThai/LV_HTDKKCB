@@ -22,6 +22,7 @@ import { AppointmentNotificationAutomationService } from './appointments.notific
 import { AttachmentStorageService } from './attachment-storage.service';
 import { AttachmentScanService } from './attachment-scan.service';
 import { AppointmentsBackgroundWorkerService } from './appointments.background-worker.service';
+import { NotificationRecipientResolverService } from './notification-recipient-resolver.service';
 
 @Module({
   imports: [PrismaModule, BookingModule, PaymentModule, PdfModule],
@@ -45,6 +46,7 @@ import { AppointmentsBackgroundWorkerService } from './appointments.background-w
     AttachmentStorageService,
     AttachmentScanService,
     AppointmentsBackgroundWorkerService,
+    NotificationRecipientResolverService,
   ],
 })
 export class AppointmentsModule {}

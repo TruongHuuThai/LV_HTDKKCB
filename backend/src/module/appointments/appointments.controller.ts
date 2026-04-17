@@ -334,9 +334,22 @@ export class PatientNotificationsController {
   @Get()
   async list(
     @CurrentUser() user: CurrentUserPayload,
-    @Query() query: NotificationListQueryDto,
+    @Query() rawQuery: Record<string, string | undefined>,
   ) {
-    return this.appointments.listNotifications(user, query);
+    const pageParsed = Number.parseInt(String(rawQuery?.page || '1'), 10);
+    const limitParsed = Number.parseInt(String(rawQuery?.limit || '20'), 10);
+    const normalizedQuery: NotificationListQueryDto = {
+      page: Number.isFinite(pageParsed) && pageParsed > 0 ? pageParsed : 1,
+      limit:
+        Number.isFinite(limitParsed) && limitParsed > 0
+          ? Math.min(limitParsed, 100)
+          : 20,
+      ...(rawQuery?.type ? { type: rawQuery.type as NotificationListQueryDto['type'] } : {}),
+      ...(rawQuery?.isRead === 'true' || rawQuery?.isRead === 'false'
+        ? { isRead: rawQuery.isRead }
+        : {}),
+    };
+    return this.appointments.listNotifications(user, normalizedQuery);
   }
 
   @Patch(':notificationId/read')
