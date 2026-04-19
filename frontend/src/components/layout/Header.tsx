@@ -427,7 +427,7 @@ export default function Header() {
                                     className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-gray-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
                                 >
                                     <Bell className="w-4 h-4" />
-                                    Thong bao
+                                    Thông báo
                                 </Link>
                                 <Button variant="ghost" size="sm" onClick={handleLogout} className="text-gray-400 hover:text-red-500 px-2">
                                     <LogOut className="w-4 h-4" />
@@ -513,7 +513,7 @@ export default function Header() {
                                                     className="mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700"
                                                 >
                                                     <Bell className="w-4 h-4" />
-                                                    Thong bao
+                                                    Thông báo
                                                 </Link>
                                                 <button
                                                     onClick={() => { setMobileOpen(false); handleLogout(); }}

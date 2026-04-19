@@ -17,8 +17,10 @@ import {
 
 function createResolvedRecipients() {
   return {
+    quickPreset: null,
     targetGroup: BULK_NOTIFICATION_TARGET_GROUP.PATIENTS,
     recipientScope: BULK_NOTIFICATION_RECIPIENT_SCOPE.PATIENTS,
+    summaryText: 'Gửi cho toàn bộ bệnh nhân (1 người).',
     scopeSummary: 'Gửi cho toàn bộ bệnh nhân.',
     filterSummary: ['Nhóm đối tượng: Bệnh nhân'],
     warnings: [],
@@ -119,6 +121,8 @@ describe('AppointmentsService bulk notification flow', () => {
 
     expect(preview.totalRecipients).toBe(created.totalRecipients);
     expect(preview.targetGroup).toBe(created.targetGroup);
+    expect(preview.summaryText).toBeTruthy();
+    expect(created.summaryText).toBeTruthy();
     expect(resolver.resolve).toHaveBeenCalledTimes(2);
   });
 

@@ -13,6 +13,10 @@ export class SchedulesService {
     return this.adminService.getDoctorWeeklySchedules(bsMa, weekStart);
   }
 
+  async exportMyWeeklySchedulesPdf(bsMa: number, weekStart?: string, exportedBy?: string) {
+    return this.adminService.exportDoctorWeeklySchedulePdf(bsMa, weekStart, exportedBy);
+  }
+
   async getMyExceptionRequests(bsMa: number, weekStart?: string) {
     return this.adminService.getDoctorScheduleExceptionRequests(bsMa, weekStart);
   }

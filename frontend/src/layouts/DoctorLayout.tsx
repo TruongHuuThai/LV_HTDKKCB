@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { CalendarDays, ChevronRight, LayoutDashboard, Menu } from 'lucide-react';
+import { CalendarDays, ChevronRight, LayoutDashboard, Menu, Stethoscope } from 'lucide-react';
 
 import AppSidebar from '@/components/layout/AppSidebar';
 import { cn } from '@/lib/utils';
@@ -10,11 +10,13 @@ import { useAuthStore } from '@/store/useAuthStore';
 const sidebarItems = [
   { label: 'Thống kê phục vụ bác sĩ', to: '/doctor/dashboard', icon: LayoutDashboard, exact: true },
   { label: 'Lịch làm việc của tôi', to: '/doctor/schedules', icon: CalendarDays, exact: true },
+  { label: 'Khám bệnh', to: '/doctor/appointments', icon: Stethoscope, exact: true },
 ];
 
 const pathTitleMap: Record<string, string> = {
   '/doctor/dashboard': 'Thống kê phục vụ bác sĩ',
   '/doctor/schedules': 'Lịch làm việc của tôi',
+  '/doctor/appointments': 'Khám bệnh',
 };
 
 export default function DoctorLayout() {

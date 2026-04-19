@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from 'react';
+﻿import { useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -32,6 +32,7 @@ import {
 } from '@/components/admin/AdminSelect';
 import { cn } from '@/lib/utils';
 import { logFrontendError } from '@/lib/frontendLogger';
+import { formatDateDdMmYyyySlash } from '@/lib/scheduleDisplay';
 
 type GroupBy = 'day' | 'week' | 'month';
 type QuickRangeKey = 'today' | 'last7' | 'last30' | 'thisMonth';
@@ -86,6 +87,12 @@ function getRangeByQuickKey(key: QuickRangeKey) {
 
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
   return { fromDate: toDateOnlyIso(monthStart), toDate: toDateOnlyIso(to) };
+}
+
+function normalizeDateRange(fromDate: string, toDate: string) {
+  if (!fromDate || !toDate) return { fromDate, toDate };
+  if (fromDate <= toDate) return { fromDate, toDate };
+  return { fromDate: toDate, toDate: fromDate };
 }
 
 function formatPercent(value?: number | null) {
@@ -228,15 +235,28 @@ export default function DoctorDashboardPage() {
   const [toDate, setToDate] = useState(defaultRange.toDate);
   const [groupBy, setGroupBy] = useState<GroupBy>('day');
   const [exporting, setExporting] = useState(false);
+  const fromDatePickerRef = useRef<HTMLInputElement>(null);
+  const toDatePickerRef = useRef<HTMLInputElement>(null);
 
-  const params = useMemo(
-    () => ({
-      fromDate,
-      toDate,
+  const openDatePicker = (ref: React.RefObject<HTMLInputElement | null>) => {
+    const input = ref.current;
+    if (!input) return;
+    if (typeof input.showPicker === 'function') {
+      input.showPicker();
+      return;
+    }
+    input.focus();
+    input.click();
+  };
+
+  const params = useMemo(() => {
+    const normalized = normalizeDateRange(fromDate, toDate);
+    return {
+      fromDate: normalized.fromDate,
+      toDate: normalized.toDate,
       groupBy,
-    }),
-    [fromDate, toDate, groupBy],
-  );
+    };
+  }, [fromDate, toDate, groupBy]);
 
   const summaryQuery = useQuery({
     queryKey: ['doctor-stats-summary', params],
@@ -463,11 +483,47 @@ export default function DoctorDashboardPage() {
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
             <div>
               <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Từ ngày</label>
-              <Input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
+              <div className="relative">
+                <Input
+                  type="text"
+                  readOnly
+                  value={fromDate ? formatDateDdMmYyyySlash(fromDate) : ''}
+                  onClick={() => openDatePicker(fromDatePickerRef)}
+                  className="cursor-pointer"
+                  placeholder="dd/MM/yyyy"
+                />
+                <input
+                  ref={fromDatePickerRef}
+                  type="date"
+                  value={fromDate}
+                  onChange={(event) => setFromDate(event.target.value)}
+                  tabIndex={-1}
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 opacity-0"
+                />
+              </div>
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Đến ngày</label>
-              <Input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
+              <div className="relative">
+                <Input
+                  type="text"
+                  readOnly
+                  value={toDate ? formatDateDdMmYyyySlash(toDate) : ''}
+                  onClick={() => openDatePicker(toDatePickerRef)}
+                  className="cursor-pointer"
+                  placeholder="dd/MM/yyyy"
+                />
+                <input
+                  ref={toDatePickerRef}
+                  type="date"
+                  value={toDate}
+                  onChange={(event) => setToDate(event.target.value)}
+                  tabIndex={-1}
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 opacity-0"
+                />
+              </div>
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Nhóm dữ liệu</label>
@@ -611,3 +667,5 @@ export default function DoctorDashboardPage() {
     </div>
   );
 }
+
+

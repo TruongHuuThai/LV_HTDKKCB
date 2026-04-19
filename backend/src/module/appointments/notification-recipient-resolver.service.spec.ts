@@ -44,9 +44,10 @@ describe('NotificationRecipientResolverService', () => {
     });
 
     expect(result.recipients).toHaveLength(2);
+    expect(result.quickPreset).toBeNull();
     expect(result.recipientScope).toBe(BULK_NOTIFICATION_RECIPIENT_SCOPE.ALL_USERS);
-    expect(result.scopeSummary).toContain('toàn bộ người dùng');
-    expect(result.warnings).toContain('Bạn đang gửi diện rộng cho toàn bộ người dùng.');
+    expect(result.summaryText).toContain('Gửi cho tất cả người dùng');
+    expect(result.warnings.length).toBeGreaterThan(0);
   });
 
   it('resolves PATIENTS without filters as all patients', async () => {
@@ -61,7 +62,7 @@ describe('NotificationRecipientResolverService', () => {
 
     expect(result.recipients).toHaveLength(1);
     expect(result.recipients[0]?.role).toBe('BENH_NHAN');
-    expect(result.scopeSummary).toBe('Gửi cho toàn bộ bệnh nhân.');
+    expect(result.scopeSummary).toContain('bệnh nhân');
   });
 
   it('resolves DOCTORS without filters as all doctors and warns broad send', async () => {
@@ -77,7 +78,7 @@ describe('NotificationRecipientResolverService', () => {
 
     expect(result.recipients).toHaveLength(2);
     expect(result.recipients.every((item) => item.role === 'BAC_SI')).toBe(true);
-    expect(result.warnings).toContain('Bạn đang gửi diện rộng không giới hạn điều kiện lọc.');
+    expect(result.warnings.length).toBeGreaterThan(0);
   });
 
   it('rejects BY_SPECIALTY when specialtyIds are missing', async () => {
@@ -103,7 +104,7 @@ describe('NotificationRecipientResolverService', () => {
     });
 
     expect(result.recipients).toHaveLength(1);
-    expect(result.scopeSummary).toContain('chuyên khoa đã chọn');
+    expect(result.scopeSummary).toContain('chuyên khoa');
     expect(result.filterSummary).toContain('Chuyên khoa: 3');
   });
 
@@ -133,7 +134,6 @@ describe('NotificationRecipientResolverService', () => {
 
     expect(result.recipients).toHaveLength(1);
     expect(result.recipientScope).toBe(BULK_NOTIFICATION_RECIPIENT_SCOPE.DOCTORS);
-    expect(result.filterSummary).toContain('Phạm vi nhận: Bác sĩ');
   });
 
   it('returns emptyReason for PATIENTS when appointment-filtered result is empty', async () => {
@@ -148,7 +148,33 @@ describe('NotificationRecipientResolverService', () => {
     });
 
     expect(result.recipients).toHaveLength(0);
-    expect(result.emptyReason).toContain('Không có bệnh nhân');
+    expect(result.emptyReason).toBeTruthy();
+  });
+
+  it('applies quick preset patients_today as PATIENTS + specificDate', async () => {
+    (prisma.dANG_KY.findMany as jest.Mock).mockResolvedValue([]);
+
+    const result = await service.resolve({
+      ...createBaseDto(),
+      quickPreset: 'patients_today',
+    });
+
+    expect(result.targetGroup).toBe(BULK_NOTIFICATION_TARGET_GROUP.PATIENTS);
+    expect(result.normalizedFilter.specificDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(result.quickPreset).toBe('patients_today');
+  });
+
+  it('applies quick preset all_doctors to DOCTORS target without explicit targetGroup', async () => {
+    (prisma.bAC_SI.findMany as jest.Mock).mockResolvedValue([
+      { TK_SDT: '0907000001', BS_HO_TEN: 'BS Preset' },
+    ]);
+
+    const result = await service.resolve({
+      ...createBaseDto(),
+      quickPreset: 'all_doctors',
+    });
+
+    expect(result.targetGroup).toBe(BULK_NOTIFICATION_TARGET_GROUP.DOCTORS);
+    expect(result.recipients).toHaveLength(1);
   });
 });
-

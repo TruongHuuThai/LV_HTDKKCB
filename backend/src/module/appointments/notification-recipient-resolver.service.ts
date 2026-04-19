@@ -7,8 +7,10 @@ import {
   BulkNotificationFilterDto,
 } from './appointments.dto';
 import {
+  BULK_NOTIFICATION_QUICK_PRESET,
   BULK_NOTIFICATION_RECIPIENT_SCOPE,
   BULK_NOTIFICATION_TARGET_GROUP,
+  type BulkNotificationQuickPreset,
   type BulkNotificationRecipientScope,
   type BulkNotificationTargetGroup,
 } from './notification-targeting.constants';
@@ -26,7 +28,7 @@ export interface BulkResolvedRecipient {
   role: RecipientRole;
 }
 
-interface NormalizedBulkFilter {
+export interface NormalizedBulkFilter {
   specialtyIds: number[];
   doctorIds: number[];
   appointmentIds: number[];
@@ -40,8 +42,10 @@ interface NormalizedBulkFilter {
 }
 
 export interface BulkNotificationResolvedResult {
+  quickPreset: BulkNotificationQuickPreset | null;
   targetGroup: BulkNotificationTargetGroup;
   recipientScope: BulkNotificationRecipientScope;
+  summaryText: string;
   scopeSummary: string;
   filterSummary: string[];
   warnings: string[];
@@ -58,8 +62,9 @@ export class NotificationRecipientResolverService {
   constructor(private readonly prisma: PrismaService) {}
 
   async resolve(dto: BulkNotificationDto): Promise<BulkNotificationResolvedResult> {
-    const targetGroup = this.resolveTargetGroup(dto);
-    const normalizedFilter = this.normalizeFilter(dto, targetGroup);
+    const quickPreset = this.resolveQuickPreset(dto);
+    const targetGroup = this.resolveTargetGroup(dto, quickPreset);
+    const normalizedFilter = this.normalizeFilter(dto, targetGroup, quickPreset);
     this.validateFilter(targetGroup, normalizedFilter);
 
     const dateFrom = normalizedFilter.specificDate
@@ -99,10 +104,13 @@ export class NotificationRecipientResolverService {
     const filterSummary = this.buildFilterSummary(targetGroup, normalizedFilter);
     const warnings = this.buildWarnings(targetGroup, normalizedFilter, deduped.length);
     const emptyReason = deduped.length > 0 ? null : this.buildEmptyReason(targetGroup, normalizedFilter);
+    const summaryText = this.buildSummaryText(targetGroup, normalizedFilter, deduped.length);
 
     return {
+      quickPreset,
       targetGroup,
       recipientScope: normalizedFilter.recipientScope,
+      summaryText,
       scopeSummary,
       filterSummary,
       warnings,
@@ -115,9 +123,30 @@ export class NotificationRecipientResolverService {
     };
   }
 
-  private resolveTargetGroup(dto: BulkNotificationDto): BulkNotificationTargetGroup {
+  private resolveQuickPreset(dto: BulkNotificationDto): BulkNotificationQuickPreset | null {
+    const raw = String(dto.quickPreset || '').trim();
+    if (!raw) return null;
+    return raw as BulkNotificationQuickPreset;
+  }
+
+  private resolveTargetGroup(
+    dto: BulkNotificationDto,
+    quickPreset: BulkNotificationQuickPreset | null,
+  ): BulkNotificationTargetGroup {
     if (dto.targetGroup) {
       return dto.targetGroup as BulkNotificationTargetGroup;
+    }
+    if (quickPreset) {
+      switch (quickPreset) {
+        case BULK_NOTIFICATION_QUICK_PRESET.ALL_USERS:
+          return BULK_NOTIFICATION_TARGET_GROUP.ALL_USERS;
+        case BULK_NOTIFICATION_QUICK_PRESET.ALL_DOCTORS:
+          return BULK_NOTIFICATION_TARGET_GROUP.DOCTORS;
+        case BULK_NOTIFICATION_QUICK_PRESET.ALL_PATIENTS:
+        case BULK_NOTIFICATION_QUICK_PRESET.PATIENTS_TODAY:
+        case BULK_NOTIFICATION_QUICK_PRESET.PATIENTS_TOMORROW:
+          return BULK_NOTIFICATION_TARGET_GROUP.PATIENTS;
+      }
     }
     return BULK_NOTIFICATION_TARGET_GROUP.PATIENTS;
   }
@@ -125,29 +154,34 @@ export class NotificationRecipientResolverService {
   private normalizeFilter(
     dto: BulkNotificationDto,
     targetGroup: BulkNotificationTargetGroup,
+    quickPreset: BulkNotificationQuickPreset | null,
   ): NormalizedBulkFilter {
+    const presetFilter = this.getQuickPresetFilter(quickPreset);
     const nested = dto.filters || new BulkNotificationFilterDto();
     const specialtyIds = this.normalizeNumberList([
+      ...(presetFilter.specialtyIds || []),
       ...(nested.specialtyIds || []),
       ...(dto.specialtyId ? [dto.specialtyId] : []),
     ]);
     const doctorIds = this.normalizeNumberList([
+      ...(presetFilter.doctorIds || []),
       ...(nested.doctorIds || []),
       ...(dto.doctorId ? [dto.doctorId] : []),
     ]);
     const appointmentIds = this.normalizeNumberList([
+      ...(presetFilter.appointmentIds || []),
       ...(nested.appointmentIds || []),
       ...(dto.appointmentIds || []),
     ]);
 
-    const specificDate = nested.specificDate || dto.date || undefined;
-    const fromDate = nested.fromDate || dto.dateFrom || undefined;
-    const toDate = nested.toDate || dto.dateTo || undefined;
-    const scheduleId = nested.scheduleId || dto.scheduleId || undefined;
-    const slotId = nested.slotId || dto.slotId || undefined;
+    const specificDate = nested.specificDate || dto.date || presetFilter.specificDate || undefined;
+    const fromDate = nested.fromDate || dto.dateFrom || presetFilter.fromDate || undefined;
+    const toDate = nested.toDate || dto.dateTo || presetFilter.toDate || undefined;
+    const scheduleId = nested.scheduleId || dto.scheduleId || presetFilter.scheduleId || undefined;
+    const slotId = nested.slotId || dto.slotId || presetFilter.slotId || undefined;
     const appointmentStatuses = Array.from(
       new Set(
-        (nested.appointmentStatuses || [])
+        [...(presetFilter.appointmentStatuses || []), ...(nested.appointmentStatuses || [])]
           .map((item) => String(item || '').trim().toUpperCase())
           .filter(Boolean),
       ),
@@ -155,6 +189,7 @@ export class NotificationRecipientResolverService {
 
     const recipientScope =
       (nested.recipientScope as BulkNotificationRecipientScope | undefined) ||
+      (presetFilter.recipientScope as BulkNotificationRecipientScope | undefined) ||
       this.defaultRecipientScopeByTarget(targetGroup);
 
     if (specificDate && (fromDate || toDate)) {
@@ -187,6 +222,38 @@ export class NotificationRecipientResolverService {
       appointmentStatuses,
       recipientScope,
     };
+  }
+
+  private getQuickPresetFilter(
+    quickPreset: BulkNotificationQuickPreset | null,
+  ): Partial<NormalizedBulkFilter> {
+    if (!quickPreset) return {};
+    const today = new Date();
+    const toIso = (value: Date) => value.toISOString().slice(0, 10);
+    if (quickPreset === BULK_NOTIFICATION_QUICK_PRESET.ALL_USERS) {
+      return { recipientScope: BULK_NOTIFICATION_RECIPIENT_SCOPE.ALL_USERS };
+    }
+    if (quickPreset === BULK_NOTIFICATION_QUICK_PRESET.ALL_DOCTORS) {
+      return { recipientScope: BULK_NOTIFICATION_RECIPIENT_SCOPE.DOCTORS };
+    }
+    if (quickPreset === BULK_NOTIFICATION_QUICK_PRESET.ALL_PATIENTS) {
+      return { recipientScope: BULK_NOTIFICATION_RECIPIENT_SCOPE.PATIENTS };
+    }
+    if (quickPreset === BULK_NOTIFICATION_QUICK_PRESET.PATIENTS_TODAY) {
+      return {
+        recipientScope: BULK_NOTIFICATION_RECIPIENT_SCOPE.PATIENTS,
+        specificDate: toIso(today),
+      };
+    }
+    if (quickPreset === BULK_NOTIFICATION_QUICK_PRESET.PATIENTS_TOMORROW) {
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      return {
+        recipientScope: BULK_NOTIFICATION_RECIPIENT_SCOPE.PATIENTS,
+        specificDate: toIso(tomorrow),
+      };
+    }
+    return {};
   }
 
   private validateFilter(
@@ -572,6 +639,32 @@ export class NotificationRecipientResolverService {
       return 'Không có bệnh nhân khớp với lịch hẹn hoặc khoảng ngày đã chọn.';
     }
     return 'Không tìm thấy người nhận hợp lệ theo tiêu chí hiện tại.';
+  }
+
+  private buildSummaryText(
+    targetGroup: BulkNotificationTargetGroup,
+    filter: NormalizedBulkFilter,
+    recipientCount: number,
+  ) {
+    if (targetGroup === BULK_NOTIFICATION_TARGET_GROUP.ALL_USERS) {
+      return `Gửi cho tất cả người dùng (${recipientCount} người).`;
+    }
+    if (targetGroup === BULK_NOTIFICATION_TARGET_GROUP.DOCTORS) {
+      if (filter.specialtyIds.length > 0) {
+        return `Gửi cho bác sĩ thuộc ${filter.specialtyIds.length} chuyên khoa (${recipientCount} người).`;
+      }
+      return `Gửi cho toàn bộ bác sĩ (${recipientCount} người).`;
+    }
+    if (targetGroup === BULK_NOTIFICATION_TARGET_GROUP.BY_SPECIALTY) {
+      return `Gửi theo chuyên khoa ${filter.specialtyIds.join(', ')} (${recipientCount} người).`;
+    }
+    if (filter.specificDate) {
+      return `Gửi cho bệnh nhân có lịch ngày ${filter.specificDate} (${recipientCount} người).`;
+    }
+    if (filter.fromDate || filter.toDate) {
+      return `Gửi cho bệnh nhân theo khoảng ngày ${filter.fromDate || '...'} đến ${filter.toDate || '...'} (${recipientCount} người).`;
+    }
+    return `Gửi cho toàn bộ bệnh nhân (${recipientCount} người).`;
   }
 
   private dedupeRecipients(items: BulkResolvedRecipient[]) {

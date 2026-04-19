@@ -24,6 +24,17 @@ import {
   CreateOrUpdatePreVisitInfoDto,
   DeleteAttachmentDto,
   DoctorStatsQueryDto,
+  StartDoctorExamDto,
+  UpdateDoctorClinicalNoteDto,
+  CreateDoctorClinicalOrdersDto,
+  UpdateDoctorOrderResultDto,
+  CreateDoctorPrescriptionDto,
+  FinishDoctorClinicalDto,
+  GenerateEncounterBillingDto,
+  MarkEncounterPaymentDto,
+  CompleteEncounterDto,
+  ConfirmDoctorExamDto,
+  DoctorCatalogQueryDto,
   NotificationListQueryDto,
   DoctorUpdateAppointmentStatusDto,
   DoctorWorklistQueryDto,
@@ -62,6 +73,11 @@ const ALLOWED_PRE_VISIT_MIME = ['application/pdf', 'image/jpeg', 'image/png'];
 const MAX_PRE_VISIT_ATTACHMENT_SIZE = 10 * 1024 * 1024;
 const ALLOWED_PRE_VISIT_EXT = ['pdf', 'jpg', 'jpeg', 'png'];
 const SUPPORTED_PAYMENT_METHODS = new Set(['VNPAY', 'QR_BANKING']);
+
+const CLINICAL_ORDER_STATUS = {
+  MOI_TAO: 'MOI_TAO',
+  DA_CO_KET_QUA: 'DA_CO_KET_QUA',
+} as const;
 
 @Injectable()
 export class AppointmentsService {
@@ -214,6 +230,12 @@ export class AppointmentsService {
       .trim();
   }
 
+  private formatCurrency(value?: number | string | null) {
+    const amount = Number(value || 0);
+    if (!Number.isFinite(amount)) return '0 VND';
+    return `${Math.round(amount).toLocaleString('vi-VN')} VND`;
+  }
+
   private buildAdvisoryLockKey(raw: string) {
     const digest = createHash('sha1').update(raw).digest('hex').slice(0, 8);
     return Number.parseInt(digest, 16) | 0;
@@ -250,7 +272,8 @@ export class AppointmentsService {
       this.optionalTableExistsCache.set(tableRegclass, exists);
       return exists;
     } catch {
-      return true;
+      // Fail closed if probing metadata fails, so background jobs can skip safely.
+      return false;
     }
   }
 
@@ -260,6 +283,20 @@ export class AppointmentsService {
       if (!exists) return false;
     }
     return true;
+  }
+
+  private isOptionalFeatureUnavailableError(e: unknown) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError) {
+      return e.code === 'P2021' || e.code === 'P2022';
+    }
+    const message = (e instanceof Error ? e.message : String(e)).toLowerCase();
+    return (
+      message.includes('connection terminated unexpectedly') ||
+      message.includes("can't reach database server") ||
+      message.includes('connection closed') ||
+      message.includes('server has closed the connection') ||
+      message.includes('econnreset')
+    );
   }
 
   private async hasThongBaoBatchColumn() {
@@ -574,7 +611,7 @@ export class AppointmentsService {
   ): Prisma.DANG_KYWhereInput {
     if (!statusGroup) return {};
     if (statusGroup === 'completed') {
-      return { DK_TRANG_THAI: 'DA_KHAM' };
+      return { DK_TRANG_THAI: { in: ['DA_KHAM', 'HOAN_TAT'] } };
     }
     if (statusGroup === 'canceled') {
       return { DK_TRANG_THAI: { in: ['HUY', 'HUY_BS_NGHI'] } };
@@ -2579,6 +2616,1236 @@ export class AppointmentsService {
     };
   }
 
+  async getDoctorClinicalServiceCatalog(query: DoctorCatalogQueryDto) {
+    const keyword = String(query.keyword || '').trim();
+    const limit = Math.min(100, Math.max(1, query.limit || 30));
+    const items = await this.prisma.dICHVU.findMany({
+      where: keyword
+        ? {
+            OR: [
+              { DVCLS_TEN: { contains: keyword, mode: 'insensitive' } },
+              { DVCLS_LOAI: { contains: keyword, mode: 'insensitive' } },
+            ],
+          }
+        : {},
+      orderBy: [{ DVCLS_TEN: 'asc' }],
+      take: limit,
+    });
+    return { items };
+  }
+
+  async getDoctorMedicineCatalog(query: DoctorCatalogQueryDto) {
+    const keyword = String(query.keyword || '').trim();
+    const limit = Math.min(100, Math.max(1, query.limit || 30));
+    const items = await this.prisma.tHUOC.findMany({
+      where: {
+        T_DA_XOA: { not: true },
+        ...(keyword
+          ? {
+              T_TEN_THUOC: { contains: keyword, mode: 'insensitive' },
+            }
+          : {}),
+      },
+      orderBy: [{ T_TEN_THUOC: 'asc' }],
+      take: limit,
+      include: {
+        DON_VI_TINH: true,
+      },
+    });
+    return { items };
+  }
+
+  private async getDoctorAppointmentForExamOrThrow(
+    user: CurrentUserPayload,
+    appointmentId: number,
+  ) {
+    if (!user.bsMa) throw new ForbiddenException('Tai khoan hien tai khong phai bac si');
+    const appointment = await this.prisma.dANG_KY.findUnique({
+      where: { DK_MA: appointmentId },
+      include: {
+        BENH_NHAN: true,
+        KHUNG_GIO: true,
+        LOAI_HINH_KHAM: true,
+        LICH_BSK: {
+          include: {
+            BAC_SI: {
+              include: { CHUYEN_KHOA: true },
+            },
+            PHONG: true,
+          },
+        },
+        PHIEU_KHAM_BENH: {
+          include: {
+            PHIEU_CDCLS: {
+              include: {
+                THUCHIEN: {
+                  include: {
+                    DICHVU: true,
+                    KET_QUA_CAN_LAM_SAN: true,
+                  },
+                },
+              },
+            },
+            DON_THUOC: {
+              include: {
+                CHI_TIET_DON_THUOC: {
+                  include: {
+                    THUOC: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        THANH_TOAN: {
+          orderBy: { TT_THOI_GIAN: 'desc' },
+        },
+      },
+    });
+
+    if (!appointment) throw new NotFoundException('Khong tim thay lich hen');
+    if (appointment.BS_MA !== user.bsMa) {
+      throw new ForbiddenException('Ban khong co quyen thao tac lich hen cua bac si khac');
+    }
+    return appointment;
+  }
+
+  private formatExamFinancialStatus(status?: string) {
+    const normalized = (status || '').toLowerCase();
+    if (!normalized) return 'CHUA_LAP_HOA_DON';
+    if (normalized === 'paid') return 'DA_THANH_TOAN';
+    if (normalized === 'pending' || normalized === 'unpaid') return 'CHO_THANH_TOAN';
+    if (normalized === 'refund_pending') return 'HOAN_TIEN_DANG_XU_LY';
+    if (normalized === 'failed' || normalized === 'refund_failed') return 'THAT_BAI';
+    if (normalized === 'refund_rejected') return 'TU_CHOI_HOAN_TIEN';
+    if (normalized === 'refunded') return 'DA_HOAN_TIEN';
+    return 'CHO_THANH_TOAN';
+  }
+
+  private buildExamWorkflowResponse(appointment: any) {
+    const encounter = appointment.PHIEU_KHAM_BENH || null;
+    const orders = (encounter?.PHIEU_CDCLS || []).flatMap((order: any) =>
+      (order.THUCHIEN || []).map((execution: any) => ({
+        orderId: order.PCD_MA,
+        orderCreatedAt: order.PCD_GIO_IN || null,
+        serviceId: execution.DVCLS_MA,
+        serviceName: execution.DICHVU?.DVCLS_TEN || null,
+        serviceType: execution.DICHVU?.DVCLS_LOAI || null,
+        quantity: 1,
+        price: Number(execution.DICHVU?.DVCLS_GIA_DV || 0),
+        lineTotal: Number(execution.DICHVU?.DVCLS_GIA_DV || 0),
+        isCompleted: Boolean(execution.CTCD_DA_THUC_HIEN),
+        pdfUrl: `/doctor/appointments/${appointment.DK_MA}/orders/${order.PCD_MA}/pdf`,
+        status: execution.KET_QUA_CAN_LAM_SAN
+          ? CLINICAL_ORDER_STATUS.DA_CO_KET_QUA
+          : CLINICAL_ORDER_STATUS.MOI_TAO,
+        result: execution.KET_QUA_CAN_LAM_SAN
+          ? {
+              summary: execution.KET_QUA_CAN_LAM_SAN.KQCLS_NHAN_XET || null,
+              imageUrl: execution.KET_QUA_CAN_LAM_SAN.KQCLS_HINH_ANH || null,
+              payload: execution.KET_QUA_CAN_LAM_SAN.KQCLS_CHI_SO || null,
+            }
+          : null,
+      })),
+    );
+    const prescriptions = (encounter?.DON_THUOC || []).map((prescription: any) => ({
+      prescriptionId: prescription.DT_MA,
+      note: prescription.DT_GHI_CHU || null,
+      days: prescription.DT_SO_NGAY_SUNG || null,
+      createdAt: prescription.DT_NGAY_TAO || null,
+      items: (prescription.CHI_TIET_DON_THUOC || []).map((item: any) => ({
+        medicineId: item.T_MA,
+        medicineName: item.THUOC?.T_TEN_THUOC || null,
+        quantity: item.CTDT_SO_LUONG || 0,
+        dosage: item.CTDT_LIEU_DUNG || null,
+        usage: item.CTDT_CACH_DUNG || null,
+      })),
+    }));
+    const latestPayment = appointment.THANH_TOAN?.[0] || null;
+    const normalizedPayment = latestPayment
+      ? this.normalizePaymentStatus(latestPayment.TT_TRANG_THAI, latestPayment.TT_THOI_GIAN)
+      : '';
+    const hasPendingOrders = orders.some((item: any) => item.status !== CLINICAL_ORDER_STATUS.DA_CO_KET_QUA);
+
+    const clinicalStatus =
+      appointment.DK_TRANG_THAI === APPOINTMENT_STATUS.CHO_KHAM
+        ? 'CHO_KHAM'
+        : appointment.DK_TRANG_THAI === APPOINTMENT_STATUS.DA_CHECKIN
+          ? hasPendingOrders
+            ? 'CHO_KET_QUA'
+            : 'DANG_KHAM'
+          : appointment.DK_TRANG_THAI === APPOINTMENT_STATUS.DA_KHAM
+            ? 'KET_THUC_CHUYEN_MON'
+            : appointment.DK_TRANG_THAI === APPOINTMENT_STATUS.HOAN_TAT
+              ? 'HOAN_TAT'
+              : 'KHAC';
+
+    return {
+      appointment: {
+        id: appointment.DK_MA,
+        status: appointment.DK_TRANG_THAI,
+        date: this.formatDateOnly(appointment.N_NGAY),
+        shift: appointment.B_TEN,
+        slot: {
+          id: appointment.KG_MA,
+          start: this.formatTimeOnly(appointment.KHUNG_GIO?.KG_BAT_DAU || null),
+          end: this.formatTimeOnly(appointment.KHUNG_GIO?.KG_KET_THUC || null),
+        },
+      },
+      patient: {
+        id: appointment.BN_MA,
+        name: this.toDisplayName([
+          appointment.BENH_NHAN?.BN_HO_CHU_LOT,
+          appointment.BENH_NHAN?.BN_TEN,
+        ]),
+        phone: appointment.BENH_NHAN?.BN_SDT_DANG_KY || appointment.BENH_NHAN?.TK_SDT || null,
+      },
+      doctor: {
+        id: appointment.BS_MA,
+        name: appointment.LICH_BSK?.BAC_SI?.BS_HO_TEN || null,
+        specialty: appointment.LICH_BSK?.BAC_SI?.CHUYEN_KHOA?.CK_TEN || null,
+        room: appointment.LICH_BSK?.PHONG?.P_TEN || null,
+      },
+      encounter: encounter
+        ? {
+            id: encounter.PKB_MA,
+            symptoms: encounter.PKB_TRIEU_CHUNG || null,
+            conclusion: encounter.PKB_KET_LUAN || null,
+            clinicalNotes: encounter.PKB_LOI_DAN || null,
+          }
+        : null,
+      orders,
+      prescriptions,
+      billing: {
+        latest: latestPayment || null,
+        normalizedStatus: this.formatExamFinancialStatus(normalizedPayment),
+      },
+      workflow: {
+        clinicalStatus,
+        financialStatus: this.formatExamFinancialStatus(normalizedPayment),
+        hasPendingOrders,
+        canFinishClinical: !hasPendingOrders && Boolean(encounter?.PKB_KET_LUAN),
+      },
+    };
+  }
+
+  private async getOrCreateEncounterTx(
+    tx: Prisma.TransactionClient,
+    appointmentId: number,
+    initialData?: {
+      symptoms?: string | null;
+      notes?: string | null;
+      conclusion?: string | null;
+    },
+  ) {
+    const existing = await tx.pHIEU_KHAM_BENH.findFirst({
+      where: { DK_MA: appointmentId },
+    });
+    if (existing) return existing;
+    return tx.pHIEU_KHAM_BENH.create({
+      data: {
+        DK_MA: appointmentId,
+        PKB_TRIEU_CHUNG: initialData?.symptoms || null,
+        PKB_LOI_DAN: initialData?.notes || null,
+        PKB_KET_LUAN: initialData?.conclusion || null,
+      },
+    });
+  }
+
+  async startDoctorExam(
+    user: CurrentUserPayload,
+    appointmentId: number,
+    dto: StartDoctorExamDto,
+  ) {
+    const appointment = await this.getDoctorAppointmentForExamOrThrow(user, appointmentId);
+    const currentStatus = appointment.DK_TRANG_THAI || '';
+    if (
+      [APPOINTMENT_STATUS.HUY, APPOINTMENT_STATUS.HUY_BS_NGHI, APPOINTMENT_STATUS.NO_SHOW].includes(
+        currentStatus as any,
+      )
+    ) {
+      throw new BadRequestException('Lich hen hien tai khong the bat dau kham');
+    }
+    if (currentStatus === APPOINTMENT_STATUS.DA_KHAM || currentStatus === APPOINTMENT_STATUS.HOAN_TAT) {
+      throw new BadRequestException('Ca kham da ket thuc');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      if (appointment.DK_TRANG_THAI === APPOINTMENT_STATUS.CHO_KHAM) {
+        await tx.dANG_KY.update({
+          where: { DK_MA: appointmentId },
+          data: { DK_TRANG_THAI: APPOINTMENT_STATUS.DA_CHECKIN },
+        });
+      }
+      await this.getOrCreateEncounterTx(tx, appointmentId, {
+        symptoms: appointment.DK_TRIEU_CHUNG || null,
+        notes: appointment.DK_GHI_CHU_TIEN_KHAM || dto.note || null,
+      });
+      await tx.aUDIT_LOG.create({
+        data: {
+          AL_TABLE: 'DANG_KY',
+          AL_ACTION: 'DOCTOR_EXAM_STARTED',
+          AL_PK: { DK_MA: appointmentId },
+          AL_OLD: { DK_TRANG_THAI: appointment.DK_TRANG_THAI },
+          AL_NEW: {
+            DK_TRANG_THAI:
+              appointment.DK_TRANG_THAI === APPOINTMENT_STATUS.CHO_KHAM
+                ? APPOINTMENT_STATUS.DA_CHECKIN
+                : appointment.DK_TRANG_THAI,
+            note: dto.note || null,
+          },
+          AL_CHANGED_BY: user.TK_SDT,
+        },
+      });
+    });
+
+    const latest = await this.getDoctorAppointmentForExamOrThrow(user, appointmentId);
+    return {
+      message: 'Bat dau kham thanh cong',
+      ...this.buildExamWorkflowResponse(latest),
+    };
+  }
+
+  async getDoctorExamWorkflow(user: CurrentUserPayload, appointmentId: number) {
+    const appointment = await this.getDoctorAppointmentForExamOrThrow(user, appointmentId);
+    return this.buildExamWorkflowResponse(appointment);
+  }
+
+  async updateDoctorClinicalNote(
+    user: CurrentUserPayload,
+    appointmentId: number,
+    dto: UpdateDoctorClinicalNoteDto,
+  ) {
+    const appointment = await this.getDoctorAppointmentForExamOrThrow(user, appointmentId);
+    const currentStatus = appointment.DK_TRANG_THAI || '';
+    if (
+      ![APPOINTMENT_STATUS.DA_CHECKIN, APPOINTMENT_STATUS.DA_KHAM, APPOINTMENT_STATUS.HOAN_TAT].includes(
+        currentStatus as any,
+      )
+    ) {
+      throw new BadRequestException('Can bat dau kham truoc khi cap nhat phieu kham');
+    }
+    if (currentStatus === APPOINTMENT_STATUS.HOAN_TAT) {
+      throw new BadRequestException('Ho so da hoan tat, khong the cap nhat');
+    }
+
+    const compactNotes = [
+      dto.clinicalNotes ? `Lam sang: ${dto.clinicalNotes}` : null,
+      dto.diagnosisPreliminary ? `Chan doan so bo: ${dto.diagnosisPreliminary}` : null,
+      dto.diagnosisFinal ? `Chan doan xac dinh: ${dto.diagnosisFinal}` : null,
+      dto.treatmentPlan ? `Huong xu tri: ${dto.treatmentPlan}` : null,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    await this.prisma.$transaction(async (tx) => {
+      const encounter = await this.getOrCreateEncounterTx(tx, appointmentId);
+      await tx.pHIEU_KHAM_BENH.update({
+        where: { PKB_MA: encounter.PKB_MA },
+        data: {
+          ...(dto.symptoms !== undefined ? { PKB_TRIEU_CHUNG: dto.symptoms || null } : {}),
+          ...(dto.conclusion !== undefined ? { PKB_KET_LUAN: dto.conclusion || null } : {}),
+          ...(compactNotes ? { PKB_LOI_DAN: compactNotes } : {}),
+        },
+      });
+      await tx.dANG_KY.update({
+        where: { DK_MA: appointmentId },
+        data: {
+          ...(dto.symptoms !== undefined ? { DK_TRIEU_CHUNG: dto.symptoms || null } : {}),
+          ...(compactNotes ? { DK_GHI_CHU_TIEN_KHAM: compactNotes } : {}),
+          DK_TIEN_KHAM_CAP_NHAT_LUC: new Date(),
+          DK_TIEN_KHAM_CAP_NHAT_BOI: user.TK_SDT,
+        },
+      });
+      await tx.aUDIT_LOG.create({
+        data: {
+          AL_TABLE: 'PHIEU_KHAM_BENH',
+          AL_ACTION: 'DOCTOR_CLINICAL_NOTE_UPDATED',
+          AL_PK: { DK_MA: appointmentId },
+          AL_OLD: Prisma.JsonNull,
+          AL_NEW: {
+            symptoms: dto.symptoms || null,
+            conclusion: dto.conclusion || null,
+            clinicalNotes: compactNotes || null,
+          },
+          AL_CHANGED_BY: user.TK_SDT,
+        },
+      });
+    });
+
+    return {
+      message: 'Cap nhat phieu kham thanh cong',
+      ...(await this.getDoctorExamWorkflow(user, appointmentId)),
+    };
+  }
+
+  async createDoctorClinicalOrders(
+    user: CurrentUserPayload,
+    appointmentId: number,
+    dto: CreateDoctorClinicalOrdersDto,
+  ) {
+    const appointment = await this.getDoctorAppointmentForExamOrThrow(user, appointmentId);
+    if (appointment.DK_TRANG_THAI !== APPOINTMENT_STATUS.DA_CHECKIN) {
+      throw new BadRequestException('Chi co the tao chi dinh khi ca kham dang duoc thuc hien');
+    }
+    const serviceIds = Array.from(new Set((dto.items || []).map((item) => Number(item.serviceId || 0)).filter(Boolean)));
+    if (serviceIds.length === 0) {
+      throw new BadRequestException('Danh sach chi dinh dang rong');
+    }
+
+    const existingServices = await this.prisma.dICHVU.findMany({
+      where: { DVCLS_MA: { in: serviceIds } },
+      select: { DVCLS_MA: true },
+    });
+    const existingSet = new Set(existingServices.map((item) => item.DVCLS_MA));
+    const missing = serviceIds.filter((item) => !existingSet.has(item));
+    if (missing.length > 0) {
+      throw new NotFoundException(`Khong tim thay dich vu can lam sang: ${missing.join(', ')}`);
+    }
+
+    const createdOrder = await this.prisma.$transaction(async (tx) => {
+      const encounter = await this.getOrCreateEncounterTx(tx, appointmentId);
+      const order = await tx.pHIEU_CDCLS.create({
+        data: {
+          PKB_MA: encounter.PKB_MA,
+        },
+      });
+      await tx.tHUCHIEN.createMany({
+        data: serviceIds.map((serviceId) => ({
+          PCD_MA: order.PCD_MA,
+          DVCLS_MA: serviceId,
+          CTCD_LAN_THUC_HIEN: 1,
+          CTCD_DA_THUC_HIEN: false,
+        })),
+      });
+      await tx.aUDIT_LOG.create({
+        data: {
+          AL_TABLE: 'PHIEU_CDCLS',
+          AL_ACTION: 'DOCTOR_CLINICAL_ORDER_CREATED',
+          AL_PK: { DK_MA: appointmentId, PCD_MA: order.PCD_MA },
+          AL_OLD: Prisma.JsonNull,
+          AL_NEW: {
+            serviceIds,
+            count: serviceIds.length,
+          },
+          AL_CHANGED_BY: user.TK_SDT,
+        },
+      });
+      return order;
+    });
+
+    const orderPdf = await this.buildDoctorClinicalOrderPdfReport(
+      user,
+      appointmentId,
+      createdOrder.PCD_MA,
+    );
+    await this.writeAuditLog({
+      table: 'PHIEU_CDCLS',
+      action: 'DOCTOR_CLINICAL_ORDER_PDF_GENERATED',
+      actor: user.TK_SDT,
+      pk: { DK_MA: appointmentId, PCD_MA: createdOrder.PCD_MA },
+      next: {
+        filename: orderPdf.filename,
+        generatedAt: new Date().toISOString(),
+        total: orderPdf.total,
+      },
+    });
+
+    return {
+      message: 'Tao chi dinh can lam sang thanh cong',
+      orderPdf: {
+        orderId: createdOrder.PCD_MA,
+        filename: orderPdf.filename,
+        url: `/doctor/appointments/${appointmentId}/orders/${createdOrder.PCD_MA}/pdf`,
+      },
+      ...(await this.getDoctorExamWorkflow(user, appointmentId)),
+    };
+  }
+
+  async getDoctorClinicalOrders(user: CurrentUserPayload, appointmentId: number) {
+    const workflow = await this.getDoctorExamWorkflow(user, appointmentId);
+    return {
+      appointmentId,
+      orders: workflow.orders,
+      workflow: workflow.workflow,
+    };
+  }
+
+  private async buildDoctorClinicalOrderPdfReport(
+    user: CurrentUserPayload,
+    appointmentId: number,
+    orderId: number,
+  ) {
+    const appointment = await this.getDoctorAppointmentForExamOrThrow(user, appointmentId);
+    const encounter = appointment.PHIEU_KHAM_BENH;
+    if (!encounter) {
+      throw new BadRequestException('Khong tim thay phieu kham benh');
+    }
+
+    const order = (encounter.PHIEU_CDCLS || []).find((item: any) => item.PCD_MA === orderId);
+    if (!order) {
+      throw new NotFoundException('Khong tim thay phieu chi dinh can lam sang');
+    }
+    const executions = order.THUCHIEN || [];
+    if (executions.length === 0) {
+      throw new BadRequestException('Phieu chi dinh khong co dich vu');
+    }
+
+    const patientName = this.toDisplayName([
+      appointment.BENH_NHAN?.BN_HO_CHU_LOT,
+      appointment.BENH_NHAN?.BN_TEN,
+    ]);
+    const patientDob = appointment.BENH_NHAN?.BN_NGAY_SINH
+      ? this.formatDateOnly(appointment.BENH_NHAN.BN_NGAY_SINH)
+      : '-';
+    const doctorName = appointment.LICH_BSK?.BAC_SI?.BS_HO_TEN || `#${appointment.BS_MA}`;
+    const specialty = appointment.LICH_BSK?.BAC_SI?.CHUYEN_KHOA?.CK_TEN || '-';
+    const room = appointment.LICH_BSK?.PHONG?.P_TEN || '-';
+    const shift = appointment.B_TEN || '-';
+    const date = this.formatDateOnly(appointment.N_NGAY);
+    const slotStart = this.formatTimeOnly(appointment.KHUNG_GIO?.KG_BAT_DAU || null);
+    const slotEnd = this.formatTimeOnly(appointment.KHUNG_GIO?.KG_KET_THUC || null);
+
+    const rows = executions.map((execution: any, index: number) => {
+      const unitPrice = Number(execution.DICHVU?.DVCLS_GIA_DV || 0);
+      const quantity = 1;
+      return {
+        stt: index + 1,
+        serviceCode: execution.DVCLS_MA,
+        serviceName: execution.DICHVU?.DVCLS_TEN || `DV ${execution.DVCLS_MA}`,
+        unitPrice,
+        quantity,
+        lineTotal: unitPrice * quantity,
+      };
+    });
+    const total = rows.reduce((sum, item) => sum + item.lineTotal, 0);
+
+    const report = await this.pdfService.buildReport({
+      title: 'PHIEU CHI DINH CAN LAM SANG',
+      subtitle: `Ma phieu: #${orderId} - Ma lich hen: #${appointmentId}`,
+      metadataLines: [
+        `Nguoi chi dinh: ${doctorName}`,
+        `So dien thoai bac si: ${user.TK_SDT}`,
+        `Thoi gian tao phieu: ${this.formatDateOnly(order.PCD_GIO_IN || new Date())} ${this.formatTimeOnly(order.PCD_GIO_IN || new Date())}`,
+      ],
+      sections: [
+        {
+          heading: 'Thong tin benh nhan',
+          keyValues: [
+            { label: 'Ho ten', value: patientName || '-' },
+            { label: 'Ma benh nhan', value: `#${appointment.BN_MA}` },
+            { label: 'Ngay sinh', value: patientDob },
+            {
+              label: 'So dien thoai',
+              value: appointment.BENH_NHAN?.BN_SDT_DANG_KY || appointment.BENH_NHAN?.TK_SDT || '-',
+            },
+          ],
+        },
+        {
+          heading: 'Thong tin kham',
+          keyValues: [
+            { label: 'Ma lich hen', value: `#${appointment.DK_MA}` },
+            { label: 'Bac si', value: doctorName },
+            { label: 'Chuyen khoa', value: specialty },
+            { label: 'Ngay kham', value: date },
+            { label: 'Buoi', value: shift },
+            { label: 'Khung gio', value: `${slotStart} - ${slotEnd}` },
+            { label: 'Phong kham', value: room },
+          ],
+        },
+        {
+          heading: 'Danh sach dich vu chi dinh',
+          table: {
+            headers: ['STT', 'Ma DV', 'Ten dich vu', 'Don gia', 'So luong', 'Thanh tien'],
+            rows: rows.map((item) => [
+              String(item.stt),
+              String(item.serviceCode),
+              item.serviceName,
+              this.formatCurrency(item.unitPrice),
+              String(item.quantity),
+              this.formatCurrency(item.lineTotal),
+            ]),
+          },
+          paragraphs: [`Tong tien dich vu: ${this.formatCurrency(total)}`],
+        },
+      ],
+    });
+
+    return {
+      appointment,
+      order,
+      total,
+      report,
+      filename: `chi-dinh-can-lam-sang-${appointmentId}-${orderId}.pdf`,
+    };
+  }
+
+  async exportDoctorClinicalOrderPdf(
+    user: CurrentUserPayload,
+    appointmentId: number,
+    orderId: number,
+  ) {
+    const { report, filename } = await this.buildDoctorClinicalOrderPdfReport(
+      user,
+      appointmentId,
+      orderId,
+    );
+    await this.writeAuditLog({
+      table: 'PHIEU_CDCLS',
+      action: 'DOCTOR_CLINICAL_ORDER_PDF_EXPORTED',
+      actor: user.TK_SDT,
+      pk: { DK_MA: appointmentId, PCD_MA: orderId },
+      next: { filename },
+    });
+    return { filename, buffer: report };
+  }
+
+  async updateDoctorClinicalOrderResult(
+    user: CurrentUserPayload,
+    appointmentId: number,
+    orderId: number,
+    serviceId: number,
+    dto: UpdateDoctorOrderResultDto,
+  ) {
+    const appointment = await this.getDoctorAppointmentForExamOrThrow(user, appointmentId);
+    const currentStatus = appointment.DK_TRANG_THAI || '';
+    if (
+      [APPOINTMENT_STATUS.HOAN_TAT, APPOINTMENT_STATUS.HUY, APPOINTMENT_STATUS.HUY_BS_NGHI].includes(
+        currentStatus as any,
+      )
+    ) {
+      throw new BadRequestException('Khong the cap nhat ket qua cho ca kham nay');
+    }
+
+    const execution = await this.prisma.tHUCHIEN.findUnique({
+      where: {
+        PCD_MA_DVCLS_MA: {
+          PCD_MA: orderId,
+          DVCLS_MA: serviceId,
+        },
+      },
+      include: {
+        PHIEU_CDCLS: {
+          include: {
+            PHIEU_KHAM_BENH: true,
+          },
+        },
+      },
+    });
+    if (!execution || execution.PHIEU_CDCLS?.PHIEU_KHAM_BENH?.DK_MA !== appointmentId) {
+      throw new NotFoundException('Khong tim thay chi dinh can lam sang');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.kET_QUA_CAN_LAM_SAN.upsert({
+        where: {
+          PCD_MA_DVCLS_MA: {
+            PCD_MA: orderId,
+            DVCLS_MA: serviceId,
+          },
+        },
+        create: {
+          PCD_MA: orderId,
+          DVCLS_MA: serviceId,
+          KQCLS_NHAN_XET: dto.resultSummary || null,
+          KQCLS_HINH_ANH: dto.imageUrl || null,
+          KQCLS_CHI_SO: dto.resultPayload ? (dto.resultPayload as Prisma.JsonObject) : Prisma.JsonNull,
+        },
+        update: {
+          KQCLS_NHAN_XET: dto.resultSummary || null,
+          KQCLS_HINH_ANH: dto.imageUrl || null,
+          KQCLS_CHI_SO: dto.resultPayload ? (dto.resultPayload as Prisma.JsonObject) : Prisma.JsonNull,
+        },
+      });
+      await tx.tHUCHIEN.update({
+        where: {
+          PCD_MA_DVCLS_MA: {
+            PCD_MA: orderId,
+            DVCLS_MA: serviceId,
+          },
+        },
+        data: {
+          CTCD_DA_THUC_HIEN: true,
+          CTCD_THOI_GIAN_CHECKIN: new Date(),
+        },
+      });
+      await tx.aUDIT_LOG.create({
+        data: {
+          AL_TABLE: 'KET_QUA_CAN_LAM_SAN',
+          AL_ACTION: 'DOCTOR_CLINICAL_RESULT_UPDATED',
+          AL_PK: { DK_MA: appointmentId, PCD_MA: orderId, DVCLS_MA: serviceId },
+          AL_OLD: Prisma.JsonNull,
+          AL_NEW: {
+            resultSummary: dto.resultSummary || null,
+            imageUrl: dto.imageUrl || null,
+          },
+          AL_CHANGED_BY: user.TK_SDT,
+        },
+      });
+    });
+
+    return {
+      message: 'Cap nhat ket qua can lam sang thanh cong',
+      ...(await this.getDoctorExamWorkflow(user, appointmentId)),
+    };
+  }
+
+  async createDoctorPrescription(
+    user: CurrentUserPayload,
+    appointmentId: number,
+    dto: CreateDoctorPrescriptionDto,
+  ) {
+    const appointment = await this.getDoctorAppointmentForExamOrThrow(user, appointmentId);
+    const currentStatus = appointment.DK_TRANG_THAI || '';
+    if (![APPOINTMENT_STATUS.DA_CHECKIN, APPOINTMENT_STATUS.DA_KHAM].includes(currentStatus as any)) {
+      throw new BadRequestException('Khong the ke don thuoc o trang thai hien tai');
+    }
+    const uniqueItems = new Map<number, CreateDoctorPrescriptionDto['items'][number]>();
+    for (const item of dto.items || []) {
+      if (!item?.medicineId || !item?.quantity) continue;
+      uniqueItems.set(Number(item.medicineId), item);
+    }
+    if (uniqueItems.size === 0) {
+      throw new BadRequestException('Danh sach thuoc dang rong');
+    }
+
+    const medicineIds = Array.from(uniqueItems.keys());
+    const meds = await this.prisma.tHUOC.findMany({
+      where: { T_MA: { in: medicineIds }, T_DA_XOA: { not: true } },
+      select: { T_MA: true },
+    });
+    const medSet = new Set(meds.map((item) => item.T_MA));
+    const missing = medicineIds.filter((id) => !medSet.has(id));
+    if (missing.length > 0) {
+      throw new NotFoundException(`Khong tim thay thuoc: ${missing.join(', ')}`);
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      const encounter = await this.getOrCreateEncounterTx(tx, appointmentId);
+      const prescription = await tx.dON_THUOC.create({
+        data: {
+          PKB_MA: encounter.PKB_MA,
+          DT_GHI_CHU: dto.note || null,
+          DT_SO_NGAY_SUNG: dto.days || null,
+        },
+      });
+      await tx.cHI_TIET_DON_THUOC.createMany({
+        data: Array.from(uniqueItems.values()).map((item) => ({
+          DT_MA: prescription.DT_MA,
+          T_MA: item.medicineId,
+          CTDT_SO_LUONG: item.quantity,
+          CTDT_LIEU_DUNG: item.dosage || null,
+          CTDT_CACH_DUNG: item.usage || null,
+        })),
+      });
+      await tx.aUDIT_LOG.create({
+        data: {
+          AL_TABLE: 'DON_THUOC',
+          AL_ACTION: 'DOCTOR_PRESCRIPTION_CREATED',
+          AL_PK: { DK_MA: appointmentId, DT_MA: prescription.DT_MA },
+          AL_OLD: Prisma.JsonNull,
+          AL_NEW: {
+            itemCount: uniqueItems.size,
+          },
+          AL_CHANGED_BY: user.TK_SDT,
+        },
+      });
+    });
+
+    return {
+      message: 'Lap don thuoc thanh cong',
+      ...(await this.getDoctorExamWorkflow(user, appointmentId)),
+    };
+  }
+
+  async getDoctorPrescriptions(user: CurrentUserPayload, appointmentId: number) {
+    const workflow = await this.getDoctorExamWorkflow(user, appointmentId);
+    return {
+      appointmentId,
+      prescriptions: workflow.prescriptions,
+    };
+  }
+
+  async finishDoctorClinical(
+    user: CurrentUserPayload,
+    appointmentId: number,
+    dto: FinishDoctorClinicalDto,
+  ) {
+    const appointment = await this.getDoctorAppointmentForExamOrThrow(user, appointmentId);
+    const currentStatus = appointment.DK_TRANG_THAI || '';
+    if (![APPOINTMENT_STATUS.DA_CHECKIN, APPOINTMENT_STATUS.DA_KHAM].includes(currentStatus as any)) {
+      throw new BadRequestException('Ca kham chua o trang thai cho phep ket thuc chuyen mon');
+    }
+    const encounter = appointment.PHIEU_KHAM_BENH;
+    if (!encounter) {
+      throw new BadRequestException('Chua co phieu kham benh');
+    }
+    if (!String(encounter.PKB_KET_LUAN || '').trim()) {
+      throw new BadRequestException('Can cap nhat ket luan truoc khi ket thuc kham chuyen mon');
+    }
+
+    const allExecutions = (encounter.PHIEU_CDCLS || []).flatMap((item: any) => item.THUCHIEN || []);
+    const pendingOrders = allExecutions.filter((item: any) => !item.KET_QUA_CAN_LAM_SAN);
+    if (pendingOrders.length > 0 && !dto.allowIncompleteOrders) {
+      throw new BadRequestException('Con chi dinh can lam sang chua co ket qua');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.dANG_KY.update({
+        where: { DK_MA: appointmentId },
+        data: { DK_TRANG_THAI: APPOINTMENT_STATUS.DA_KHAM },
+      });
+      await tx.aUDIT_LOG.create({
+        data: {
+          AL_TABLE: 'DANG_KY',
+          AL_ACTION: 'DOCTOR_CLINICAL_FINISHED',
+          AL_PK: { DK_MA: appointmentId },
+          AL_OLD: { DK_TRANG_THAI: appointment.DK_TRANG_THAI },
+          AL_NEW: {
+            DK_TRANG_THAI: APPOINTMENT_STATUS.DA_KHAM,
+            pendingOrders: pendingOrders.length,
+            allowIncompleteOrders: Boolean(dto.allowIncompleteOrders),
+          },
+          AL_CHANGED_BY: user.TK_SDT,
+        },
+      });
+    });
+
+    return {
+      message: 'Ket thuc kham chuyen mon thanh cong',
+      ...(await this.getDoctorExamWorkflow(user, appointmentId)),
+    };
+  }
+
+  private async calculateEncounterCharges(input: {
+    appointment: any;
+    encounterId: number;
+  }) {
+    const examFee = Number(input.appointment.LOAI_HINH_KHAM?.LHK_GIA || 0);
+    const serviceExecutions = await this.prisma.tHUCHIEN.findMany({
+      where: {
+        PHIEU_CDCLS: {
+          PKB_MA: input.encounterId,
+        },
+      },
+      include: {
+        DICHVU: true,
+      },
+    });
+    const serviceFee = serviceExecutions.reduce(
+      (sum, item) => sum + Number(item.DICHVU?.DVCLS_GIA_DV || 0),
+      0,
+    );
+    const prescriptionItems = await this.prisma.cHI_TIET_DON_THUOC.findMany({
+      where: {
+        DON_THUOC: {
+          PKB_MA: input.encounterId,
+        },
+      },
+      include: {
+        THUOC: true,
+      },
+    });
+    const prescriptionFee = prescriptionItems.reduce(
+      (sum, item) => sum + Number(item.CTDT_SO_LUONG || 0) * Number(item.THUOC?.T_GIA_THUOC || 0),
+      0,
+    );
+    const total = Number((examFee + serviceFee + prescriptionFee).toFixed(2));
+    return { examFee, serviceFee, prescriptionFee, total };
+  }
+
+  async generateEncounterBilling(
+    user: CurrentUserPayload,
+    appointmentId: number,
+    dto: GenerateEncounterBillingDto,
+  ) {
+    const appointment = await this.getDoctorAppointmentForExamOrThrow(user, appointmentId);
+    const currentStatus = appointment.DK_TRANG_THAI || '';
+    if (![APPOINTMENT_STATUS.DA_KHAM, APPOINTMENT_STATUS.HOAN_TAT].includes(currentStatus as any)) {
+      throw new BadRequestException('Chi co the lap hoa don sau khi ket thuc kham chuyen mon');
+    }
+    if (!appointment.PHIEU_KHAM_BENH) {
+      throw new BadRequestException('Khong tim thay phieu kham de lap hoa don');
+    }
+
+    const latestPayment = appointment.THANH_TOAN?.[0] || null;
+    if (latestPayment) {
+      const normalized = this.normalizePaymentStatus(
+        latestPayment.TT_TRANG_THAI,
+        latestPayment.TT_THOI_GIAN,
+      );
+      if (normalized === 'paid' || normalized === 'unpaid' || normalized === 'pending') {
+        return {
+          message: 'Da ton tai hoa don cho ca kham nay',
+          payment: latestPayment,
+          ...(await this.getDoctorExamWorkflow(user, appointmentId)),
+        };
+      }
+    }
+
+    const { examFee, serviceFee, prescriptionFee, total } =
+      await this.calculateEncounterCharges({
+        appointment,
+        encounterId: appointment.PHIEU_KHAM_BENH.PKB_MA,
+      });
+    const method = String(dto.paymentMethod || 'QR_BANKING').trim().toUpperCase();
+    const paymentMethod = SUPPORTED_PAYMENT_METHODS.has(method) ? method : 'QR_BANKING';
+
+    const payment = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.tHANH_TOAN.create({
+        data: {
+          DK_MA: appointmentId,
+          PKB_MA: appointment.PHIEU_KHAM_BENH!.PKB_MA,
+          TT_LOAI: 'KHAM_BENH',
+          TT_PHUONG_THUC: paymentMethod,
+          TT_TRANG_THAI: 'CHUA_THANH_TOAN',
+          TT_TIEN_KHAM: examFee,
+          TT_PHI_TIEN_ICH: 0,
+          TT_MIEN_GIAM: 0,
+          TT_TONG_TIEN: total,
+          TT_THUC_THU: total,
+        },
+      });
+      await tx.aUDIT_LOG.create({
+        data: {
+          AL_TABLE: 'THANH_TOAN',
+          AL_ACTION: 'ENCOUNTER_BILL_GENERATED',
+          AL_PK: { DK_MA: appointmentId, TT_MA: created.TT_MA },
+          AL_OLD: Prisma.JsonNull,
+          AL_NEW: {
+            examFee,
+            serviceFee,
+            prescriptionFee,
+            total,
+            paymentMethod,
+          },
+          AL_CHANGED_BY: user.TK_SDT,
+        },
+      });
+      return created;
+    });
+
+    return {
+      message: 'Lap hoa don thanh cong',
+      payment,
+      ...(await this.getDoctorExamWorkflow(user, appointmentId)),
+    };
+  }
+
+  async markEncounterPaymentAsPaid(
+    user: CurrentUserPayload,
+    appointmentId: number,
+    paymentId: number,
+    dto: MarkEncounterPaymentDto,
+  ) {
+    const appointment = await this.getDoctorAppointmentForExamOrThrow(user, appointmentId);
+    const payment = await this.prisma.tHANH_TOAN.findUnique({
+      where: { TT_MA: paymentId },
+    });
+    if (!payment || payment.DK_MA !== appointment.DK_MA) {
+      throw new NotFoundException('Khong tim thay hoa don can cap nhat');
+    }
+    const normalized = this.normalizePaymentStatus(payment.TT_TRANG_THAI, payment.TT_THOI_GIAN);
+    if (normalized === 'paid') {
+      return {
+        message: 'Hoa don da thanh toan',
+        payment,
+        ...(await this.getDoctorExamWorkflow(user, appointmentId)),
+      };
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.tHANH_TOAN.update({
+        where: { TT_MA: paymentId },
+        data: {
+          TT_TRANG_THAI: 'DA_THANH_TOAN',
+          TT_PHUONG_THUC_TT: dto.paymentGateway || 'INTERNAL',
+          TT_MA_GIAO_DICH: dto.transactionCode || payment.TT_MA_GIAO_DICH || `INTERNAL_${paymentId}`,
+          TT_THOI_GIAN: new Date(),
+        },
+      });
+      await tx.aUDIT_LOG.create({
+        data: {
+          AL_TABLE: 'THANH_TOAN',
+          AL_ACTION: 'ENCOUNTER_PAYMENT_MARKED_PAID',
+          AL_PK: { DK_MA: appointmentId, TT_MA: paymentId },
+          AL_OLD: { TT_TRANG_THAI: payment.TT_TRANG_THAI },
+          AL_NEW: {
+            TT_TRANG_THAI: 'DA_THANH_TOAN',
+            transactionCode: dto.transactionCode || null,
+            paymentGateway: dto.paymentGateway || null,
+          },
+          AL_CHANGED_BY: user.TK_SDT,
+        },
+      });
+    });
+
+    return {
+      message: 'Cap nhat thanh toan thanh cong',
+      ...(await this.getDoctorExamWorkflow(user, appointmentId)),
+    };
+  }
+
+  async confirmDoctorExamComplete(
+    user: CurrentUserPayload,
+    appointmentId: number,
+    dto: ConfirmDoctorExamDto,
+  ) {
+    const appointment = await this.getDoctorAppointmentForExamOrThrow(user, appointmentId);
+    const currentStatus = appointment.DK_TRANG_THAI || '';
+    if (
+      [APPOINTMENT_STATUS.HUY, APPOINTMENT_STATUS.HUY_BS_NGHI, APPOINTMENT_STATUS.NO_SHOW].includes(
+        currentStatus as any,
+      )
+    ) {
+      throw new BadRequestException('Khong the hoan tat cho ca kham da huy hoac no-show');
+    }
+    if (currentStatus === APPOINTMENT_STATUS.CHO_KHAM) {
+      throw new BadRequestException('Can bat dau kham truoc khi xac nhan hoan tat');
+    }
+
+    const encounter = appointment.PHIEU_KHAM_BENH;
+    if (!encounter) {
+      throw new BadRequestException('Chua co phieu kham benh');
+    }
+    if (!String(encounter.PKB_KET_LUAN || '').trim()) {
+      throw new BadRequestException('Can cap nhat ket luan truoc khi xac nhan hoan tat');
+    }
+    const allExecutions = (encounter.PHIEU_CDCLS || []).flatMap((item: any) => item.THUCHIEN || []);
+    const pendingOrders = allExecutions.filter((item: any) => !item.KET_QUA_CAN_LAM_SAN);
+    if (pendingOrders.length > 0 && !dto.allowIncompleteOrders) {
+      throw new BadRequestException('Con chi dinh can lam sang chua co ket qua');
+    }
+
+    const existingLatestPayment = appointment.THANH_TOAN?.[0] || null;
+    const existingNormalized = existingLatestPayment
+      ? this.normalizePaymentStatus(
+          existingLatestPayment.TT_TRANG_THAI,
+          existingLatestPayment.TT_THOI_GIAN,
+        )
+      : 'unpaid';
+    const { examFee, serviceFee, prescriptionFee, total } = await this.calculateEncounterCharges({
+      appointment,
+      encounterId: encounter.PKB_MA,
+    });
+
+    const payment = await this.prisma.$transaction(async (tx) => {
+      const latest = await tx.tHANH_TOAN.findFirst({
+        where: { DK_MA: appointmentId },
+        orderBy: { TT_THOI_GIAN: 'desc' },
+      });
+      const latestNormalized = latest
+        ? this.normalizePaymentStatus(latest.TT_TRANG_THAI, latest.TT_THOI_GIAN)
+        : 'unpaid';
+
+      if (!latest && total > 0) {
+        const created = await tx.tHANH_TOAN.create({
+          data: {
+            DK_MA: appointmentId,
+            PKB_MA: encounter.PKB_MA,
+            TT_LOAI: 'KHAM_BENH',
+            TT_PHUONG_THUC: 'QR_BANKING',
+            TT_TRANG_THAI: 'CHUA_THANH_TOAN',
+            TT_TIEN_KHAM: examFee,
+            TT_PHI_TIEN_ICH: 0,
+            TT_MIEN_GIAM: 0,
+            TT_TONG_TIEN: total,
+            TT_THUC_THU: total,
+          },
+        });
+        await tx.aUDIT_LOG.create({
+          data: {
+            AL_TABLE: 'THANH_TOAN',
+            AL_ACTION: 'ENCOUNTER_BILL_AUTO_GENERATED_ON_COMPLETE',
+            AL_PK: { DK_MA: appointmentId, TT_MA: created.TT_MA },
+            AL_OLD: Prisma.JsonNull,
+            AL_NEW: {
+              examFee,
+              serviceFee,
+              prescriptionFee,
+              total,
+            },
+            AL_CHANGED_BY: user.TK_SDT,
+          },
+        });
+        return created;
+      }
+
+      if (latestNormalized === 'paid' || latestNormalized === 'pending' || latestNormalized === 'unpaid') {
+        return latest;
+      }
+      return latest;
+    });
+
+    const oldStatus = appointment.DK_TRANG_THAI || null;
+    if (currentStatus !== APPOINTMENT_STATUS.HOAN_TAT) {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.dANG_KY.update({
+          where: { DK_MA: appointmentId },
+          data: { DK_TRANG_THAI: APPOINTMENT_STATUS.HOAN_TAT },
+        });
+        await tx.aUDIT_LOG.create({
+          data: {
+            AL_TABLE: 'DANG_KY',
+            AL_ACTION: 'DOCTOR_EXAM_CONFIRMED_COMPLETE',
+            AL_PK: { DK_MA: appointmentId },
+            AL_OLD: { DK_TRANG_THAI: oldStatus },
+            AL_NEW: {
+              DK_TRANG_THAI: APPOINTMENT_STATUS.HOAN_TAT,
+              pendingOrders: pendingOrders.length,
+              allowIncompleteOrders: Boolean(dto.allowIncompleteOrders),
+              note: dto.note || null,
+            },
+            AL_CHANGED_BY: user.TK_SDT,
+          },
+        });
+      });
+    }
+
+    const patientPhone = appointment.BENH_NHAN?.TK_SDT || appointment.BENH_NHAN?.BN_SDT_DANG_KY;
+    if (patientPhone) {
+      await this.createAppointmentNotification({
+        appointmentId,
+        phone: patientPhone,
+        type: 'system_auto',
+        title: 'Kết quả khám đã sẵn sàng',
+        content:
+          `Ca khám #${appointmentId} đã được bác sĩ xác nhận hoàn tất. ` +
+          `Vui lòng vào hệ thống để xem kết quả khám và đơn thuốc.`,
+        dedupeKey: `[EXAM_COMPLETED_DK_MA=${appointmentId}]`,
+      });
+
+      const normalized = payment
+        ? this.normalizePaymentStatus(payment.TT_TRANG_THAI, payment.TT_THOI_GIAN)
+        : existingNormalized;
+      const shouldNotifyPayment =
+        total > 0 &&
+        normalized !== 'paid' &&
+        normalized !== 'refunded' &&
+        normalized !== 'refund_pending';
+      if (shouldNotifyPayment) {
+        await this.createPaymentNotification({
+          phone: patientPhone,
+          type: 'payment_pending',
+          title: 'Thông báo thanh toán dịch vụ',
+          content:
+            `Ca khám #${appointmentId} có chi phí dịch vụ cần thanh toán. ` +
+            `Tổng tiền tạm tính: ${this.formatCurrency(total)}.`,
+          dedupeKey: `[EXAM_PAYMENT_PENDING_DK_MA=${appointmentId}]`,
+        });
+      }
+    }
+
+    return {
+      message: 'Xac nhan kham hoan tat thanh cong',
+      ...(await this.getDoctorExamWorkflow(user, appointmentId)),
+    };
+  }
+
+  async completeEncounterAfterPayment(
+    user: CurrentUserPayload,
+    appointmentId: number,
+    dto: CompleteEncounterDto,
+  ) {
+    const appointment = await this.getDoctorAppointmentForExamOrThrow(user, appointmentId);
+    const currentStatus = appointment.DK_TRANG_THAI || '';
+    if (![APPOINTMENT_STATUS.DA_KHAM, APPOINTMENT_STATUS.HOAN_TAT].includes(currentStatus as any)) {
+      throw new BadRequestException('Ca kham chua ket thuc chuyen mon');
+    }
+    const latestPayment = appointment.THANH_TOAN?.[0] || null;
+    const normalized = latestPayment
+      ? this.normalizePaymentStatus(latestPayment.TT_TRANG_THAI, latestPayment.TT_THOI_GIAN)
+      : 'unpaid';
+    if (normalized !== 'paid') {
+      throw new BadRequestException('Can thanh toan thanh cong truoc khi hoan tat ho so');
+    }
+    if (appointment.DK_TRANG_THAI === APPOINTMENT_STATUS.HOAN_TAT) {
+      return {
+        message: 'Ho so da hoan tat',
+        ...(await this.getDoctorExamWorkflow(user, appointmentId)),
+      };
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.dANG_KY.update({
+        where: { DK_MA: appointmentId },
+        data: { DK_TRANG_THAI: APPOINTMENT_STATUS.HOAN_TAT },
+      });
+      await tx.aUDIT_LOG.create({
+        data: {
+          AL_TABLE: 'DANG_KY',
+          AL_ACTION: 'ENCOUNTER_COMPLETED_AFTER_PAYMENT',
+          AL_PK: { DK_MA: appointmentId },
+          AL_OLD: { DK_TRANG_THAI: appointment.DK_TRANG_THAI },
+          AL_NEW: {
+            DK_TRANG_THAI: APPOINTMENT_STATUS.HOAN_TAT,
+            note: dto.note || null,
+          },
+          AL_CHANGED_BY: user.TK_SDT,
+        },
+      });
+    });
+
+    const patientPhone = appointment.BENH_NHAN?.TK_SDT || appointment.BENH_NHAN?.BN_SDT_DANG_KY || null;
+    if (patientPhone) {
+      await this.createAppointmentNotification({
+        appointmentId,
+        phone: patientPhone,
+        type: 'system_auto',
+        title: 'Ho so kham benh da hoan tat',
+        content:
+          `Ho so kham benh DK_MA=${appointmentId} da hoan tat.` +
+          ` Ket qua kham, don thuoc va hoa don da san sang tren he thong.`,
+        dedupeKey: `[ENCOUNTER_COMPLETED_DK_MA=${appointmentId}]`,
+      });
+    }
+
+    return {
+      message: 'Hoan tat ho so kham benh thanh cong',
+      ...(await this.getDoctorExamWorkflow(user, appointmentId)),
+    };
+  }
+
+  private buildDoctorWorklistWhere(bsMa: number, query: DoctorWorklistQueryDto) {
+    const targetDate = query.date ? parseDateOnly(query.date) : undefined;
+    const statusList = this.parseStatusList(query.status);
+
+    return {
+      BS_MA: bsMa,
+      ...(targetDate ? { N_NGAY: targetDate } : {}),
+      ...(query.shift ? { B_TEN: query.shift } : {}),
+      ...(statusList.length > 0 ? { DK_TRANG_THAI: { in: statusList } } : {}),
+      ...(query.roomId ? { LICH_BSK: { P_MA: query.roomId } } : {}),
+    } satisfies Prisma.DANG_KYWhereInput;
+  }
+
+  private mapDoctorWorklistItem(row: any) {
+    const latestPayment = row.THANH_TOAN?.[0] || null;
+    return {
+      DK_MA: row.DK_MA,
+      BN_MA: row.BN_MA,
+      patientName: `${row.BENH_NHAN?.BN_HO_CHU_LOT || ''} ${row.BENH_NHAN?.BN_TEN || ''}`
+        .trim()
+        .trim(),
+      patientDob: row.BENH_NHAN?.BN_NGAY_SINH || null,
+      patientPhone: row.BENH_NHAN?.BN_SDT_DANG_KY || row.BENH_NHAN?.TK_SDT || null,
+      N_NGAY: row.N_NGAY,
+      B_TEN: row.B_TEN,
+      KG_MA: row.KG_MA,
+      KG_BAT_DAU: row.KHUNG_GIO?.KG_BAT_DAU || null,
+      KG_KET_THUC: row.KHUNG_GIO?.KG_KET_THUC || null,
+      DK_TRANG_THAI: row.DK_TRANG_THAI,
+      note: row.DK_LY_DO_HUY || null,
+      preVisitSymptoms: row.DK_TRIEU_CHUNG || null,
+      preVisitNote: row.DK_GHI_CHU_TIEN_KHAM || null,
+      paymentStatus: latestPayment
+        ? this.normalizePaymentStatus(latestPayment.TT_TRANG_THAI, latestPayment.TT_THOI_GIAN)
+        : 'unpaid',
+      roomId: row.LICH_BSK?.P_MA || null,
+      roomName: row.LICH_BSK?.PHONG?.P_TEN || null,
+    };
+  }
+
   async getDoctorWorklist(user: CurrentUserPayload, query: DoctorWorklistQueryDto) {
     const bsMa = user.bsMa;
     if (!bsMa) throw new ForbiddenException('Tai khoan hien tai khong phai bac si');
@@ -2586,15 +3853,7 @@ export class AppointmentsService {
     const page = query.page ?? 1;
     const limit = query.limit ?? 50;
     const skip = (page - 1) * limit;
-    const targetDate = query.date ? parseDateOnly(query.date) : undefined;
-    const statusList = this.parseStatusList(query.status);
-
-    const where: Prisma.DANG_KYWhereInput = {
-      BS_MA: bsMa,
-      ...(targetDate ? { N_NGAY: targetDate } : {}),
-      ...(query.shift ? { B_TEN: query.shift } : {}),
-      ...(statusList.length > 0 ? { DK_TRANG_THAI: { in: statusList } } : {}),
-    };
+    const where = this.buildDoctorWorklistWhere(bsMa, query);
 
     const [total, rows] = await this.prisma.$transaction([
       this.prisma.dANG_KY.count({ where }),
@@ -2606,6 +3865,11 @@ export class AppointmentsService {
         include: {
           BENH_NHAN: true,
           KHUNG_GIO: true,
+          LICH_BSK: {
+            include: {
+              PHONG: true,
+            },
+          },
           THANH_TOAN: {
             orderBy: { TT_THOI_GIAN: 'desc' },
             take: 1,
@@ -2615,37 +3879,121 @@ export class AppointmentsService {
     ]);
 
     return {
-      items: rows.map((row) => {
-        const latestPayment = row.THANH_TOAN[0] || null;
-        return {
-          DK_MA: row.DK_MA,
-          BN_MA: row.BN_MA,
-          patientName: `${row.BENH_NHAN?.BN_HO_CHU_LOT || ''} ${row.BENH_NHAN?.BN_TEN || ''}`
-            .trim()
-            .trim(),
-          N_NGAY: row.N_NGAY,
-          B_TEN: row.B_TEN,
-          KG_MA: row.KG_MA,
-          KG_BAT_DAU: row.KHUNG_GIO?.KG_BAT_DAU || null,
-          KG_KET_THUC: row.KHUNG_GIO?.KG_KET_THUC || null,
-          DK_TRANG_THAI: row.DK_TRANG_THAI,
-          note: row.DK_LY_DO_HUY || null,
-          preVisitSymptoms: row.DK_TRIEU_CHUNG || null,
-          preVisitNote: row.DK_GHI_CHU_TIEN_KHAM || null,
-          paymentStatus: latestPayment
-            ? this.normalizePaymentStatus(
-                latestPayment.TT_TRANG_THAI,
-                latestPayment.TT_THOI_GIAN,
-              )
-            : 'unpaid',
-        };
-      }),
+      items: rows.map((row) => this.mapDoctorWorklistItem(row)),
       meta: {
         page,
         limit,
         total,
         totalPages: Math.max(1, Math.ceil(total / limit)),
       },
+    };
+  }
+
+  async exportDoctorWorklistPdf(user: CurrentUserPayload, query: DoctorWorklistQueryDto) {
+    if (!user.bsMa) throw new ForbiddenException('Tai khoan hien tai khong phai bac si');
+
+    const where = this.buildDoctorWorklistWhere(user.bsMa, query);
+    const [doctor, rows] = await Promise.all([
+      this.prisma.bAC_SI.findUnique({
+        where: { BS_MA: user.bsMa },
+        include: { CHUYEN_KHOA: true },
+      }),
+      this.prisma.dANG_KY.findMany({
+        where,
+        orderBy: [{ N_NGAY: 'asc' }, { B_TEN: 'asc' }, { KG_MA: 'asc' }, { DK_STT: 'asc' }],
+        include: {
+          BENH_NHAN: true,
+          KHUNG_GIO: true,
+          LICH_BSK: {
+            include: {
+              PHONG: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    const items = rows.map((row) => this.mapDoctorWorklistItem(row));
+    const shiftLabel = (shift?: string) => {
+      const normalized = (shift || '').toUpperCase();
+      if (normalized === 'SANG') return 'Sáng';
+      if (normalized === 'CHIEU') return 'Chiều';
+      if (normalized === 'TOI') return 'Tối';
+      return shift || '-';
+    };
+
+    const tableRows =
+      items.length > 0
+        ? items.map((item) => [
+            shiftLabel(item.B_TEN),
+            item.roomName || '-',
+            `${this.formatTimeOnly(item.KG_BAT_DAU)} - ${this.formatTimeOnly(item.KG_KET_THUC)}`,
+            item.patientName || '-',
+            `#${item.DK_MA}`,
+            `#${item.BN_MA}`,
+            item.patientPhone || '-',
+            item.preVisitSymptoms || '-',
+            item.preVisitNote || '-',
+          ])
+        : [['-', '-', '-', '-', '-', '-', '-', '-', '-']];
+
+    const subtitleDate = query.date ? this.formatDateOnly(query.date) : 'Toàn bộ ngày';
+    const subtitleShift = query.shift ? shiftLabel(query.shift) : 'Toàn bộ buổi';
+
+    const report = await this.pdfService.buildReport({
+      title: 'DANH SÁCH BỆNH NHÂN ĐẶT KHÁM',
+      subtitle: `Bác sĩ: ${doctor?.BS_HO_TEN || `#${user.bsMa}`}`,
+      metadataLines: [
+        `Mã bác sĩ: ${user.bsMa}`,
+        `Chuyên khoa: ${doctor?.CHUYEN_KHOA?.CK_TEN || '-'}`,
+        `Ngày: ${subtitleDate}`,
+        `Buổi: ${subtitleShift}`,
+        query.roomId ? `Phòng lọc: #${query.roomId}` : 'Phòng lọc: Tất cả',
+        `Người xuất: ${user.TK_SDT}`,
+      ],
+      sections: [
+        {
+          heading: 'Danh sách theo khung giờ và phòng',
+          paragraphs: [
+            `Tổng số bệnh nhân: ${items.length}`,
+            'Dữ liệu được sắp xếp theo buổi, phòng và khung giờ.',
+          ],
+          table: {
+            headers: [
+              'Buổi',
+              'Phòng',
+              'Khung giờ',
+              'Bệnh nhân',
+              'Mã lịch hẹn',
+              'Mã hồ sơ',
+              'SĐT',
+              'Triệu chứng',
+              'Ghi chú',
+            ],
+            rows: tableRows,
+          },
+        },
+      ],
+    });
+
+    await this.writeAuditLog({
+      table: 'DANG_KY',
+      action: 'DOCTOR_WORKLIST_PDF_EXPORTED',
+      actor: user.TK_SDT,
+      pk: { BS_MA: user.bsMa },
+      next: {
+        date: query.date || null,
+        shift: query.shift || null,
+        roomId: query.roomId || null,
+        totalItems: items.length,
+      },
+    });
+
+    const fileDate = query.date || 'all-dates';
+    const fileShift = (query.shift || 'all-shifts').toLowerCase();
+    return {
+      filename: `doctor-worklist-${user.bsMa}-${fileDate}-${fileShift}.pdf`,
+      buffer: report,
     };
   }
 
@@ -2808,36 +4156,42 @@ export class AppointmentsService {
       String(item.noShow ?? 0),
     ]);
 
+    const groupByTextMap: Record<string, string> = {
+      day: 'ngày',
+      week: 'tuần',
+      month: 'tháng',
+    };
+
     const report = await this.pdfService.buildReport({
-      title: 'BAO CAO THONG KE PHUC VU BAC SI',
-      subtitle: `Bac si: ${doctor?.BS_HO_TEN || `#${user.bsMa}`}`,
+      title: 'BÁO CÁO THỐNG KÊ PHỤC VỤ BÁC SĨ',
+      subtitle: `Bác sĩ: ${doctor?.BS_HO_TEN || `#${user.bsMa}`}`,
       metadataLines: [
-        `Doctor ID: ${user.bsMa}`,
-        `Specialty: ${doctor?.CHUYEN_KHOA?.CK_TEN || '-'}`,
-        `Exported by: ${user.TK_SDT}`,
+        `Mã bác sĩ: ${user.bsMa}`,
+        `Chuyên khoa: ${doctor?.CHUYEN_KHOA?.CK_TEN || '-'}`,
+        `Người xuất: ${user.TK_SDT}`,
       ],
       sections: [
         {
-          heading: 'Tong quan',
+          heading: 'Tổng quan',
           keyValues: [
-            { label: 'Khoang ngay', value: `${summary.fromDate} -> ${summary.toDate}` },
-            { label: 'Tong lich hen', value: String(summary.totalAppointments ?? 0) },
-            { label: 'Da kham', value: String(summary.completedAppointments ?? 0) },
-            { label: 'Da huy', value: String(summary.canceledAppointments ?? 0) },
+            { label: 'Khoảng ngày', value: `${summary.fromDate} -> ${summary.toDate}` },
+            { label: 'Tổng lịch hẹn', value: String(summary.totalAppointments ?? 0) },
+            { label: 'Đã khám', value: String(summary.completedAppointments ?? 0) },
+            { label: 'Đã hủy', value: String(summary.canceledAppointments ?? 0) },
             { label: 'No-show', value: String(summary.noShowAppointments ?? 0) },
-            { label: 'Da check-in', value: String(summary.totalCheckedIn ?? 0) },
-            { label: 'Sap toi', value: String(summary.upcomingAppointments ?? 0) },
-            { label: 'Lich hom nay', value: String(summary.todayAppointments ?? 0) },
-            { label: 'Lich tuan nay', value: String(summary.thisWeekAppointments ?? 0) },
-            { label: 'Ty le huy (%)', value: String(summary.cancellationRate ?? 0) },
-            { label: 'Ty le no-show (%)', value: String(summary.noShowRate ?? 0) },
+            { label: 'Đã check-in', value: String(summary.totalCheckedIn ?? 0) },
+            { label: 'Sắp tới', value: String(summary.upcomingAppointments ?? 0) },
+            { label: 'Lịch hôm nay', value: String(summary.todayAppointments ?? 0) },
+            { label: 'Lịch tuần này', value: String(summary.thisWeekAppointments ?? 0) },
+            { label: 'Tỷ lệ hủy (%)', value: String(summary.cancellationRate ?? 0) },
+            { label: 'Tỷ lệ no-show (%)', value: String(summary.noShowRate ?? 0) },
           ],
         },
         {
-          heading: 'Xu huong theo thoi gian',
-          paragraphs: [`Group by: ${trends.groupBy || 'day'}`],
+          heading: 'Xu hướng theo thời gian',
+          paragraphs: [`Nhóm theo: ${groupByTextMap[trends.groupBy] || trends.groupBy || 'ngày'}`],
           table: {
-            headers: ['Moc thoi gian', 'Tong', 'Da kham', 'Huy', 'No-show'],
+            headers: ['Mốc thời gian', 'Tổng', 'Đã khám', 'Hủy', 'No-show'],
             rows: trendTableRows.length > 0 ? trendTableRows : [['-', '0', '0', '0', '0']],
           },
         },
@@ -2871,10 +4225,13 @@ export class AppointmentsService {
     const sample = resolved.recipients.slice(0, 20);
 
     return {
+      quickPreset: resolved.quickPreset,
       targetGroup: resolved.targetGroup,
       recipientScope: resolved.recipientScope,
+      summaryText: resolved.summaryText,
       scopeSummary: resolved.scopeSummary,
       filterSummary: resolved.filterSummary,
+      resolvedFilter: resolved.normalizedFilter,
       totalRecipients: resolved.recipients.length,
       previewRecipients: sample,
       sampleRecipients: sample,
@@ -2893,8 +4250,10 @@ export class AppointmentsService {
 
     const idempotencyPayload = {
       type: dto.type,
+      quickPreset: resolved.quickPreset,
       targetGroup: resolved.targetGroup,
       recipientScope: resolved.recipientScope,
+      summaryText: resolved.summaryText,
       title: dto.title || null,
       message: dto.message.trim(),
       appointmentIds: resolved.normalizedIds,
@@ -2940,8 +4299,10 @@ export class AppointmentsService {
           TBB_TRANG_THAI: 'QUEUED',
           TBB_NGUOI_TAO: user.TK_SDT,
           TBB_METADATA: {
+            quickPreset: resolved.quickPreset,
             targetGroup: resolved.targetGroup,
             recipientScope: resolved.recipientScope,
+            summaryText: resolved.summaryText,
             warnings: resolved.warnings,
             scopeSummary: resolved.scopeSummary,
           },
@@ -2964,6 +4325,7 @@ export class AppointmentsService {
           AL_PK: { TBB_MA: batch.TBB_MA },
           AL_NEW: {
             type: dto.type,
+            quickPreset: resolved.quickPreset,
             targetGroup: resolved.targetGroup,
             recipientCount: resolved.recipients.length,
             criteria: idempotencyPayload,
@@ -2981,7 +4343,9 @@ export class AppointmentsService {
       batchId: created.TBB_MA,
       totalRecipients: resolved.recipients.length,
       status: 'QUEUED',
+      quickPreset: resolved.quickPreset,
       targetGroup: resolved.targetGroup,
+      summaryText: resolved.summaryText,
       warnings: resolved.warnings,
     };
   }
@@ -3157,12 +4521,13 @@ export class AppointmentsService {
   }
 
   async processQueuedBulkNotificationBatches() {
-    const required = await this.hasOptionalTables([
-      'public."THONG_BAO_BATCH"',
-      'public."THONG_BAO_BATCH_RECIPIENT"',
-      'public."THONG_BAO"',
-    ]);
-    if (!required) return { processedBatches: 0, skippedByMissingTables: true };
+    try {
+      const required = await this.hasOptionalTables([
+        'public."THONG_BAO_BATCH"',
+        'public."THONG_BAO_BATCH_RECIPIENT"',
+        'public."THONG_BAO"',
+      ]);
+      if (!required) return { processedBatches: 0, skippedByMissingTables: true };
 
     const batch = await this.prisma.tHONG_BAO_BATCH.findFirst({
       where: { TBB_TRANG_THAI: { in: ['QUEUED', 'PROCESSING'] } },
@@ -3296,7 +4661,14 @@ export class AppointmentsService {
       return { processedBatches: 1, batchId: latestBatch.TBB_MA, success, failed };
     });
 
-    return lockedResult || { processedBatches: 0, skippedByLock: true };
+      return lockedResult || { processedBatches: 0, skippedByLock: true };
+    } catch (e) {
+      if (this.isOptionalFeatureUnavailableError(e)) {
+        this.optionalTableExistsCache.clear();
+        return { processedBatches: 0, skippedByMissingTables: true };
+      }
+      throw e;
+    }
   }
 
   async getOpsDashboard(query: OpsDashboardQueryDto) {

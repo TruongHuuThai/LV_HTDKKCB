@@ -31,7 +31,18 @@ import {
   CreateOrUpdatePreVisitInfoDto,
   DeleteAttachmentDto,
   DoctorStatsQueryDto,
+  StartDoctorExamDto,
+  UpdateDoctorClinicalNoteDto,
+  CreateDoctorClinicalOrdersDto,
+  UpdateDoctorOrderResultDto,
+  CreateDoctorPrescriptionDto,
+  FinishDoctorClinicalDto,
+  GenerateEncounterBillingDto,
+  MarkEncounterPaymentDto,
+  CompleteEncounterDto,
+  ConfirmDoctorExamDto,
   DoctorUpdateAppointmentStatusDto,
+  DoctorCatalogQueryDto,
   DoctorWorklistQueryDto,
   JoinWaitlistDto,
   ManualBookingDto,
@@ -421,6 +432,28 @@ export class DoctorAppointmentsController {
     return this.appointments.getDoctorWorklist(user, query);
   }
 
+  @Get('catalog/clinical-services')
+  async clinicalServiceCatalog(@Query() query: DoctorCatalogQueryDto) {
+    return this.appointments.getDoctorClinicalServiceCatalog(query);
+  }
+
+  @Get('catalog/medicines')
+  async medicineCatalog(@Query() query: DoctorCatalogQueryDto) {
+    return this.appointments.getDoctorMedicineCatalog(query);
+  }
+
+  @Get('worklist/pdf')
+  async worklistPdf(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query() query: DoctorWorklistQueryDto,
+    @Res() res: Response,
+  ) {
+    const result = await this.appointments.exportDoctorWorklistPdf(user, query);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+    res.send(result.buffer);
+  }
+
   @Patch(':appointmentId/status')
   async updateStatus(
     @CurrentUser() user: CurrentUserPayload,
@@ -428,6 +461,151 @@ export class DoctorAppointmentsController {
     @Body() dto: DoctorUpdateAppointmentStatusDto,
   ) {
     return this.appointments.updateStatusByDoctor(user, appointmentId, dto);
+  }
+
+  @Patch(':appointmentId/start-exam')
+  async startExam(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('appointmentId', ParseIntPipe) appointmentId: number,
+    @Body() dto: StartDoctorExamDto,
+  ) {
+    return this.appointments.startDoctorExam(user, appointmentId, dto);
+  }
+
+  @Get(':appointmentId/exam-workflow')
+  async examWorkflow(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('appointmentId', ParseIntPipe) appointmentId: number,
+  ) {
+    return this.appointments.getDoctorExamWorkflow(user, appointmentId);
+  }
+
+  @Patch(':appointmentId/clinical-note')
+  async updateClinicalNote(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('appointmentId', ParseIntPipe) appointmentId: number,
+    @Body() dto: UpdateDoctorClinicalNoteDto,
+  ) {
+    return this.appointments.updateDoctorClinicalNote(user, appointmentId, dto);
+  }
+
+  @Post(':appointmentId/orders')
+  async createOrders(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('appointmentId', ParseIntPipe) appointmentId: number,
+    @Body() dto: CreateDoctorClinicalOrdersDto,
+  ) {
+    return this.appointments.createDoctorClinicalOrders(user, appointmentId, dto);
+  }
+
+  @Get(':appointmentId/orders')
+  async getOrders(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('appointmentId', ParseIntPipe) appointmentId: number,
+  ) {
+    return this.appointments.getDoctorClinicalOrders(user, appointmentId);
+  }
+
+  @Patch(':appointmentId/orders/:orderId/services/:serviceId/result')
+  async updateOrderResult(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('appointmentId', ParseIntPipe) appointmentId: number,
+    @Param('orderId', ParseIntPipe) orderId: number,
+    @Param('serviceId', ParseIntPipe) serviceId: number,
+    @Body() dto: UpdateDoctorOrderResultDto,
+  ) {
+    return this.appointments.updateDoctorClinicalOrderResult(
+      user,
+      appointmentId,
+      orderId,
+      serviceId,
+      dto,
+    );
+  }
+
+  @Post(':appointmentId/prescriptions')
+  async createPrescription(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('appointmentId', ParseIntPipe) appointmentId: number,
+    @Body() dto: CreateDoctorPrescriptionDto,
+  ) {
+    return this.appointments.createDoctorPrescription(user, appointmentId, dto);
+  }
+
+  @Get(':appointmentId/prescriptions')
+  async getPrescriptions(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('appointmentId', ParseIntPipe) appointmentId: number,
+  ) {
+    return this.appointments.getDoctorPrescriptions(user, appointmentId);
+  }
+
+  @Patch(':appointmentId/finish-clinical')
+  async finishClinical(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('appointmentId', ParseIntPipe) appointmentId: number,
+    @Body() dto: FinishDoctorClinicalDto,
+  ) {
+    return this.appointments.finishDoctorClinical(user, appointmentId, dto);
+  }
+
+  @Post(':appointmentId/billing/generate')
+  async generateBilling(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('appointmentId', ParseIntPipe) appointmentId: number,
+    @Body() dto: GenerateEncounterBillingDto,
+  ) {
+    return this.appointments.generateEncounterBilling(user, appointmentId, dto);
+  }
+
+  @Patch(':appointmentId/billing/:paymentId/mark-paid')
+  async markBillingPaid(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('appointmentId', ParseIntPipe) appointmentId: number,
+    @Param('paymentId', ParseIntPipe) paymentId: number,
+    @Body() dto: MarkEncounterPaymentDto,
+  ) {
+    return this.appointments.markEncounterPaymentAsPaid(
+      user,
+      appointmentId,
+      paymentId,
+      dto,
+    );
+  }
+
+  @Patch(':appointmentId/complete')
+  async completeEncounter(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('appointmentId', ParseIntPipe) appointmentId: number,
+    @Body() dto: CompleteEncounterDto,
+  ) {
+    return this.appointments.completeEncounterAfterPayment(user, appointmentId, dto);
+  }
+
+  @Patch(':appointmentId/complete-exam')
+  async completeExam(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('appointmentId', ParseIntPipe) appointmentId: number,
+    @Body() dto: ConfirmDoctorExamDto,
+  ) {
+    return this.appointments.confirmDoctorExamComplete(user, appointmentId, dto);
+  }
+
+  @Get(':appointmentId/orders/:orderId/pdf')
+  async orderPdf(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('appointmentId', ParseIntPipe) appointmentId: number,
+    @Param('orderId', ParseIntPipe) orderId: number,
+    @Res() res: Response,
+  ) {
+    const result = await this.appointments.exportDoctorClinicalOrderPdf(
+      user,
+      appointmentId,
+      orderId,
+    );
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${result.filename}"`);
+    res.send(result.buffer);
   }
 
   @Get(':appointmentId/pre-visit-info')

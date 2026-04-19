@@ -776,4 +776,11 @@ export const doctorScheduleWorkflowApi = {
     const res = await axiosClient.post('/schedules/exception-requests', data);
     return res.data;
   },
+
+  downloadWeeklySchedulePdf: async (weekStart?: string) => {
+    await downloadPdf('/schedules/weekly-schedules/pdf', {
+      params: { weekStart },
+      fallbackFilename: 'doctor-weekly-schedule.pdf',
+    });
+  },
 };

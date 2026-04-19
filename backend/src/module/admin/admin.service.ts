@@ -4367,6 +4367,68 @@ export class AdminService {
     };
   }
 
+  async exportDoctorWeeklySchedulePdf(
+    BS_MA: number,
+    weekStartRaw?: string,
+    exportedBy = 'DOCTOR',
+  ) {
+    const [overview, list] = await Promise.all([
+      this.getDoctorWeekOverview(BS_MA, weekStartRaw),
+      this.getDoctorWeeklySchedules(BS_MA, weekStartRaw),
+    ]);
+
+    const rows = (list as any)?.items || [];
+    const tableRows = rows.map((item: any) => [
+      this.toDateOnlyIso(new Date(item.N_NGAY)),
+      item.B_TEN || '-',
+      item.room?.P_TEN || `Phong #${item.P_MA}`,
+      item.status || '-',
+      String(item.bookingCount ?? 0),
+      String(item.slotCount ?? 0),
+    ]);
+
+    const report = await this.pdfService.buildReport({
+      title: 'LỊCH LÀM VIỆC THEO TUẦN (BÁC SĨ)',
+      subtitle: `Bác sĩ: ${overview?.doctor?.BS_HO_TEN || `#${BS_MA}`} | Tuần ${overview.weekStartDate} -> ${overview.weekEndDate}`,
+      metadataLines: [
+        `Mã bác sĩ: ${overview?.doctor?.BS_MA ?? BS_MA}`,
+        `Chuyên khoa: ${overview?.doctor?.CHUYEN_KHOA?.CK_TEN || '-'}`,
+        `Người xuất: ${exportedBy}`,
+      ],
+      sections: [
+        {
+          heading: 'Tổng quan tuần',
+          keyValues: [
+            { label: 'Trạng thái chu kỳ', value: overview.workflowStatus || '-' },
+            { label: 'Tổng ca', value: String(overview.summary?.total ?? rows.length) },
+            { label: 'Đã xác nhận', value: String(overview.summary?.confirmed ?? 0) },
+            { label: 'Cần điều chỉnh', value: String(overview.summary?.changeRequested ?? 0) },
+            { label: 'Ca chính thức', value: String(overview.summary?.finalized ?? 0) },
+          ],
+        },
+        {
+          heading: 'Danh sách ca làm việc',
+          table: {
+            headers: ['Ngày', 'Buổi', 'Phòng', 'Trạng thái', 'Lịch hẹn', 'Slot'],
+            rows: tableRows.length > 0 ? tableRows : [['-', '-', '-', '-', '0', '0']],
+          },
+        },
+      ],
+    });
+
+    await this.writePdfAuditLog('DOCTOR_WEEKLY_SCHEDULE_PDF_EXPORTED', exportedBy, {
+      doctorId: BS_MA,
+      weekStart: overview.weekStartDate,
+      weekEnd: overview.weekEndDate,
+      count: rows.length,
+    });
+
+    return {
+      filename: `doctor-weekly-schedule-${BS_MA}-${overview.weekStartDate}.pdf`,
+      buffer: report,
+    };
+  }
+
   async exportPatientsPdf(
     params: {
       search?: string;

@@ -1,6 +1,7 @@
 import {
   APPOINTMENT_STATUS,
   canTransitionAppointmentStatus,
+  isAppointmentTerminalStatus,
 } from './appointments.status';
 
 describe('appointment status transition', () => {
@@ -38,5 +39,18 @@ describe('appointment status transition', () => {
         APPOINTMENT_STATUS.CHO_KHAM,
       ),
     ).toBe(false);
+  });
+
+  it('allows DA_KHAM -> HOAN_TAT', () => {
+    expect(
+      canTransitionAppointmentStatus(
+        APPOINTMENT_STATUS.DA_KHAM,
+        APPOINTMENT_STATUS.HOAN_TAT,
+      ),
+    ).toBe(true);
+  });
+
+  it('marks HOAN_TAT as terminal', () => {
+    expect(isAppointmentTerminalStatus(APPOINTMENT_STATUS.HOAN_TAT)).toBe(true);
   });
 });

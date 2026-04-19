@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+﻿import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -40,6 +40,7 @@ import {
   notificationsApi,
   type AdminBulkNotificationPayload,
   type AdminBulkNotificationType,
+  type AdminNotificationQuickPreset,
   type AdminNotificationRecipientScope,
   type AdminNotificationTargetGroup,
 } from '@/services/api/notificationsApi';
@@ -115,7 +116,7 @@ interface TargetGroupOption {
 }
 
 interface QuickTargetPreset {
-  id: string;
+  id: AdminNotificationQuickPreset;
   label: string;
   targetGroup: AdminNotificationTargetGroup;
   description: string;
@@ -379,7 +380,7 @@ export default function AdminNotificationsPage() {
   const [doctorPickerValue, setDoctorPickerValue] = useState('all');
   const [listTypeFilter, setListTypeFilter] = useState<'' | AdminBulkNotificationType>('');
   const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null);
-  const [lastQuickPreset, setLastQuickPreset] = useState<string | undefined>(undefined);
+  const [lastQuickPreset, setLastQuickPreset] = useState<AdminNotificationQuickPreset | undefined>(undefined);
 
   const selectedTypeOption = useMemo(() => TYPE_OPTIONS.find((item) => item.value === type), [type]);
   const selectedTargetOption = useMemo(
@@ -617,6 +618,7 @@ export default function AdminNotificationsPage() {
   const handleCreate = () => {
     if (!validateBeforeSubmit()) return;
 
+    const naturalSummary = preview?.summaryText ? `\n\nPhạm vi gửi: ${preview.summaryText}` : '';
     const warningText = preview?.warnings?.length
       ? `\n\nCảnh báo:\n- ${preview.warnings.join('\n- ')}`
       : targetGroup === 'ALL_USERS'
@@ -624,8 +626,8 @@ export default function AdminNotificationsPage() {
         : '';
 
     const confirmText = preview?.totalRecipients
-      ? `Bạn sắp gửi thông báo đến ${preview.totalRecipients} người nhận. Bạn có chắc chắn muốn tiếp tục?${warningText}`
-      : `Bạn sắp gửi thông báo theo phạm vi đã chọn. Bạn có chắc chắn muốn tiếp tục?${warningText}`;
+      ? `Bạn sắp gửi thông báo đến ${preview.totalRecipients} người nhận. Bạn có chắc chắn muốn tiếp tục?${naturalSummary}${warningText}`
+      : `Bạn sắp gửi thông báo theo phạm vi đã chọn. Bạn có chắc chắn muốn tiếp tục?${naturalSummary}${warningText}`;
 
     if (!window.confirm(confirmText)) {
       return;
@@ -635,6 +637,7 @@ export default function AdminNotificationsPage() {
   };
 
   const recipientSummaryLine = useMemo(() => {
+    if (preview?.summaryText) return preview.summaryText;
     if (preview?.scopeSummary) return preview.scopeSummary;
 
     if (targetGroup === 'ALL_USERS') return 'Gửi cho toàn bộ người dùng trong hệ thống.';
@@ -645,15 +648,15 @@ export default function AdminNotificationsPage() {
     if (specificDate) return `Gửi cho bệnh nhân có lịch vào ngày ${specificDate}.`;
     if (fromDate || toDate) return `Gửi cho bệnh nhân theo khoảng ngày ${fromDate || '...'} đến ${toDate || '...'}.`;
     return 'Gửi cho bệnh nhân theo phạm vi mặc định.';
-  }, [fromDate, preview?.scopeSummary, specificDate, targetGroup, toDate]);
+  }, [fromDate, preview?.scopeSummary, preview?.summaryText, specificDate, targetGroup, toDate]);
 
   const stepCompletion = {
     type: Boolean(type),
     recipient: Boolean(targetGroup),
     filters:
-      targetGroup !== 'ADVANCED_FILTER' ||
-      hasAdvancedMeaningfulFilter ||
-      targetGroup === 'ADVANCED_FILTER',
+      (targetGroup === 'ADVANCED_FILTER' && hasAdvancedMeaningfulFilter) ||
+      (targetGroup === 'BY_SPECIALTY' && specialtyIds.length > 0) ||
+      (targetGroup !== 'ADVANCED_FILTER' && targetGroup !== 'BY_SPECIALTY'),
     preview: Boolean(preview),
     content: Boolean(message.trim()),
     send: createMutation.isSuccess,
@@ -1065,6 +1068,9 @@ export default function AdminNotificationsPage() {
               <div className="space-y-3">
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
                   <p className="text-sm font-medium leading-5 text-slate-800">{recipientSummaryLine}</p>
+                  {preview?.summaryText ? (
+                    <p className="mt-1 text-xs text-slate-500">{preview.summaryText}</p>
+                  ) : null}
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {(preview?.filterSummary || []).length === 0 ? (
                       <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-500">
@@ -1161,6 +1167,9 @@ export default function AdminNotificationsPage() {
                     <p className="mt-0.5 text-sm font-semibold text-slate-900">
                       {preview?.totalRecipients ? `${preview.totalRecipients} người (preview)` : 'Theo bộ lọc đã chọn'}
                     </p>
+                    {preview?.summaryText ? (
+                      <p className="mt-1 text-xs text-slate-500">{preview.summaryText}</p>
+                    ) : null}
                   </div>
                   <div className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2">
                     <p className="text-[11px] uppercase tracking-wide text-slate-500">Tiêu đề</p>

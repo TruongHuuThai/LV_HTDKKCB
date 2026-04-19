@@ -59,6 +59,12 @@ export type AdminNotificationTargetGroup =
   | 'ADVANCED_FILTER';
 
 export type AdminNotificationRecipientScope = 'PATIENTS' | 'DOCTORS' | 'ALL_USERS';
+export type AdminNotificationQuickPreset =
+  | 'all_patients'
+  | 'all_doctors'
+  | 'all_users'
+  | 'patients_today'
+  | 'patients_tomorrow';
 
 export interface AdminBulkNotificationFilters {
   specialtyIds?: number[];
@@ -79,7 +85,7 @@ export interface AdminBulkNotificationPayload {
   title?: string;
   targetGroup?: AdminNotificationTargetGroup;
   filters?: AdminBulkNotificationFilters;
-  quickPreset?: string;
+  quickPreset?: AdminNotificationQuickPreset;
 
   // Legacy fields kept for compatibility with existing backend filters.
   appointmentIds?: number[];
@@ -93,10 +99,13 @@ export interface AdminBulkNotificationPayload {
 }
 
 export interface AdminBulkNotificationPreviewResponse {
+  quickPreset?: AdminNotificationQuickPreset | null;
   targetGroup?: AdminNotificationTargetGroup;
   recipientScope?: AdminNotificationRecipientScope;
+  summaryText?: string;
   scopeSummary?: string;
   filterSummary?: string[];
+  resolvedFilter?: AdminBulkNotificationFilters;
   warnings?: string[];
   emptyReason?: string | null;
   totalRecipients: number;
@@ -200,7 +209,9 @@ export const notificationsApi = {
       duplicatedRequest?: boolean;
       totalRecipients?: number;
       status?: string;
+      quickPreset?: AdminNotificationQuickPreset | null;
       targetGroup?: AdminNotificationTargetGroup;
+      summaryText?: string;
       warnings?: string[];
     };
   },

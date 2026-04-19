@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsIn,
   IsInt,
   IsOptional,
@@ -14,6 +15,7 @@ import {
 } from 'class-validator';
 import { APPOINTMENT_STATUS } from './appointments.status';
 import {
+  BULK_NOTIFICATION_QUICK_PRESET_VALUES,
   BULK_NOTIFICATION_RECIPIENT_SCOPE_VALUES,
   BULK_NOTIFICATION_TARGET_GROUP_VALUES,
 } from './notification-targeting.constants';
@@ -158,7 +160,26 @@ export class DoctorWorklistQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  roomId?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
   page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number;
+}
+
+export class DoctorCatalogQueryDto {
+  @IsOptional()
+  @IsString()
+  keyword?: string;
 
   @IsOptional()
   @Type(() => Number)
@@ -197,6 +218,146 @@ export class DoctorUpdateAppointmentStatusDto {
   @IsOptional()
   @IsString()
   reason?: string;
+}
+
+export class StartDoctorExamDto {
+  @IsOptional()
+  @IsString()
+  note?: string;
+}
+
+export class UpdateDoctorClinicalNoteDto {
+  @IsOptional()
+  @IsString()
+  symptoms?: string;
+
+  @IsOptional()
+  @IsString()
+  clinicalNotes?: string;
+
+  @IsOptional()
+  @IsString()
+  diagnosisPreliminary?: string;
+
+  @IsOptional()
+  @IsString()
+  diagnosisFinal?: string;
+
+  @IsOptional()
+  @IsString()
+  conclusion?: string;
+
+  @IsOptional()
+  @IsString()
+  treatmentPlan?: string;
+}
+
+export class CreateDoctorClinicalOrderItemDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  serviceId!: number;
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+}
+
+export class CreateDoctorClinicalOrdersDto {
+  @IsArray()
+  @ArrayMaxSize(30)
+  @ValidateNested({ each: true })
+  @Type(() => CreateDoctorClinicalOrderItemDto)
+  items!: CreateDoctorClinicalOrderItemDto[];
+}
+
+export class UpdateDoctorOrderResultDto {
+  @IsOptional()
+  @IsString()
+  resultSummary?: string;
+
+  @IsOptional()
+  resultPayload?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
+}
+
+export class CreateDoctorPrescriptionItemDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  medicineId!: number;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  quantity!: number;
+
+  @IsOptional()
+  @IsString()
+  dosage?: string;
+
+  @IsOptional()
+  @IsString()
+  usage?: string;
+}
+
+export class CreateDoctorPrescriptionDto {
+  @IsArray()
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => CreateDoctorPrescriptionItemDto)
+  items!: CreateDoctorPrescriptionItemDto[];
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  days?: number;
+}
+
+export class FinishDoctorClinicalDto {
+  @IsOptional()
+  @IsBoolean()
+  allowIncompleteOrders?: boolean;
+}
+
+export class GenerateEncounterBillingDto {
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
+}
+
+export class MarkEncounterPaymentDto {
+  @IsOptional()
+  @IsString()
+  transactionCode?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentGateway?: string;
+}
+
+export class CompleteEncounterDto {
+  @IsOptional()
+  @IsString()
+  note?: string;
+}
+
+export class ConfirmDoctorExamDto {
+  @IsOptional()
+  @IsBoolean()
+  allowIncompleteOrders?: boolean;
+
+  @IsOptional()
+  @IsString()
+  note?: string;
 }
 
 export class RefundListQueryDto {
@@ -551,6 +712,7 @@ export class BulkNotificationDto {
   @IsOptional()
   @IsString()
   @MaxLength(80)
+  @IsIn(BULK_NOTIFICATION_QUICK_PRESET_VALUES)
   quickPreset?: string;
 
   @IsIn([

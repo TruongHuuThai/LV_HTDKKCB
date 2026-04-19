@@ -5,6 +5,7 @@ export const APPOINTMENT_STATUS = {
   CHO_KHAM: 'CHO_KHAM',
   DA_CHECKIN: 'DA_CHECKIN',
   DA_KHAM: 'DA_KHAM',
+  HOAN_TAT: 'HOAN_TAT',
   HUY: 'HUY',
   HUY_BS_NGHI: 'HUY_BS_NGHI',
   NO_SHOW: 'NO_SHOW',
@@ -23,6 +24,7 @@ const TRANSITIONS: Record<string, string[]> = {
     APPOINTMENT_STATUS.DA_KHAM,
     APPOINTMENT_STATUS.NO_SHOW,
   ],
+  [APPOINTMENT_STATUS.DA_KHAM]: [APPOINTMENT_STATUS.HOAN_TAT],
 };
 
 export function canTransitionAppointmentStatus(from: string, to: string) {
@@ -44,6 +46,7 @@ export function isAppointmentTerminalStatus(status?: string | null) {
     APPOINTMENT_STATUS.HUY,
     APPOINTMENT_STATUS.HUY_BS_NGHI,
     APPOINTMENT_STATUS.DA_KHAM,
+    APPOINTMENT_STATUS.HOAN_TAT,
     APPOINTMENT_STATUS.NO_SHOW,
   ] as string[]).includes(status);
 }

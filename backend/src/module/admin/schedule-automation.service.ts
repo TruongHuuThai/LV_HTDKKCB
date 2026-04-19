@@ -79,6 +79,17 @@ export class ScheduleAutomationService implements OnModuleInit, OnModuleDestroy 
     return 10_000;
   }
 
+  private isTransientDbConnectionError(e: unknown) {
+    const message = (e instanceof Error ? e.message : String(e)).toLowerCase();
+    return (
+      message.includes('connection terminated unexpectedly') ||
+      message.includes("can't reach database server") ||
+      message.includes('connection closed') ||
+      message.includes('server has closed the connection') ||
+      message.includes('econnreset')
+    );
+  }
+
   private async runMaintenance(reason: 'startup' | 'interval') {
     if (this.running) {
       this.logger.warn('Schedule automation already running, skip this tick.');
@@ -97,7 +108,11 @@ export class ScheduleAutomationService implements OnModuleInit, OnModuleDestroy 
       );
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      this.logger.error(`Schedule automation failed: ${message}`);
+      if (this.isTransientDbConnectionError(e)) {
+        this.logger.warn(`Schedule automation skipped due to temporary DB connection issue: ${message}`);
+      } else {
+        this.logger.error(`Schedule automation failed: ${message}`);
+      }
     } finally {
       this.running = false;
     }

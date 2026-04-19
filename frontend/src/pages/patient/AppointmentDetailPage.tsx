@@ -9,10 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { bookingApi } from '@/services/api/bookingApi';
 import {
-  useAppointmentCancelPolicy,
   useAppointmentDetail,
   useAppointmentPaymentStatus,
-  useCancelAppointment,
   useRescheduleAppointment,
   useRetryPayment,
 } from '@/hooks/usePatientAppointments';
@@ -40,6 +38,57 @@ function getTodayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function canShowRescheduleSection(status?: string | null) {
+  const normalized = String(status || '').toUpperCase();
+  if (!normalized) return false;
+  return !['DA_KHAM', 'HOAN_TAT', 'HUY', 'HUY_BS_NGHI', 'NO_SHOW'].includes(normalized);
+}
+
+function normalizeVietnamese(value: string) {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
+function parseClinicalSections(note?: string | null) {
+  const lines = String(note || '')
+    .split(/\r?\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  let clinicalNote = '';
+  let diagnosisPreliminary = '';
+  let diagnosisConfirmed = '';
+  let treatmentPlan = '';
+
+  for (const line of lines) {
+    const normalized = normalizeVietnamese(line);
+    const [_, rawValue = ''] = line.split(/:(.+)/, 2);
+    const value = rawValue.trim() || line;
+
+    if (normalized.startsWith('lam sang:')) {
+      clinicalNote = value;
+      continue;
+    }
+    if (normalized.startsWith('chan doan so bo:')) {
+      diagnosisPreliminary = value;
+      continue;
+    }
+    if (normalized.startsWith('chan doan xac dinh:')) {
+      diagnosisConfirmed = value;
+      continue;
+    }
+    if (normalized.startsWith('huong xu tri:') || normalized.startsWith('huong dieu tri:')) {
+      treatmentPlan = value;
+      continue;
+    }
+  }
+
+  return { clinicalNote, diagnosisPreliminary, diagnosisConfirmed, treatmentPlan };
+}
+
 export default function AppointmentDetailPage() {
   const params = useParams<{ id: string }>();
   const appointmentId = Number.parseInt(params.id || '', 10) || 0;
@@ -56,16 +105,17 @@ export default function AppointmentDetailPage() {
 
   const detailQuery = useAppointmentDetail(appointmentId);
   const paymentStatusQuery = useAppointmentPaymentStatus(appointmentId);
-  const cancelPolicyQuery = useAppointmentCancelPolicy(appointmentId);
 
   const retryMutation = useRetryPayment();
-  const cancelMutation = useCancelAppointment();
   const rescheduleMutation = useRescheduleAppointment();
 
   const appointment = detailQuery.data?.appointment as Record<string, any> | undefined;
   const paymentStatus = paymentStatusQuery.data?.payment?.normalizedStatus || 'unpaid';
+  const parsedClinicalSections = useMemo(
+    () => parseClinicalSections(detailQuery.data?.preVisit?.note || ''),
+    [detailQuery.data?.preVisit?.note],
+  );
 
-  const [cancelReason, setCancelReason] = useState('B?nh nhân ch? đ?ng h?y');
   const [rescheduleReason, setRescheduleReason] = useState('');
   const [rescheduleDate, setRescheduleDate] = useState(getTodayIso());
   const [selectedDoctorId, setSelectedDoctorId] = useState<number | null>(null);
@@ -113,33 +163,18 @@ export default function AppointmentDetailPage() {
           window.location.assign(result.payment_url as string);
           return;
         }
-        toast.success('Đ? t?o yêu c?u thanh toán l?i.');
+        toast.success('Đã tạo yêu cầu thanh toán lại.');
       },
       onError: (error) => {
         logFrontendError('appointment-detail-retry-payment', error, { appointmentId });
-        toast.error(getPatientFlowErrorMessage(error, 'Không th? thanh toán l?i.'));
+        toast.error(getPatientFlowErrorMessage(error, 'Không thể thanh toán lại.'));
       },
     });
   };
 
-  const handleCancel = () => {
-    cancelMutation.mutate(
-      { appointmentId, payload: { reason: cancelReason || 'B?nh nhân ch? đ?ng h?y', source: 'WEB' } },
-      {
-        onSuccess: (result) => {
-          toast.success(result.message || 'Đ? h?y l?ch h?n.');
-        },
-        onError: (error) => {
-          logFrontendError('appointment-detail-cancel', error, { appointmentId });
-          toast.error(getPatientFlowErrorMessage(error, 'Không th? h?y l?ch h?n này.'));
-        },
-      },
-    );
-  };
-
   const handleReschedule = () => {
     if (!selectedSlot) {
-      toast.error('Vui l?ng ch?n slot m?i trư?c khi đ?i l?ch.');
+      toast.error('Vui lòng chọn slot mới trước khi đổi lịch.');
       return;
     }
     rescheduleMutation.mutate(
@@ -155,11 +190,11 @@ export default function AppointmentDetailPage() {
       },
       {
         onSuccess: (result) => {
-          toast.success(result.message || 'Đ?i l?ch thành công.');
+          toast.success(result.message || 'Đổi lịch thành công.');
         },
         onError: (error) => {
           logFrontendError('appointment-detail-reschedule', error, { appointmentId });
-          toast.error(getPatientFlowErrorMessage(error, 'Không th? đ?i l?ch h?n này.'));
+          toast.error(getPatientFlowErrorMessage(error, 'Không thể đổi lịch hẹn này.'));
         },
       },
     );
@@ -169,14 +204,14 @@ export default function AppointmentDetailPage() {
     return (
       <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
         <Card>
-          <CardContent className="py-10 text-center">M? l?ch h?n không h?p l?.</CardContent>
+          <CardContent className="py-10 text-center">Mã lịch hẹn không hợp lệ.</CardContent>
         </Card>
       </div>
     );
   }
 
   if (detailQuery.isLoading) {
-    return <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8 text-slate-600">Đang t?i chi ti?t l?ch h?n...</div>;
+    return <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8 text-slate-600">Đang tải chi tiết lịch hẹn...</div>;
   }
 
   if (detailQuery.isError || !appointment) {
@@ -184,10 +219,10 @@ export default function AppointmentDetailPage() {
       <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
         <Card className="border-red-200 bg-red-50">
           <CardContent className="space-y-3 py-8 text-red-700">
-            <p>{getPatientFlowErrorMessage(detailQuery.error, 'Không th? t?i chi ti?t l?ch h?n.')}</p>
+            <p>{getPatientFlowErrorMessage(detailQuery.error, 'Không thể tải chi tiết lịch hẹn.')}</p>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => detailQuery.refetch()}>Th? l?i</Button>
-              <Button asChild variant="outline"><Link to={backToListHref}>Quay v? danh sách</Link></Button>
+              <Button variant="outline" onClick={() => detailQuery.refetch()}>Thử lại</Button>
+              <Button asChild variant="outline"><Link to={backToListHref}>Quay về danh sách</Link></Button>
             </div>
           </CardContent>
         </Card>
@@ -196,6 +231,7 @@ export default function AppointmentDetailPage() {
   }
 
   const action = searchParams.get('action');
+  const canReschedule = canShowRescheduleSection(appointment.DK_TRANG_THAI);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
@@ -207,31 +243,61 @@ export default function AppointmentDetailPage() {
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <Card className="border-slate-200">
           <CardHeader>
-            <CardTitle>Chi ti?t l?ch h?n #{appointment.DK_MA}</CardTitle>
+            <CardTitle>Chi tiết lịch hẹn #{appointment.DK_MA}</CardTitle>
             <CardDescription>
-              Theo d?i tr?ng thái l?ch, thanh toán và các m?c thay đ?i quan tr?ng.
+              Theo dõi trạng thái lịch, thanh toán và các mốc thay đổi quan trọng.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
             <div className="grid gap-3 sm:grid-cols-2">
-              <InfoRow label="Bác s?" value={appointment.LICH_BSK?.BAC_SI?.BS_HO_TEN || 'Chưa có d? li?u'} />
-              <InfoRow label="Chuyên khoa" value={appointment.LICH_BSK?.BAC_SI?.CHUYEN_KHOA?.CK_TEN || 'Chưa có d? li?u'} />
+              <InfoRow label="Bác sĩ" value={appointment.LICH_BSK?.BAC_SI?.BS_HO_TEN || 'Chưa có dữ liệu'} />
+              <InfoRow label="Chuyên khoa" value={appointment.LICH_BSK?.BAC_SI?.CHUYEN_KHOA?.CK_TEN || 'Chưa có dữ liệu'} />
               <InfoRow label="Ngày khám" value={String(appointment.N_NGAY || '').slice(0, 10)} />
-              <InfoRow label="Bu?i" value={appointment.B_TEN || 'Chưa có d? li?u'} />
-              <InfoRow label="Gi? khám" value={`${String(appointment.KHUNG_GIO?.KG_BAT_DAU || '').slice(11, 16)} - ${String(appointment.KHUNG_GIO?.KG_KET_THUC || '').slice(11, 16)}`} />
-              <InfoRow label="Ph?ng" value={appointment.LICH_BSK?.PHONG?.P_TEN || 'Chưa có d? li?u'} />
+              <InfoRow label="Buổi" value={appointment.B_TEN || 'Chưa có dữ liệu'} />
+              <InfoRow label="Giờ khám" value={`${String(appointment.KHUNG_GIO?.KG_BAT_DAU || '').slice(11, 16)} - ${String(appointment.KHUNG_GIO?.KG_KET_THUC || '').slice(11, 16)}`} />
+              <InfoRow label="Phòng" value={appointment.LICH_BSK?.PHONG?.P_TEN || 'Chưa có dữ liệu'} />
             </div>
 
             <div className="rounded-2xl border border-slate-200 p-4">
-              <p className="mb-2 font-medium text-slate-900">Thông tin ti?n khám</p>
-              <p className="text-slate-700"><strong>Tri?u ch?ng:</strong> {detailQuery.data?.preVisit?.symptoms || 'Chưa c?p nh?t'}</p>
-              <p className="mt-1 text-slate-700"><strong>Ghi chú:</strong> {detailQuery.data?.preVisit?.note || 'Chưa c?p nh?t'}</p>
+              <p className="mb-2 font-medium text-slate-900">Thông tin tiền khám</p>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                  <p className="text-xs text-slate-500">Triệu chứng</p>
+                  <p className="mt-1 font-medium text-slate-900">
+                    {detailQuery.data?.preVisit?.symptoms || 'Chưa cập nhật'}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                  <p className="text-xs text-slate-500">Ghi chú</p>
+                  <p className="mt-1 font-medium text-slate-900">
+                    {parsedClinicalSections.clinicalNote || detailQuery.data?.preVisit?.note || 'Chưa cập nhật'}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                  <p className="text-xs text-slate-500">Chẩn đoán sơ bộ</p>
+                  <p className="mt-1 font-medium text-slate-900">
+                    {parsedClinicalSections.diagnosisPreliminary || 'Chưa cập nhật'}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                  <p className="text-xs text-slate-500">Chẩn đoán xác định</p>
+                  <p className="mt-1 font-medium text-slate-900">
+                    {parsedClinicalSections.diagnosisConfirmed || 'Chưa cập nhật'}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 sm:col-span-2 lg:col-span-1">
+                  <p className="text-xs text-slate-500">Hướng điều trị</p>
+                  <p className="mt-1 font-medium text-slate-900">
+                    {parsedClinicalSections.treatmentPlan || 'Chưa cập nhật'}
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div className="rounded-2xl border border-slate-200 p-4">
-              <p className="mb-2 font-medium text-slate-900">Timeline thông báo g?n nh?t</p>
+              <p className="mb-2 font-medium text-slate-900">Timeline thông báo gần nhất</p>
               {(detailQuery.data?.notifications || []).length === 0 ? (
-                <p className="text-slate-500">Chưa có thông báo g?n đây.</p>
+                <p className="text-slate-500">Chưa có thông báo gần đây.</p>
               ) : (
                 <ul className="space-y-2">
                   {(detailQuery.data?.notifications || []).map((item: any) => (
@@ -250,7 +316,7 @@ export default function AppointmentDetailPage() {
         <div className="space-y-6">
           <Card className="border-slate-200">
             <CardHeader>
-              <CardTitle>Tr?ng thái</CardTitle>
+              <CardTitle>Trạng thái</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               <div className="flex flex-wrap gap-2">
@@ -260,12 +326,6 @@ export default function AppointmentDetailPage() {
                 <span className={`rounded-full border px-3 py-1 text-xs font-medium ${toneClass(getPaymentStatusTone(paymentStatus))}`}>
                   {getPaymentStatusLabel(paymentStatus)}
                 </span>
-              </div>
-
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-                {cancelPolicyQuery.data?.canCancel
-                  ? `B?n có th? h?y l?ch trư?c ${cancelPolicyQuery.data?.cancelDeadlineAt || 'h?n policy'}.`
-                  : `Không th? h?y l?ch lúc này${cancelPolicyQuery.data?.reasonIfBlocked ? ` (${cancelPolicyQuery.data.reasonIfBlocked})` : ''}.`}
               </div>
 
               <div className="flex flex-col gap-2">
@@ -279,93 +339,82 @@ export default function AppointmentDetailPage() {
                         logFrontendError('appointment-detail-download-confirmation', error, {
                           appointmentId,
                         });
-                        toast.error('Khong the tai phieu xac nhan luc nay.');
+                        toast.error('Không thể tải phiếu xác nhận lúc này.');
                       }
                     })();
                   }}
                 >
-                  In xac nhan PDF
+                  In xác nhận PDF
                 </Button>
 
                 {isRetryPaymentAllowed(paymentStatus) ? (
                   <Button onClick={handleRetryPayment} disabled={retryMutation.isPending}>
-                    {retryMutation.isPending ? 'Đang t?o thanh toán l?i...' : 'Thanh toán l?i'}
+                    {retryMutation.isPending ? 'Đang tạo thanh toán lại...' : 'Thanh toán lại'}
                   </Button>
-                ) : null}
-
-                {cancelPolicyQuery.data?.canCancel ? (
-                  <>
-                    <Input
-                      value={cancelReason}
-                      onChange={(event) => setCancelReason(event.target.value)}
-                      placeholder="L? do h?y l?ch"
-                    />
-                    <Button variant="outline" onClick={handleCancel} disabled={cancelMutation.isPending}>
-                      {cancelMutation.isPending ? 'Đang h?y l?ch...' : 'H?y l?ch'}
-                    </Button>
-                  </>
                 ) : null}
               </div>
             </CardContent>
           </Card>
 
-          <Card className={`border-slate-200 ${action === 'reschedule' ? 'ring-2 ring-blue-200' : ''}`}>
-            <CardHeader>
-              <CardTitle>Đ?i l?ch khám</CardTitle>
-              <CardDescription>
-                Ch?n bác s?, ngày và slot m?i. H? th?ng s? ki?m tra tính h?p l? trư?c khi c?p nh?t.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Input type="date" value={rescheduleDate} min={getTodayIso()} onChange={(event) => setRescheduleDate(event.target.value)} />
-              <Select
-                value={selectedDoctorId ? String(selectedDoctorId) : undefined}
-                onValueChange={(value) => {
-                  setSelectedDoctorId(Number(value));
-                  setSelectedSlotKey(null);
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Ch?n bác s?" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(doctorsQuery.data || []).map((doctor) => (
-                    <SelectItem key={doctor.BS_MA} value={String(doctor.BS_MA)}>
-                      {doctor.BS_HO_TEN}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          {canReschedule ? (
+            <Card className={`border-slate-200 ${action === 'reschedule' ? 'ring-2 ring-blue-200' : ''}`}>
+              <CardHeader>
+                <CardTitle>Đổi lịch khám</CardTitle>
+                <CardDescription>
+                  Chọn bác sĩ, ngày và slot mới. Hệ thống sẽ kiểm tra tính hợp lệ trước khi cập nhật.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Input type="date" value={rescheduleDate} min={getTodayIso()} onChange={(event) => setRescheduleDate(event.target.value)} />
+                <Select
+                  value={selectedDoctorId ? String(selectedDoctorId) : undefined}
+                  onValueChange={(value) => {
+                    setSelectedDoctorId(Number(value));
+                    setSelectedSlotKey(null);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn bác sĩ" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(doctorsQuery.data || []).map((doctor) => (
+                      <SelectItem key={doctor.BS_MA} value={String(doctor.BS_MA)}>
+                        {doctor.BS_HO_TEN}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-              <Select
-                value={selectedSlotKey || undefined}
-                onValueChange={setSelectedSlotKey}
-                disabled={!selectedDoctorId}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Ch?n slot m?i" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableSlots.map((slot) => (
-                    <SelectItem key={slot.key} value={slot.key}>
-                      {slot.B_TEN} · {slot.KG_BAT_DAU.slice(11, 16)} - {slot.KG_KET_THUC.slice(11, 16)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <Select
+                  value={selectedSlotKey || undefined}
+                  onValueChange={setSelectedSlotKey}
+                  disabled={!selectedDoctorId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn slot mới" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableSlots.map((slot) => (
+                      <SelectItem key={slot.key} value={slot.key}>
+                        {slot.B_TEN} · {slot.KG_BAT_DAU.slice(11, 16)} - {slot.KG_KET_THUC.slice(11, 16)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-              <Textarea
-                placeholder="L? do đ?i l?ch (không b?t bu?c)"
-                value={rescheduleReason}
-                onChange={(event) => setRescheduleReason(event.target.value)}
-                rows={3}
-              />
+                <Textarea
+                  placeholder="Lý do đổi lịch (không bắt buộc)"
+                  value={rescheduleReason}
+                  onChange={(event) => setRescheduleReason(event.target.value)}
+                  rows={3}
+                />
 
-              <Button onClick={handleReschedule} disabled={rescheduleMutation.isPending || !selectedSlot}>
-                {rescheduleMutation.isPending ? 'Đang đ?i l?ch...' : 'Xác nh?n đ?i l?ch'}
-              </Button>
-            </CardContent>
-          </Card>
+                <Button onClick={handleReschedule} disabled={rescheduleMutation.isPending || !selectedSlot}>
+                  {rescheduleMutation.isPending ? 'Đang đổi lịch...' : 'Xác nhận đổi lịch'}
+                </Button>
+              </CardContent>
+            </Card>
+          ) : null}
         </div>
       </div>
     </div>
