@@ -94,6 +94,7 @@ export class PdfService {
       doc.moveDown(0.6);
 
       for (const section of input.sections) {
+        doc.x = doc.page.margins.left;
         this.ensureBottomSpace(doc, 80);
         if (section.heading) {
           this.setFont(doc, true);
@@ -183,6 +184,7 @@ export class PdfService {
   }
 
   private renderKeyValues(doc: PdfKitDocument, rows: PdfKeyValueRow[]) {
+    doc.x = doc.page.margins.left;
     const labelWidth = 170;
     const valueWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right - labelWidth - 8;
     this.setFont(doc, false);
@@ -206,6 +208,7 @@ export class PdfService {
 
   private renderTable(doc: PdfKitDocument, table: PdfTable) {
     if (!table.headers.length) return;
+    doc.x = doc.page.margins.left;
     const columnCount = table.headers.length;
     const tableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
     const columnWidth = tableWidth / columnCount;
@@ -258,5 +261,7 @@ export class PdfService {
       }
       doc.y = y + rowHeight;
     });
+
+    doc.x = doc.page.margins.left;
   }
 }

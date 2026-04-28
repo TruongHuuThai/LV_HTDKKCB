@@ -1,0 +1,20 @@
+{
+  "run_id": "n200_t0p45_k5",
+  "timestamp_utc": "2026-04-21T21:28:08+00:00",
+  "num_rows": 200,
+  "threshold": 0.45,
+  "k": 5,
+  "model": "gpt-4o-mini",
+  "judge_model": "gpt-4o-mini",
+  "num_queries": 200,
+  "latency_ms": 303.32831500156317,
+  "retrieval_time_ms": null,
+  "gen_time_ms": null,
+  "context_precision": null,
+  "context_recall": null,
+  "faithfulness": null,
+  "answer_relevancy": null,
+  "hit_at_k": null,
+  "recall_at_k": null,
+  "mrr": null
+}

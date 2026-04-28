@@ -932,15 +932,56 @@ export class AppointmentsService {
       .catch(() => []);
 
     const preVisit = await this.buildPreVisitInfoResponse(appointment);
+    const prescriptions = await this.getPrescriptionSummaryByAppointment(appointment.DK_MA);
 
     return {
       appointment,
       preVisit,
+      prescriptions,
       cancelPolicy,
       refund: this.buildRefundSummary(appointment),
       notifications,
       waitlist: waitlistItems,
     };
+  }
+
+  private async getPrescriptionSummaryByAppointment(appointmentId: number) {
+    const prescriptions = await this.prisma.dON_THUOC.findMany({
+      where: {
+        PHIEU_KHAM_BENH: {
+          is: {
+            DK_MA: appointmentId,
+          },
+        },
+      },
+      orderBy: { DT_NGAY_TAO: 'desc' },
+      include: {
+        CHI_TIET_DON_THUOC: {
+          include: {
+            THUOC: {
+              include: {
+                DON_VI_TINH: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return prescriptions.map((prescription) => ({
+      prescriptionId: prescription.DT_MA,
+      note: prescription.DT_GHI_CHU || null,
+      days: prescription.DT_SO_NGAY_SUNG || null,
+      createdAt: prescription.DT_NGAY_TAO || null,
+      medicines: (prescription.CHI_TIET_DON_THUOC || []).map((item) => ({
+        medicineId: item.T_MA,
+        medicineName: item.THUOC?.T_TEN_THUOC || null,
+        quantity: Number(item.CTDT_SO_LUONG || 0),
+        unit: item.THUOC?.DON_VI_TINH?.DVT_TEN || null,
+        dosage: item.CTDT_LIEU_DUNG || null,
+        usage: item.CTDT_CACH_DUNG || null,
+      })),
+    }));
   }
 
   private async buildAppointmentConfirmationPdfBuffer(appointment: any, exportedBy: string) {
@@ -2663,7 +2704,14 @@ export class AppointmentsService {
     const appointment = await this.prisma.dANG_KY.findUnique({
       where: { DK_MA: appointmentId },
       include: {
-        BENH_NHAN: true,
+        BENH_NHAN: {
+          include: {
+            CHI_SO_SUC_KHOE: {
+              orderBy: { CSSK_NGAY_DO: 'desc' },
+              take: 1,
+            },
+          },
+        },
         KHUNG_GIO: true,
         LOAI_HINH_KHAM: true,
         LICH_BSK: {
@@ -2724,6 +2772,31 @@ export class AppointmentsService {
 
   private buildExamWorkflowResponse(appointment: any) {
     const encounter = appointment.PHIEU_KHAM_BENH || null;
+    const latestHealth = appointment.BENH_NHAN?.CHI_SO_SUC_KHOE?.[0] || null;
+    const toNumberOrNull = (value: unknown) => {
+      if (value === null || value === undefined || value === '') return null;
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+    const weightKg = toNumberOrNull(latestHealth?.CSSK_CAN_NANG);
+    const heightCm = toNumberOrNull(latestHealth?.CSSK_CHIEU_CAO);
+    const bmi =
+      weightKg && heightCm && heightCm > 0
+        ? Number((weightKg / Math.pow(heightCm / 100, 2)).toFixed(1))
+        : null;
+    const healthIndicators = latestHealth
+      ? {
+          measuredAt: latestHealth.CSSK_NGAY_DO || null,
+          weightKg,
+          heightCm,
+          bmi,
+          bloodPressure: latestHealth.CSSK_HUYET_AP || null,
+          heartRateBpm: latestHealth.CSSK_NHIP_TIM || null,
+          bodyTemperatureC: toNumberOrNull(latestHealth.CSSK_NHIET_DO),
+          bloodGlucoseMmolL: toNumberOrNull(latestHealth.CSSK_DUONG_HUYET),
+          note: latestHealth.CSSK_GHI_CHU || null,
+        }
+      : null;
     const orders = (encounter?.PHIEU_CDCLS || []).flatMap((order: any) =>
       (order.THUCHIEN || []).map((execution: any) => ({
         orderId: order.PCD_MA,
@@ -2799,6 +2872,15 @@ export class AppointmentsService {
           appointment.BENH_NHAN?.BN_TEN,
         ]),
         phone: appointment.BENH_NHAN?.BN_SDT_DANG_KY || appointment.BENH_NHAN?.TK_SDT || null,
+        dateOfBirth: appointment.BENH_NHAN?.BN_NGAY_SINH
+          ? this.formatDateOnly(appointment.BENH_NHAN.BN_NGAY_SINH)
+          : null,
+        gender:
+          appointment.BENH_NHAN?.BN_LA_NAM === undefined || appointment.BENH_NHAN?.BN_LA_NAM === null
+            ? null
+            : appointment.BENH_NHAN.BN_LA_NAM
+              ? 'NAM'
+              : 'NU',
       },
       doctor: {
         id: appointment.BS_MA,
@@ -2816,6 +2898,7 @@ export class AppointmentsService {
         : null,
       orders,
       prescriptions,
+      healthIndicators,
       billing: {
         latest: latestPayment || null,
         normalizedStatus: this.formatExamFinancialStatus(normalizedPayment),
@@ -3364,6 +3447,156 @@ export class AppointmentsService {
       appointmentId,
       prescriptions: workflow.prescriptions,
     };
+  }
+
+  private async buildDoctorPrescriptionPdfReport(
+    user: CurrentUserPayload,
+    appointmentId: number,
+    prescriptionId: number,
+  ) {
+    const appointment = await this.getDoctorAppointmentForExamOrThrow(user, appointmentId);
+    const encounter = appointment.PHIEU_KHAM_BENH;
+    if (!encounter) {
+      throw new BadRequestException('Khong tim thay phieu kham benh');
+    }
+
+    const prescription = (encounter.DON_THUOC || []).find(
+      (item: any) => item.DT_MA === prescriptionId,
+    );
+    if (!prescription) {
+      throw new NotFoundException('Khong tim thay don thuoc');
+    }
+
+    const prescriptionItems = prescription.CHI_TIET_DON_THUOC || [];
+    if (prescriptionItems.length === 0) {
+      throw new BadRequestException('Don thuoc khong co thuoc');
+    }
+
+    const patientName = this.toDisplayName([
+      appointment.BENH_NHAN?.BN_HO_CHU_LOT,
+      appointment.BENH_NHAN?.BN_TEN,
+    ]);
+    const patientDob = appointment.BENH_NHAN?.BN_NGAY_SINH
+      ? this.formatDateOnly(appointment.BENH_NHAN.BN_NGAY_SINH)
+      : '-';
+    const doctorName = appointment.LICH_BSK?.BAC_SI?.BS_HO_TEN || `#${appointment.BS_MA}`;
+    const specialty = appointment.LICH_BSK?.BAC_SI?.CHUYEN_KHOA?.CK_TEN || '-';
+    const room = appointment.LICH_BSK?.PHONG?.P_TEN || '-';
+    const shift = appointment.B_TEN || '-';
+    const date = this.formatDateOnly(appointment.N_NGAY);
+    const slotStart = this.formatTimeOnly(appointment.KHUNG_GIO?.KG_BAT_DAU || null);
+    const slotEnd = this.formatTimeOnly(appointment.KHUNG_GIO?.KG_KET_THUC || null);
+
+    const rows = prescriptionItems.map((item: any, index: number) => {
+      const quantity = Number(item.CTDT_SO_LUONG || 0);
+      const unitPrice = Number(item.THUOC?.T_GIA_THUOC || 0);
+      return {
+        stt: index + 1,
+        medicineCode: item.T_MA,
+        medicineName: item.THUOC?.T_TEN_THUOC || `Thuoc ${item.T_MA}`,
+        quantity,
+        unitPrice,
+        lineTotal: quantity * unitPrice,
+        dosage: item.CTDT_LIEU_DUNG || '-',
+        usage: item.CTDT_CACH_DUNG || '-',
+      };
+    });
+    const total = rows.reduce((sum, item) => sum + item.lineTotal, 0);
+
+    const guideLines = rows.map(
+      (item) =>
+        `${item.stt}. ${item.medicineName} - Lieu dung: ${item.dosage}. Cach dung: ${item.usage}.`,
+    );
+
+    const report = await this.pdfService.buildReport({
+      title: 'DON THUOC',
+      subtitle: `Ma don: #${prescriptionId} - Ma lich hen: #${appointmentId}`,
+      metadataLines: [
+        `Bac si ke don: ${doctorName}`,
+        `So dien thoai bac si: ${user.TK_SDT}`,
+        `Thoi gian tao don: ${this.formatDateOnly(prescription.DT_NGAY_TAO || new Date())} ${this.formatTimeOnly(prescription.DT_NGAY_TAO || new Date())}`,
+      ],
+      sections: [
+        {
+          heading: 'Thong tin benh nhan',
+          keyValues: [
+            { label: 'Ho ten', value: patientName || '-' },
+            { label: 'Ma benh nhan', value: `#${appointment.BN_MA}` },
+            { label: 'Ngay sinh', value: patientDob },
+            {
+              label: 'So dien thoai',
+              value: appointment.BENH_NHAN?.BN_SDT_DANG_KY || appointment.BENH_NHAN?.TK_SDT || '-',
+            },
+          ],
+        },
+        {
+          heading: 'Thong tin kham',
+          keyValues: [
+            { label: 'Ma lich hen', value: `#${appointment.DK_MA}` },
+            { label: 'Bac si', value: doctorName },
+            { label: 'Chuyen khoa', value: specialty },
+            { label: 'Ngay kham', value: date },
+            { label: 'Buoi', value: shift },
+            { label: 'Khung gio', value: `${slotStart} - ${slotEnd}` },
+            { label: 'Phong kham', value: room },
+            {
+              label: 'So ngay su dung',
+              value: prescription.DT_SO_NGAY_SUNG ? String(prescription.DT_SO_NGAY_SUNG) : '-',
+            },
+          ],
+        },
+        {
+          heading: 'Danh sach thuoc',
+          table: {
+            headers: ['STT', 'Ma thuoc', 'Ten thuoc', 'So luong', 'Don gia', 'Thanh tien'],
+            rows: rows.map((item) => [
+              String(item.stt),
+              String(item.medicineCode),
+              item.medicineName,
+              String(item.quantity),
+              this.formatCurrency(item.unitPrice),
+              this.formatCurrency(item.lineTotal),
+            ]),
+          },
+          paragraphs: [
+            `Tong tien thuoc: ${this.formatCurrency(total)}`,
+            `Ghi chu don thuoc: ${prescription.DT_GHI_CHU || '-'}`,
+          ],
+        },
+        {
+          heading: 'Huong dan su dung',
+          paragraphs: guideLines,
+        },
+      ],
+    });
+
+    return {
+      appointment,
+      prescription,
+      total,
+      report,
+      filename: `don-thuoc-${appointmentId}-${prescriptionId}.pdf`,
+    };
+  }
+
+  async exportDoctorPrescriptionPdf(
+    user: CurrentUserPayload,
+    appointmentId: number,
+    prescriptionId: number,
+  ) {
+    const { report, filename } = await this.buildDoctorPrescriptionPdfReport(
+      user,
+      appointmentId,
+      prescriptionId,
+    );
+    await this.writeAuditLog({
+      table: 'DON_THUOC',
+      action: 'DOCTOR_PRESCRIPTION_PDF_EXPORTED',
+      actor: user.TK_SDT,
+      pk: { DK_MA: appointmentId, DT_MA: prescriptionId },
+      next: { filename },
+    });
+    return { filename, buffer: report };
   }
 
   async finishDoctorClinical(

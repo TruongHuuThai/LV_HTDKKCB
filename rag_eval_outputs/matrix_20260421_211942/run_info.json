@@ -1,0 +1,23 @@
+{
+  "matrix_id": "matrix_20260421_211942",
+  "master_file": "eval_questions_master_250.jsonl",
+  "thresholds": [
+    0.45,
+    0.5,
+    0.55,
+    0.6
+  ],
+  "row_sizes": [
+    100,
+    150,
+    200,
+    250
+  ],
+  "k": 5,
+  "seed": 20260422,
+  "embed_model": "text-embedding-3-small",
+  "chat_model": "gpt-4o-mini",
+  "judge_model": "gpt-4o-mini",
+  "dry_run": false,
+  "created_at_utc": "2026-04-21T21:36:11+00:00"
+}

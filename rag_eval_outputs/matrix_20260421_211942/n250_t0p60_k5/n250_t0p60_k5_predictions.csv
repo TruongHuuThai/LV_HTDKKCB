@@ -1,0 +1,2251 @@
+﻿run_id,query_id,question,gold_answer,gold_doc_ids,retrieved_doc_ids,retrieved_titles,retrieved_scores,hit_at_k,recall_at_k,mrr,context_precision,context_recall,faithfulness,answer_relevancy,retrieval_time_ms,gen_time_ms,latency_ms,threshold,num_rows,k,error
+n250_t0p60_k5,Q0074,Sử dụng BHYT cần mang giấy tờ gì là như thế nào?,Bệnh nhân cần mang giấy tờ hợp lệ; quyền lợi bảo hiểm phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,348.78020000178367,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0084,"Tôi muốn đổi lịch và thanh toán ngay, quy định nào cần nhớ để mình xác nhận lại đúng không?",Cần đến sớm 15-20 phút để xác nhận thông tin và mang giấy tờ hợp lệ nếu dùng BHYT/bảo hiểm tư nhân.,"[""D01"", ""D04""]",[],[],[],,,,,,,,,,267.0240000006743,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0111,Cho mình hỏi nếu tôi đến khám theo giờ hẹn và muốn dùng bảo hiểm thì cần gì để mình xác nhận lại?,Hủy/đổi lịch cần trước giờ khám tối thiểu 1 giờ; thanh toán hiện hỗ trợ QR Banking và thông tin được gửi sau khi tạo lịch.,"[""D02"", ""D03""]",[],[],[],,,,,,,,,,272.29569997871295,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0226,"Cho hỏi nhanh, tôi muốn đổi lịch nhưng đã qua mốc 1 giờ trước giờ khám, so với trường hợp còn hơn 1 giờ thì khác gì được không?",Còn hơn 1 giờ trước giờ khám có thể hủy/đổi; qua mốc này hệ thống có thể từ chối.,"[""D02""]",[],[],[],,,,,,,,,,341.38849994633347,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0011,"Xác nhận giúp, sau khi tạo lịch thì nhận thông tin thanh toán như thế nào được không?",Hệ thống hỗ trợ thanh toán chuyển khoản QR Banking; sau khi tạo lịch bệnh nhân sẽ nhận thông tin thanh toán để hoàn tất.,"[""D03""]",[],[],[],,,,,,,,,,336.41410002019256,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0063,"Tư vấn giúp mình, nếu tôi đến khám theo giờ hẹn và muốn dùng bảo hiểm thì cần gì cho mình check thông tin được không?","Nếu muốn đổi lịch thì cần thực hiện trước giờ khám tối thiểu 1 giờ, và nên đến sớm 15-20 phút khi đi khám.","[""D01"", ""D02""]",[],[],[],,,,,,,,,,271.13199996529147,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0070,Nếu tôi đến khám theo giờ hẹn và muốn dùng bảo hiểm thì cần gì để mình xác nhận lại là như thế nào?,Hủy/đổi lịch cần trước giờ khám tối thiểu 1 giờ; thanh toán hiện hỗ trợ QR Banking và thông tin được gửi sau khi tạo lịch.,"[""D02"", ""D03""]",[],[],[],,,,,,,,,,1741.735699994024,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0203,"Mình cần biết, nếu đã tạo lịch thì lúc nào nhận thông tin QR Banking được không?","Sau khi tạo lịch, bệnh nhân sẽ nhận thông tin thanh toán QR Banking để hoàn tất.","[""D03""]",[],[],[],,,,,,,,,,1252.6682000025176,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0066,"Tư vấn giúp mình, bảo hiểm tư nhân cần giấy tờ hợp lệ như thế nào được không?",Bệnh nhân cần mang giấy tờ hợp lệ; quyền lợi bảo hiểm phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,337.9529999801889,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0238,"Mình cần biết, bệnh nhân có nhận thông tin thanh toán ngay sau tạo lịch không được không?",Hệ thống hỗ trợ thanh toán chuyển khoản QR Banking; sau khi tạo lịch bệnh nhân sẽ nhận thông tin thanh toán để hoàn tất.,"[""D03""]",[],[],[],,,,,,,,,,306.64329999126494,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0003,Cho mình hỏi nếu vừa cần đổi lịch vừa cần thanh toán thì nên ưu tiên bước nào để không vi phạm mốc thời gian?,Cần đảm bảo thao tác hủy/đổi trước giờ khám tối thiểu 1 giờ; thanh toán QR Banking được hỗ trợ và thông tin gửi sau khi tạo lịch.,"[""D02"", ""D03""]",[],[],[],,,,,,,,,,285.46650003409013,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0151,Tư vấn giúp mình nếu tôi dùng bảo hiểm và đóng tiền QR Banking thì cần lưu ý gì xin trả lời ngắn gọn?,"Nếu muốn đổi lịch thì cần thực hiện trước giờ khám tối thiểu 1 giờ, và nên đến sớm 15-20 phút khi đi khám.","[""D01"", ""D02""]",[],[],[],,,,,,,,,,289.2026999616064,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0165,Địa chỉ cụ thể của phòng khám là gì là như thế nào?,Không tìm thấy thông tin này trong bộ tri thức hiện tại. Vui lòng liên hệ lễ tân/hỗ trợ để được cập nhật chính xác.,[],[],[],[],,,,,,,,,,239.34079997707158,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0225,"Tôi muốn đổi lịch nhưng đã qua mốc 1 giờ trước giờ khám, so với trường hợp còn hơn 1 giờ thì khác gì là như thế nào?",Còn hơn 1 giờ trước giờ khám có thể hủy/đổi; qua mốc này hệ thống có thể từ chối.,"[""D02""]",[],[],[],,,,,,,,,,437.68770003225654,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0173,Tôi đến trước giờ hẹn 15 đến 20 phút có đúng khuyến nghị không đúng không?,Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; bệnh nhân nên đến sớm 15-20 phút để xác nhận thông tin.,"[""D01""]",[],[],[],,,,,,,,,,246.2752999854274,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0218,"Xác nhận giúp, bảo hiểm tư nhân cần giấy tờ hợp lệ như thế nào được không?",Bệnh nhân cần mang giấy tờ hợp lệ; quyền lợi bảo hiểm phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,373.1087000342086,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0031,Cho hỏi nhanh hãy ghép thông tin về khung giờ và chính sách hủy đổi lịch xin trả lời ngắn gọn?,Cần đến sớm 15-20 phút để xác nhận thông tin và mang giấy tờ hợp lệ nếu dùng BHYT/bảo hiểm tư nhân.,"[""D01"", ""D04""]",[],[],[],,,,,,,,,,277.92319998843595,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0038,Mình cần biết sau khi tạo lịch thì nhận thông tin thanh toán như thế nào?,Hệ thống hỗ trợ thanh toán chuyển khoản QR Banking; sau khi tạo lịch bệnh nhân sẽ nhận thông tin thanh toán để hoàn tất.,"[""D03""]",[],[],[],,,,,,,,,,256.8402999895625,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0104,Nếu sát giờ khám thì có chắc chắn đổi lịch được không là như thế nào?,Có thể hủy/đổi lịch nếu thực hiện trước giờ khám tối thiểu 1 giờ; qua mốc này hệ thống có thể từ chối thao tác.,"[""D02""]",[],[],[],,,,,,,,,,361.3140999805182,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0181,Cho hỏi nhanh khi dùng bảo hiểm cần lưu ý điều kiện gì?,Bệnh nhân cần mang giấy tờ hợp lệ; quyền lợi bảo hiểm phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,219.00149999419227,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0069,Tư vấn giúp mình [gấp] BHYT bảo hiểm cần giấy tờ hợp lệ (mình cần gấp)?,Cần mang giấy tờ hợp lệ; quyền lợi phụ thuộc quy định bảo hiểm và tình trạng hồ sơ.,"[""D04""]",[],[],[],,,,,,,,,,257.84089998342097,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0145,[gấp] hủy đổi lịch trước 1 giờ (có thể viết ngắn) là như thế nào?,Hủy/đổi lịch cần trước giờ khám tối thiểu 1 giờ; qua mốc này hệ thống có thể từ chối.,"[""D02""]",[],[],[],,,,,,,,,,275.06309997988865,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0057,Cho mình hỏi Phụ nữ mang thai có được ưu tiên xếp hàng không?,Không tìm thấy thông tin này trong bộ tri thức hiện tại. Vui lòng liên hệ lễ tân/hỗ trợ để được cập nhật chính xác.,[],[],[],[],,,,,,,,,,220.01250000903383,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0157,Cho hỏi nhanh vừa hỏi về lịch khám vừa hỏi về thanh toán thì thông tin tổng hợp là gì để mình xác nhận lại?,Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; hệ thống hỗ trợ QR Banking và gửi thông tin thanh toán sau khi tạo lịch.,"[""D01"", ""D03""]",[],[],[],,,,,,,,,,289.5767000154592,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0222,"Cho hỏi nhanh, mốc thời gian tối thiểu để được phép hủy lịch là gì được không?",Có thể hủy/đổi lịch nếu thực hiện trước giờ khám tối thiểu 1 giờ; qua mốc này hệ thống có thể từ chối thao tác.,"[""D02""]",[],[],[],,,,,,,,,,266.1290999967605,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0100,"Cho mình hỏi, khung giờ khám buổi sáng là mấy giờ đến mấy giờ được không?",Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; bệnh nhân nên đến sớm 15-20 phút để xác nhận thông tin.,"[""D01""]",[],[],[],,,,,,,,,,338.9986000256613,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0180,Hãy ghép thông tin về khung giờ và chính sách hủy đổi lịch trả lời đầy đủ giúp mình là như thế nào?,Hủy/đổi lịch cần trước giờ khám tối thiểu 1 giờ; thanh toán hiện hỗ trợ QR Banking và thông tin được gửi sau khi tạo lịch.,"[""D02"", ""D03""]",[],[],[],,,,,,,,,,250.78729999950156,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0036,Có thể hủy lịch trước giờ khám tối thiểu bao lâu là như thế nào?,Có thể hủy/đổi lịch nếu thực hiện trước giờ khám tối thiểu 1 giờ; qua mốc này hệ thống có thể từ chối thao tác.,"[""D02""]",[],[],[],,,,,,,,,,316.26620003953576,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0159,"[urgent] hủy đổi lịch trước 1 giờ (có thể viết ngắn) -- từ khóa: lịch,bảo hiểm,qr,giờ đúng không?",Hủy/đổi lịch cần trước giờ khám tối thiểu 1 giờ; qua mốc này hệ thống có thể từ chối.,"[""D02""]",[],[],[],,,,,,,,,,314.6505000186153,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0184,Nếu tôi đến khám theo giờ hẹn và muốn dùng bảo hiểm thì cần gì cho mình bản tóm tắt đúng không?,Nếu cần hủy/đổi lịch phải trước giờ khám tối thiểu 1 giờ; quyền lợi bảo hiểm còn phụ thuộc quy định đơn vị bảo hiểm và hồ sơ tiếp nhận.,"[""D02"", ""D04""]",[],[],[],,,,,,,,,,287.35260001849383,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0103,"Tư vấn giúp mình, tôi muốn đổi lịch nhưng đã qua mốc 1 giờ trước giờ khám, so với trường hợp còn hơn 1 giờ thì khác gì được không?",Còn hơn 1 giờ trước giờ khám có thể hủy/đổi; qua mốc này hệ thống có thể từ chối.,"[""D02""]",[],[],[],,,,,,,,,,335.8355999807827,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0092,Cho mình hỏi khi dùng bảo hiểm cần lưu ý điều kiện gì?,Bệnh nhân cần mang giấy tờ hợp lệ; quyền lợi bảo hiểm phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,259.915100003127,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0053,"Cho mình hỏi, tôi muốn đổi lịch và thanh toán ngay, quy định nào cần nhớ trả lời đầy đủ giúp mình được không?",Hủy/đổi lịch cần trước giờ khám tối thiểu 1 giờ; thanh toán hiện hỗ trợ QR Banking và thông tin được gửi sau khi tạo lịch.,"[""D02"", ""D03""]",[],[],[],,,,,,,,,,265.87410003412515,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0249,Trường hợp có bảo hiểm nhưng không mang đủ giấy tờ thì quyền lợi xử lý thế nào đúng không?,Cần giấy tờ hợp lệ khi sử dụng BHYT/bảo hiểm; quyền lợi phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,237.77290002908558,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0189,Khi dùng bảo hiểm cần lưu ý điều kiện gì đúng không?,Bệnh nhân cần mang giấy tờ hợp lệ; quyền lợi bảo hiểm phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,226.37869999743998,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0120,Mốc thời gian tối thiểu để được phép hủy lịch là gì đúng không?,Có thể hủy/đổi lịch nếu thực hiện trước giờ khám tối thiểu 1 giờ; qua mốc này hệ thống có thể từ chối thao tác.,"[""D02""]",[],[],[],,,,,,,,,,336.92279999377206,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0079,Bệnh nhân có nhận thông tin thanh toán ngay sau tạo lịch không là như thế nào?,Hệ thống hỗ trợ thanh toán chuyển khoản QR Banking; sau khi tạo lịch bệnh nhân sẽ nhận thông tin thanh toán để hoàn tất.,"[""D03""]",[],[],[],,,,,,,,,,243.58080001547933,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0215,Quyền lợi bảo hiểm được xác định dựa trên yếu tố nào là như thế nào?,Bệnh nhân cần mang giấy tờ hợp lệ; quyền lợi bảo hiểm phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,361.8516999995336,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0004,"Cho hỏi nhanh, sử dụng BHYT cần mang giấy tờ gì được không?",Bệnh nhân cần mang giấy tờ hợp lệ; quyền lợi bảo hiểm phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,197.5770000135526,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0046,Bảo hiểm tư nhân cần giấy tờ hợp lệ như thế nào là như thế nào?,Bệnh nhân cần mang giấy tờ hợp lệ; quyền lợi bảo hiểm phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,308.986600022763,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0067,Vui lòng tóm tắt giúp tôi các bước chuẩn bị trước khi đến khám để mình xác nhận lại là như thế nào?,Hủy/đổi lịch cần trước giờ khám tối thiểu 1 giờ; thanh toán hiện hỗ trợ QR Banking và thông tin được gửi sau khi tạo lịch.,"[""D02"", ""D03""]",[],[],[],,,,,,,,,,262.3774000094272,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0136,"Xác nhận giúp, mốc thời gian tối thiểu để được phép hủy lịch là gì được không?",Có thể hủy/đổi lịch nếu thực hiện trước giờ khám tối thiểu 1 giờ; qua mốc này hệ thống có thể từ chối thao tác.,"[""D02""]",[],[],[],,,,,,,,,,207.4991000117734,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0112,Xác nhận giúp khung giờ khám ca chiều là mấy giờ đến mấy giờ?,Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; bệnh nhân nên đến sớm 15-20 phút để xác nhận thông tin.,"[""D01""]",[],[],[],,,,,,,,,,315.50079997396097,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0008,"Cho mình hỏi, xin hỏi gấp: QR Banking nhận thông tin sau tạo lịch (xin trả lời chính xác) -- từ khóa: lịch,bảo hiểm,qr,giờ được không?",Hệ thống hỗ trợ QR Banking; thông tin thanh toán gửi sau khi tạo lịch.,"[""D03""]",[],[],[],,,,,,,,,,338.9000999741256,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0043,Cho tôi hỏi nếu đã tạo lịch thì lúc nào nhận thông tin QR Banking?,"Sau khi tạo lịch, bệnh nhân sẽ nhận thông tin thanh toán QR Banking để hoàn tất.","[""D03""]",[],[],[],,,,,,,,,,240.16739998478442,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0028,"Tư vấn giúp mình, bệnh nhân có nhận thông tin thanh toán ngay sau tạo lịch không được không?",Hệ thống hỗ trợ thanh toán chuyển khoản QR Banking; sau khi tạo lịch bệnh nhân sẽ nhận thông tin thanh toán để hoàn tất.,"[""D03""]",[],[],[],,,,,,,,,,242.01059999177232,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0039,Khi dùng bảo hiểm cần lưu ý điều kiện gì là như thế nào?,Bệnh nhân cần mang giấy tờ hợp lệ; quyền lợi bảo hiểm phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,305.1949999644421,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0140,"Mình cần biết, vừa hỏi về lịch khám vừa hỏi về thanh toán thì thông tin tổng hợp là gì cho mình bản tóm tắt được không?",Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; hệ thống hỗ trợ QR Banking và gửi thông tin thanh toán sau khi tạo lịch.,"[""D01"", ""D03""]",[],[],[],,,,,,,,,,212.8933999920264,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0137,Vừa hỏi về lịch khám vừa hỏi về thanh toán thì thông tin tổng hợp là gì xin trả lời ngắn gọn đúng không?,Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; hệ thống hỗ trợ QR Banking và gửi thông tin thanh toán sau khi tạo lịch.,"[""D01"", ""D03""]",[],[],[],,,,,,,,,,308.78739996114746,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0065,"Cho mình hỏi xin hỏi gấp: BHYT bảo hiểm cần giấy tờ hợp lệ (có thể viết ngắn) -- từ khóa: lịch,bảo hiểm,qr,giờ?",Cần mang giấy tờ hợp lệ; quyền lợi phụ thuộc quy định bảo hiểm và tình trạng hồ sơ.,"[""D04""]",[],[],[],,,,,,,,,,323.4507000306621,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0216,Hãy ghép thông tin về khung giờ và chính sách hủy đổi lịch trả lời đầy đủ giúp mình đúng không?,"Nếu muốn đổi lịch thì cần thực hiện trước giờ khám tối thiểu 1 giờ, và nên đến sớm 15-20 phút khi đi khám.","[""D01"", ""D02""]",[],[],[],,,,,,,,,,278.6259999847971,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0235,Có hỗ trợ đặt lịch qua Zalo OA không đúng không?,Không tìm thấy thông tin này trong bộ tri thức hiện tại. Vui lòng liên hệ lễ tân/hỗ trợ để được cập nhật chính xác.,[],[],[],[],,,,,,,,,,239.3586000544019,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0080,Xác nhận giúp quyền lợi bảo hiểm được xác định dựa trên yếu tố nào?,Bệnh nhân cần mang giấy tờ hợp lệ; quyền lợi bảo hiểm phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,314.1409999807365,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0126,Cho tôi hỏi nếu tôi đến khám theo giờ hẹn và muốn dùng bảo hiểm thì cần gì trả lời đầy đủ giúp mình?,Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; hệ thống hỗ trợ QR Banking và gửi thông tin thanh toán sau khi tạo lịch.,"[""D01"", ""D03""]",[],[],[],,,,,,,,,,307.6015000115149,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0071,"Cho tôi hỏi, vừa hỏi về lịch khám vừa hỏi về thanh toán thì thông tin tổng hợp là gì xin trả lời ngắn gọn được không?",Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; hệ thống hỗ trợ QR Banking và gửi thông tin thanh toán sau khi tạo lịch.,"[""D01"", ""D03""]",[],[],[],,,,,,,,,,301.6846999526024,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0106,Cho hỏi nhanh qua mốc 1 giờ trước giờ khám thì hệ thống xử lý hủy đổi lịch ra sao?,Có thể hủy/đổi lịch nếu thực hiện trước giờ khám tối thiểu 1 giờ; qua mốc này hệ thống có thể từ chối thao tác.,"[""D02""]",[],[],[],,,,,,,,,,222.32269996311516,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0019,"Cho mình hỏi, phòng khám hoạt động trong ngày theo khung giờ nào được không?",Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; bệnh nhân nên đến sớm 15-20 phút để xác nhận thông tin.,"[""D01""]",[],[],[],,,,,,,,,,315.71210001129657,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0160,Xác nhận giúp tôi đến trước giờ hẹn 15 đến 20 phút có đúng khuyến nghị không?,Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; bệnh nhân nên đến sớm 15-20 phút để xác nhận thông tin.,"[""D01""]",[],[],[],,,,,,,,,,296.98539996752515,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0091,Khung giờ khám ca sáng là mấy giờ đến mấy giờ là như thế nào?,Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; bệnh nhân nên đến sớm 15-20 phút để xác nhận thông tin.,"[""D01""]",[],[],[],,,,,,,,,,320.2542000217363,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0113,Vui lòng tóm tắt giúp tôi các bước chuẩn bị trước khi đến khám trả lời đầy đủ giúp mình đúng không?,Nếu cần hủy/đổi lịch phải trước giờ khám tối thiểu 1 giờ; quyền lợi bảo hiểm còn phụ thuộc quy định đơn vị bảo hiểm và hồ sơ tiếp nhận.,"[""D02"", ""D04""]",[],[],[],,,,,,,,,,228.25510002439842,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0133,Qua mốc 1 giờ trước giờ khám thì hệ thống xử lý hủy đổi lịch ra sao đúng không?,Có thể hủy/đổi lịch nếu thực hiện trước giờ khám tối thiểu 1 giờ; qua mốc này hệ thống có thể từ chối thao tác.,"[""D02""]",[],[],[],,,,,,,,,,274.5706999558024,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0168,"Xác nhận giúp, hãy ghép thông tin về khung giờ và chính sách hủy đổi lịch cho mình check thông tin được không?",Hủy/đổi lịch cần trước giờ khám tối thiểu 1 giờ; thanh toán hiện hỗ trợ QR Banking và thông tin được gửi sau khi tạo lịch.,"[""D02"", ""D03""]",[],[],[],,,,,,,,,,226.29919997416437,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0195,"Cho hỏi nhanh, đổi lịch cần thực hiện trước giờ khám bao nhiêu phút được không?",Có thể hủy/đổi lịch nếu thực hiện trước giờ khám tối thiểu 1 giờ; qua mốc này hệ thống có thể từ chối thao tác.,"[""D02""]",[],[],[],,,,,,,,,,211.17869997397065,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0073,"Cho hỏi nhanh, so sánh trường hợp hủy lịch trước 90 phút và trước 30 phút được không?",Trước 90 phút (>=1 giờ) có thể hủy/đổi; trước 30 phút (<1 giờ) hệ thống có thể từ chối thao tác.,"[""D02""]",[],[],[],,,,,,,,,,325.6449999753386,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0134,Cho tôi hỏi so sánh trường hợp hủy lịch trước 90 phút và trước 30 phút?,Trước 90 phút (>=1 giờ) có thể hủy/đổi; trước 30 phút (<1 giờ) hệ thống có thể từ chối thao tác.,"[""D02""]",[],[],[],,,,,,,,,,349.8323000385426,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0163,Xác nhận giúp vui lòng tóm tắt giúp tôi các bước chuẩn bị trước khi đến khám cho mình bản tóm tắt?,Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; hệ thống hỗ trợ QR Banking và gửi thông tin thanh toán sau khi tạo lịch.,"[""D01"", ""D03""]",[],[],[],,,,,,,,,,309.7958999569528,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0102,Nên đến sớm bao nhiêu phút trước giờ khám để xác nhận thông tin là như thế nào?,Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; bệnh nhân nên đến sớm 15-20 phút để xác nhận thông tin.,"[""D01""]",[],[],[],,,,,,,,,,272.3071000073105,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0141,"Cho mình hỏi, sử dụng BHYT cần mang giấy tờ gì được không?",Bệnh nhân cần mang giấy tờ hợp lệ; quyền lợi bảo hiểm phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,248.4600999741815,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0040,Hệ thống đang hỗ trợ hình thức thanh toán nào là như thế nào?,Hệ thống hỗ trợ thanh toán chuyển khoản QR Banking; sau khi tạo lịch bệnh nhân sẽ nhận thông tin thanh toán để hoàn tất.,"[""D03""]",[],[],[],,,,,,,,,,294.28380000172183,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0119,"Cho mình hỏi, khung giờ khám buổi chiều là mấy giờ đến mấy giờ được không?",Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; bệnh nhân nên đến sớm 15-20 phút để xác nhận thông tin.,"[""D01""]",[],[],[],,,,,,,,,,230.89700000127777,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0227,"Xác nhận giúp, phòng khám hoạt động trong ngày theo khung giờ nào được không?",Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; bệnh nhân nên đến sớm 15-20 phút để xác nhận thông tin.,"[""D01""]",[],[],[],,,,,,,,,,235.7221000129357,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0110,"Xác nhận giúp, tôi muốn đổi lịch nhưng đã qua mốc 1 giờ trước giờ khám, so với trường hợp còn hơn 1 giờ thì khác gì được không?",Còn hơn 1 giờ trước giờ khám có thể hủy/đổi; qua mốc này hệ thống có thể từ chối.,"[""D02""]",[],[],[],,,,,,,,,,318.4361000312492,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0221,Tôi đến trước giờ hẹn 15 đến 20 phút có đúng khuyến nghị không là như thế nào?,Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; bệnh nhân nên đến sớm 15-20 phút để xác nhận thông tin.,"[""D01""]",[],[],[],,,,,,,,,,239.43429999053478,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0179,Xác nhận giúp hãy ghép thông tin về khung giờ và chính sách hủy đổi lịch cho mình bản tóm tắt?,"Nếu muốn đổi lịch thì cần thực hiện trước giờ khám tối thiểu 1 giờ, và nên đến sớm 15-20 phút khi đi khám.","[""D01"", ""D02""]",[],[],[],,,,,,,,,,352.83230000641197,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0161,Cho hỏi nhanh có hỗ trợ chuyển khoản QR Banking không?,Hệ thống hỗ trợ thanh toán chuyển khoản QR Banking; sau khi tạo lịch bệnh nhân sẽ nhận thông tin thanh toán để hoàn tất.,"[""D03""]",[],[],[],,,,,,,,,,202.17599999159575,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0135,Cho hỏi nhanh nếu tôi đến khám theo giờ hẹn và muốn dùng bảo hiểm thì cần gì trả lời đầy đủ giúp mình?,Hủy/đổi lịch cần trước giờ khám tối thiểu 1 giờ; thanh toán hiện hỗ trợ QR Banking và thông tin được gửi sau khi tạo lịch.,"[""D02"", ""D03""]",[],[],[],,,,,,,,,,248.1380000244826,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0012,"Cho hỏi nhanh, vui lòng tóm tắt giúp tôi các bước chuẩn bị trước khi đến khám cho mình bản tóm tắt được không?",Hủy/đổi lịch cần trước giờ khám tối thiểu 1 giờ; thanh toán hiện hỗ trợ QR Banking và thông tin được gửi sau khi tạo lịch.,"[""D02"", ""D03""]",[],[],[],,,,,,,,,,294.5507999975234,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0088,Có thể hủy lịch trước giờ khám tối thiểu bao lâu đúng không?,Có thể hủy/đổi lịch nếu thực hiện trước giờ khám tối thiểu 1 giờ; qua mốc này hệ thống có thể từ chối thao tác.,"[""D02""]",[],[],[],,,,,,,,,,253.34060000022873,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0188,"Xác nhận giúp, tôi muốn đổi lịch và thanh toán ngay, quy định nào cần nhớ cho mình check thông tin được không?",Cần đến sớm 15-20 phút để xác nhận thông tin và mang giấy tờ hợp lệ nếu dùng BHYT/bảo hiểm tư nhân.,"[""D01"", ""D04""]",[],[],[],,,,,,,,,,2639.643599977717,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0167,"Cho hỏi nhanh, khung giờ khám buổi sáng là mấy giờ đến mấy giờ được không?",Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; bệnh nhân nên đến sớm 15-20 phút để xác nhận thông tin.,"[""D01""]",[],[],[],,,,,,,,,,384.77329997112975,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0243,Cho hỏi nhanh vừa hỏi về lịch khám vừa hỏi về thanh toán thì thông tin tổng hợp là gì trả lời đầy đủ giúp mình?,Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; hệ thống hỗ trợ QR Banking và gửi thông tin thanh toán sau khi tạo lịch.,"[""D01"", ""D03""]",[],[],[],,,,,,,,,,278.18660001503304,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0058,"Xác nhận giúp, so sánh quyền lợi bảo hiểm khi hồ sơ đầy đủ và khi hồ sơ chưa đầy đủ được không?",Quyền lợi phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,288.70249999454245,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0155,"Tư vấn giúp mình, nếu sát giờ khám thì có chắc chắn đổi lịch được không được không?",Có thể hủy/đổi lịch nếu thực hiện trước giờ khám tối thiểu 1 giờ; qua mốc này hệ thống có thể từ chối thao tác.,"[""D02""]",[],[],[],,,,,,,,,,282.7207999653183,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0107,Có hỗ trợ chuyển khoản QR Banking không đúng không?,Hệ thống hỗ trợ thanh toán chuyển khoản QR Banking; sau khi tạo lịch bệnh nhân sẽ nhận thông tin thanh toán để hoàn tất.,"[""D03""]",[],[],[],,,,,,,,,,389.57070000469685,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0089,Cho hỏi nhanh nếu tôi đến sát giờ hẹn thay vì đến sớm 15-20 phút thì có đúng khuyến nghị không?,Không đúng khuyến nghị; bệnh nhân nên đến sớm 15-20 phút để xác nhận thông tin.,"[""D01""]",[],[],[],,,,,,,,,,334.50539998011664,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0204,Tư vấn giúp mình quyền lợi BHYT có cố định hay phụ thuộc hồ sơ tiếp nhận?,Bệnh nhân cần mang giấy tờ hợp lệ; quyền lợi bảo hiểm phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,306.21219996828586,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0123,"Cho hỏi nhanh xin hỏi gấp: hủy đổi lịch trước 1 giờ (xin trả lời chính xác) -- từ khóa: lịch,bảo hiểm,qr,giờ?",Hủy/đổi lịch cần trước giờ khám tối thiểu 1 giờ; qua mốc này hệ thống có thể từ chối.,"[""D02""]",[],[],[],,,,,,,,,,330.6385000469163,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0105,Nếu vừa cần đổi lịch vừa cần thanh toán thì nên ưu tiên bước nào để không vi phạm mốc thời gian đúng không?,Cần đảm bảo thao tác hủy/đổi trước giờ khám tối thiểu 1 giờ; thanh toán QR Banking được hỗ trợ và thông tin gửi sau khi tạo lịch.,"[""D02"", ""D03""]",[],[],[],,,,,,,,,,298.7032000091858,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0041,Tư vấn giúp mình nếu vừa cần đổi lịch vừa cần thanh toán thì nên ưu tiên bước nào để không vi phạm mốc thời gian?,Cần đảm bảo thao tác hủy/đổi trước giờ khám tối thiểu 1 giờ; thanh toán QR Banking được hỗ trợ và thông tin gửi sau khi tạo lịch.,"[""D02"", ""D03""]",[],[],[],,,,,,,,,,323.69230000767857,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0150,So sánh quyền lợi bảo hiểm khi hồ sơ đầy đủ và khi hồ sơ chưa đầy đủ đúng không?,Quyền lợi phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,340.8837000024505,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0061,"Tư vấn giúp mình, thông tin thanh toán được gửi vào thời điểm nào được không?",Hệ thống hỗ trợ thanh toán chuyển khoản QR Banking; sau khi tạo lịch bệnh nhân sẽ nhận thông tin thanh toán để hoàn tất.,"[""D03""]",[],[],[],,,,,,,,,,313.2409999961965,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0082,"Cho tôi hỏi, Phụ nữ mang thai có được ưu tiên xếp hàng không được không?",Không tìm thấy thông tin này trong bộ tri thức hiện tại. Vui lòng liên hệ lễ tân/hỗ trợ để được cập nhật chính xác.,[],[],[],[],,,,,,,,,,225.9102000389248,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0229,Mình cần biết phòng khám hoạt động trong ngày theo khung giờ nào?,Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; bệnh nhân nên đến sớm 15-20 phút để xác nhận thông tin.,"[""D01""]",[],[],[],,,,,,,,,,350.24200001498684,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0020,"Cho hỏi nhanh, xin hỏi gấp: hủy đổi lịch trước 1 giờ (mình cần gấp) được không?",Hủy/đổi lịch cần trước giờ khám tối thiểu 1 giờ; qua mốc này hệ thống có thể từ chối.,"[""D02""]",[],[],[],,,,,,,,,,443.8429999863729,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0124,Quyền lợi bảo hiểm được xác định dựa trên yếu tố nào đúng không?,Bệnh nhân cần mang giấy tờ hợp lệ; quyền lợi bảo hiểm phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,243.67280001752079,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0185,"Tư vấn giúp mình, trường hợp có bảo hiểm nhưng không mang đủ giấy tờ thì quyền lợi xử lý thế nào được không?",Cần giấy tờ hợp lệ khi sử dụng BHYT/bảo hiểm; quyền lợi phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,372.79300001682714,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0149,Tôi ghi nhanh: giờ khám sáng chiều và đến sớm (giữ nguyên ý nghĩa nhé) là như thế nào?,Phòng khám 07:30-11:30 và 13:00-16:30; nên đến sớm 15-20 phút.,"[""D01""]",[],[],[],,,,,,,,,,276.08239999972284,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0127,"Cho tôi hỏi tôi muốn đổi lịch nhưng đã qua mốc 1 giờ trước giờ khám, so với trường hợp còn hơn 1 giờ thì khác gì?",Còn hơn 1 giờ trước giờ khám có thể hủy/đổi; qua mốc này hệ thống có thể từ chối.,"[""D02""]",[],[],[],,,,,,,,,,250.5710999830626,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0175,So sánh quyền lợi bảo hiểm khi hồ sơ đầy đủ và khi hồ sơ chưa đầy đủ là như thế nào?,Quyền lợi phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,434.13270002929494,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0192,Vừa hỏi về lịch khám vừa hỏi về thanh toán thì thông tin tổng hợp là gì để mình xác nhận lại đúng không?,Hủy/đổi lịch cần trước giờ khám tối thiểu 1 giờ; thanh toán hiện hỗ trợ QR Banking và thông tin được gửi sau khi tạo lịch.,"[""D02"", ""D03""]",[],[],[],,,,,,,,,,249.96460002148524,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0087,Cho mình hỏi hệ thống đang hỗ trợ hình thức thanh toán nào?,Hệ thống hỗ trợ thanh toán chuyển khoản QR Banking; sau khi tạo lịch bệnh nhân sẽ nhận thông tin thanh toán để hoàn tất.,"[""D03""]",[],[],[],,,,,,,,,,262.7601000131108,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0048,"Cho tôi hỏi, faq check: QR Banking nhận thông tin sau tạo lịch (giữ nguyên ý nghĩa nhé) được không?",Hệ thống hỗ trợ QR Banking; thông tin thanh toán gửi sau khi tạo lịch.,"[""D03""]",[],[],[],,,,,,,,,,252.41850002203137,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0050,Tư vấn giúp mình khung giờ khám ca sáng là mấy giờ đến mấy giờ?,Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; bệnh nhân nên đến sớm 15-20 phút để xác nhận thông tin.,"[""D01""]",[],[],[],,,,,,,,,,239.08859997754917,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0018,Cho mình hỏi sau khi tạo lịch thì nhận thông tin thanh toán như thế nào?,Hệ thống hỗ trợ thanh toán chuyển khoản QR Banking; sau khi tạo lịch bệnh nhân sẽ nhận thông tin thanh toán để hoàn tất.,"[""D03""]",[],[],[],,,,,,,,,,363.28180000418797,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0187,"Xác nhận giúp, sử dụng BHYT cần mang giấy tờ gì được không?",Bệnh nhân cần mang giấy tờ hợp lệ; quyền lợi bảo hiểm phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,328.3823999809101,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0005,Tư vấn giúp mình nếu tôi đến khám theo giờ hẹn và muốn dùng bảo hiểm thì cần gì để mình xác nhận lại?,Hệ thống hỗ trợ QR Banking sau khi tạo lịch; khi dùng BHYT/bảo hiểm cần có giấy tờ hợp lệ và quyền lợi phụ thuộc quy định/hồ sơ.,"[""D03"", ""D04""]",[],[],[],,,,,,,,,,215.10999999009073,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0030,Đổi lịch cần thực hiện trước giờ khám bao nhiêu phút đúng không?,Có thể hủy/đổi lịch nếu thực hiện trước giờ khám tối thiểu 1 giờ; qua mốc này hệ thống có thể từ chối thao tác.,"[""D02""]",[],[],[],,,,,,,,,,326.68589998502284,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0017,"Cho mình hỏi, so sánh quyền lợi bảo hiểm khi hồ sơ đầy đủ và khi hồ sơ chưa đầy đủ được không?",Quyền lợi phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,273.01190001890063,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0108,Cho mình hỏi bệnh nhân có nhận thông tin thanh toán ngay sau tạo lịch không?,Hệ thống hỗ trợ thanh toán chuyển khoản QR Banking; sau khi tạo lịch bệnh nhân sẽ nhận thông tin thanh toán để hoàn tất.,"[""D03""]",[],[],[],,,,,,,,,,302.6242000050843,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0114,Cho hỏi nhanh bảo hiểm tư nhân cần giấy tờ hợp lệ như thế nào?,Bệnh nhân cần mang giấy tờ hợp lệ; quyền lợi bảo hiểm phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,234.15369994472712,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0115,"Xin hỏi gấp: hủy đổi lịch trước 1 giờ (giữ nguyên ý nghĩa nhé) -- từ khóa: lịch,bảo hiểm,qr,giờ đúng không?",Hủy/đổi lịch cần trước giờ khám tối thiểu 1 giờ; qua mốc này hệ thống có thể từ chối.,"[""D02""]",[],[],[],,,,,,,,,,310.98629999905825,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0199,"Mình cần biết, qua mốc 1 giờ trước giờ khám thì hệ thống xử lý hủy đổi lịch ra sao được không?",Có thể hủy/đổi lịch nếu thực hiện trước giờ khám tối thiểu 1 giờ; qua mốc này hệ thống có thể từ chối thao tác.,"[""D02""]",[],[],[],,,,,,,,,,257.4563000234775,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0098,"Cho tôi hỏi, nếu tôi đến sát giờ hẹn thay vì đến sớm 15-20 phút thì có đúng khuyến nghị không được không?",Không đúng khuyến nghị; bệnh nhân nên đến sớm 15-20 phút để xác nhận thông tin.,"[""D01""]",[],[],[],,,,,,,,,,281.55799995874986,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0056,"Xác nhận giúp, Có được khám ngoài giờ sau 18:00 không được không?",Không tìm thấy thông tin này trong bộ tri thức hiện tại. Vui lòng liên hệ lễ tân/hỗ trợ để được cập nhật chính xác.,[],[],[],[],,,,,,,,,,257.30459997430444,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0241,Cho tôi hỏi hãy ghép thông tin về khung giờ và chính sách hủy đổi lịch cho mình bản tóm tắt?,Cần đến sớm 15-20 phút để xác nhận thông tin và mang giấy tờ hợp lệ nếu dùng BHYT/bảo hiểm tư nhân.,"[""D01"", ""D04""]",[],[],[],,,,,,,,,,332.78410002822056,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0138,Cho tôi hỏi vui lòng tóm tắt giúp tôi các bước chuẩn bị trước khi đến khám cho mình check thông tin?,"Nếu muốn đổi lịch thì cần thực hiện trước giờ khám tối thiểu 1 giờ, và nên đến sớm 15-20 phút khi đi khám.","[""D01"", ""D02""]",[],[],[],,,,,,,,,,341.03130002040416,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0193,Xác nhận giúp nên đến sớm bao nhiêu phút trước giờ khám để xác nhận thông tin?,Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; bệnh nhân nên đến sớm 15-20 phút để xác nhận thông tin.,"[""D01""]",[],[],[],,,,,,,,,,237.5629000016488,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0132,"Tư vấn giúp mình, nếu tôi dùng bảo hiểm và đóng tiền QR Banking thì cần lưu ý gì xin trả lời ngắn gọn được không?",Hủy/đổi lịch cần trước giờ khám tối thiểu 1 giờ; thanh toán hiện hỗ trợ QR Banking và thông tin được gửi sau khi tạo lịch.,"[""D02"", ""D03""]",[],[],[],,,,,,,,,,339.3896999768913,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0169,"Tôi muốn đổi lịch và thanh toán ngay, quy định nào cần nhớ xin trả lời ngắn gọn là như thế nào?",Nếu cần hủy/đổi lịch phải trước giờ khám tối thiểu 1 giờ; quyền lợi bảo hiểm còn phụ thuộc quy định đơn vị bảo hiểm và hồ sơ tiếp nhận.,"[""D02"", ""D04""]",[],[],[],,,,,,,,,,313.8201999827288,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0016,Cho hỏi nhanh phòng khám hoạt động trong ngày theo khung giờ nào?,Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; bệnh nhân nên đến sớm 15-20 phút để xác nhận thông tin.,"[""D01""]",[],[],[],,,,,,,,,,253.33690003026277,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0095,"Cho mình hỏi, xin hỏi gấp: hủy đổi lịch trước 1 giờ (có thể viết ngắn) -- từ khóa: lịch,bảo hiểm,qr,giờ được không?",Hủy/đổi lịch cần trước giờ khám tối thiểu 1 giờ; qua mốc này hệ thống có thể từ chối.,"[""D02""]",[],[],[],,,,,,,,,,257.8956999932416,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0164,Khung giờ khám buổi chiều là mấy giờ đến mấy giờ là như thế nào?,Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; bệnh nhân nên đến sớm 15-20 phút để xác nhận thông tin.,"[""D01""]",[],[],[],,,,,,,,,,298.5216000233777,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0183,Xác nhận giúp sử dụng BHYT cần mang giấy tờ gì?,Bệnh nhân cần mang giấy tờ hợp lệ; quyền lợi bảo hiểm phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,306.20420002378523,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0064,Tôi ghi nhanh: đổi lịch + QR Banking (giữ nguyên ý nghĩa nhé) là như thế nào?,Đổi lịch cần trước 1 giờ; thanh toán hỗ trợ QR Banking và thông tin gửi sau tạo lịch.,"[""D02"", ""D03""]",[],[],[],,,,,,,,,,264.72999999532476,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0224,Khung giờ khám buổi chiều là mấy giờ đến mấy giờ đúng không?,Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; bệnh nhân nên đến sớm 15-20 phút để xác nhận thông tin.,"[""D01""]",[],[],[],,,,,,,,,,316.92320003639907,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0247,"Cho mình hỏi, nếu vừa cần đổi lịch vừa cần thanh toán thì nên ưu tiên bước nào để không vi phạm mốc thời gian được không?",Cần đảm bảo thao tác hủy/đổi trước giờ khám tối thiểu 1 giờ; thanh toán QR Banking được hỗ trợ và thông tin gửi sau khi tạo lịch.,"[""D02"", ""D03""]",[],[],[],,,,,,,,,,320.6002999795601,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0194,Vui lòng tóm tắt giúp tôi các bước chuẩn bị trước khi đến khám cho mình bản tóm tắt là như thế nào?,"Nếu muốn đổi lịch thì cần thực hiện trước giờ khám tối thiểu 1 giờ, và nên đến sớm 15-20 phút khi đi khám.","[""D01"", ""D02""]",[],[],[],,,,,,,,,,484.27120002452284,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0032,"Cho mình hỏi tôi muốn đổi lịch và thanh toán ngay, quy định nào cần nhớ cho mình check thông tin?",Cần đến sớm 15-20 phút để xác nhận thông tin và mang giấy tờ hợp lệ nếu dùng BHYT/bảo hiểm tư nhân.,"[""D01"", ""D04""]",[],[],[],,,,,,,,,,235.04129995126277,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0146,Nếu tôi dùng bảo hiểm và đóng tiền QR Banking thì cần lưu ý gì cho mình bản tóm tắt là như thế nào?,Nếu cần hủy/đổi lịch phải trước giờ khám tối thiểu 1 giờ; quyền lợi bảo hiểm còn phụ thuộc quy định đơn vị bảo hiểm và hồ sơ tiếp nhận.,"[""D02"", ""D04""]",[],[],[],,,,,,,,,,291.8677999987267,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0034,"Tư vấn giúp mình, khung giờ khám ca chiều là mấy giờ đến mấy giờ được không?",Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; bệnh nhân nên đến sớm 15-20 phút để xác nhận thông tin.,"[""D01""]",[],[],[],,,,,,,,,,299.1563000250608,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0101,Cho hỏi nhanh nếu tôi đến khám theo giờ hẹn và muốn dùng bảo hiểm thì cần gì xin trả lời ngắn gọn?,Cần đến sớm 15-20 phút để xác nhận thông tin và mang giấy tờ hợp lệ nếu dùng BHYT/bảo hiểm tư nhân.,"[""D01"", ""D04""]",[],[],[],,,,,,,,,,304.74380002124235,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0198,Nếu tôi đến sát giờ hẹn thay vì đến sớm 15-20 phút thì có đúng khuyến nghị không là như thế nào?,Không đúng khuyến nghị; bệnh nhân nên đến sớm 15-20 phút để xác nhận thông tin.,"[""D01""]",[],[],[],,,,,,,,,,322.1694999956526,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0220,[gấp] BHYT bảo hiểm cần giấy tờ hợp lệ (có thể viết ngắn) đúng không?,Cần mang giấy tờ hợp lệ; quyền lợi phụ thuộc quy định bảo hiểm và tình trạng hồ sơ.,"[""D04""]",[],[],[],,,,,,,,,,325.7384999888018,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0223,Nếu tôi dùng bảo hiểm và đóng tiền QR Banking thì cần lưu ý gì cho mình check thông tin là như thế nào?,Hủy/đổi lịch cần trước giờ khám tối thiểu 1 giờ; thanh toán hiện hỗ trợ QR Banking và thông tin được gửi sau khi tạo lịch.,"[""D02"", ""D03""]",[],[],[],,,,,,,,,,339.2382999882102,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0093,"Tư vấn giúp mình, đổi lịch cần thực hiện trước giờ khám bao nhiêu phút được không?",Có thể hủy/đổi lịch nếu thực hiện trước giờ khám tối thiểu 1 giờ; qua mốc này hệ thống có thể từ chối thao tác.,"[""D02""]",[],[],[],,,,,,,,,,192.98389996401966,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0054,So sánh trường hợp hủy lịch trước 90 phút và trước 30 phút đúng không?,Trước 90 phút (>=1 giờ) có thể hủy/đổi; trước 30 phút (<1 giờ) hệ thống có thể từ chối thao tác.,"[""D02""]",[],[],[],,,,,,,,,,227.5491000036709,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0248,"Cho tôi hỏi, Có hỗ trợ đặt lịch qua Zalo OA không được không?",Không tìm thấy thông tin này trong bộ tri thức hiện tại. Vui lòng liên hệ lễ tân/hỗ trợ để được cập nhật chính xác.,[],[],[],[],,,,,,,,,,404.6581999864429,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0207,"Cho hỏi nhanh, bảo hiểm tư nhân cần giấy tờ hợp lệ như thế nào được không?",Bệnh nhân cần mang giấy tờ hợp lệ; quyền lợi bảo hiểm phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,1262.6097000320442,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0015,"Xác nhận giúp, qua mốc 1 giờ trước giờ khám thì hệ thống xử lý hủy đổi lịch ra sao được không?",Có thể hủy/đổi lịch nếu thực hiện trước giờ khám tối thiểu 1 giờ; qua mốc này hệ thống có thể từ chối thao tác.,"[""D02""]",[],[],[],,,,,,,,,,316.4350999868475,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0197,Hãy ghép thông tin về khung giờ và chính sách hủy đổi lịch cho mình bản tóm tắt là như thế nào?,Nếu cần hủy/đổi lịch phải trước giờ khám tối thiểu 1 giờ; quyền lợi bảo hiểm còn phụ thuộc quy định đơn vị bảo hiểm và hồ sơ tiếp nhận.,"[""D02"", ""D04""]",[],[],[],,,,,,,,,,336.02970000356436,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0210,"Tôi muốn đổi lịch và thanh toán ngay, quy định nào cần nhớ trả lời đầy đủ giúp mình là như thế nào?",Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; hệ thống hỗ trợ QR Banking và gửi thông tin thanh toán sau khi tạo lịch.,"[""D01"", ""D03""]",[],[],[],,,,,,,,,,325.3260999917984,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0055,Tư vấn giúp mình thông tin thanh toán được gửi vào thời điểm nào?,Hệ thống hỗ trợ thanh toán chuyển khoản QR Banking; sau khi tạo lịch bệnh nhân sẽ nhận thông tin thanh toán để hoàn tất.,"[""D03""]",[],[],[],,,,,,,,,,212.22809999017045,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0022,"Cho mình hỏi, quyền lợi bảo hiểm được xác định dựa trên yếu tố nào được không?",Bệnh nhân cần mang giấy tờ hợp lệ; quyền lợi bảo hiểm phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,320.10539999464527,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0013,Xác nhận giúp khung giờ khám buổi sáng là mấy giờ đến mấy giờ?,Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; bệnh nhân nên đến sớm 15-20 phút để xác nhận thông tin.,"[""D01""]",[],[],[],,,,,,,,,,258.58309998875484,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0144,"Tư vấn giúp mình, nếu tôi đến khám theo giờ hẹn và muốn dùng bảo hiểm thì cần gì cho mình bản tóm tắt được không?","Nếu muốn đổi lịch thì cần thực hiện trước giờ khám tối thiểu 1 giờ, và nên đến sớm 15-20 phút khi đi khám.","[""D01"", ""D02""]",[],[],[],,,,,,,,,,317.25530000403523,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0014,Hãy ghép thông tin về khung giờ và chính sách hủy đổi lịch cho mình bản tóm tắt đúng không?,Hệ thống hỗ trợ QR Banking sau khi tạo lịch; khi dùng BHYT/bảo hiểm cần có giấy tờ hợp lệ và quyền lợi phụ thuộc quy định/hồ sơ.,"[""D03"", ""D04""]",[],[],[],,,,,,,,,,219.68390000984073,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0072,"Cho hỏi nhanh, tôi ghi nhanh: giờ khám sáng chiều và đến sớm (xin trả lời chính xác) được không?",Phòng khám 07:30-11:30 và 13:00-16:30; nên đến sớm 15-20 phút.,"[""D01""]",[],[],[],,,,,,,,,,281.6156999906525,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0009,Phòng khám có gửi xe miễn phí không là như thế nào?,Không tìm thấy thông tin này trong bộ tri thức hiện tại. Vui lòng liên hệ lễ tân/hỗ trợ để được cập nhật chính xác.,[],[],[],[],,,,,,,,,,234.9089000490494,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0129,Cho mình hỏi nếu tôi dùng bảo hiểm và đóng tiền QR Banking thì cần lưu ý gì trả lời đầy đủ giúp mình?,Cần đến sớm 15-20 phút để xác nhận thông tin và mang giấy tờ hợp lệ nếu dùng BHYT/bảo hiểm tư nhân.,"[""D01"", ""D04""]",[],[],[],,,,,,,,,,315.898000029847,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0174,"Cho mình hỏi faq check: đổi lịch + QR Banking (giữ nguyên ý nghĩa nhé) -- từ khóa: lịch,bảo hiểm,qr,giờ?",Đổi lịch cần trước 1 giờ; thanh toán hỗ trợ QR Banking và thông tin gửi sau tạo lịch.,"[""D02"", ""D03""]",[],[],[],,,,,,,,,,282.64349995879456,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0027,"Cho tôi hỏi, sử dụng BHYT cần mang giấy tờ gì được không?",Bệnh nhân cần mang giấy tờ hợp lệ; quyền lợi bảo hiểm phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,234.99880003510043,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0075,"Cho hỏi nhanh, tôi muốn đổi lịch và thanh toán ngay, quy định nào cần nhớ cho mình check thông tin được không?","Nếu muốn đổi lịch thì cần thực hiện trước giờ khám tối thiểu 1 giờ, và nên đến sớm 15-20 phút khi đi khám.","[""D01"", ""D02""]",[],[],[],,,,,,,,,,255.24629995925352,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0085,Có được khám ngoài giờ sau 18:00 không là như thế nào?,Không tìm thấy thông tin này trong bộ tri thức hiện tại. Vui lòng liên hệ lễ tân/hỗ trợ để được cập nhật chính xác.,[],[],[],[],,,,,,,,,,298.3935999800451,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0177,"Mình cần biết, nếu tôi dùng bảo hiểm và đóng tiền QR Banking thì cần lưu ý gì cho mình bản tóm tắt được không?",Hủy/đổi lịch cần trước giờ khám tối thiểu 1 giờ; thanh toán hiện hỗ trợ QR Banking và thông tin được gửi sau khi tạo lịch.,"[""D02"", ""D03""]",[],[],[],,,,,,,,,,299.69279997749254,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0025,"Tư vấn giúp mình tôi muốn đổi lịch nhưng đã qua mốc 1 giờ trước giờ khám, so với trường hợp còn hơn 1 giờ thì khác gì?",Còn hơn 1 giờ trước giờ khám có thể hủy/đổi; qua mốc này hệ thống có thể từ chối.,"[""D02""]",[],[],[],,,,,,,,,,380.30140002956614,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0170,"Xác nhận giúp, có hỗ trợ chuyển khoản QR Banking không được không?",Hệ thống hỗ trợ thanh toán chuyển khoản QR Banking; sau khi tạo lịch bệnh nhân sẽ nhận thông tin thanh toán để hoàn tất.,"[""D03""]",[],[],[],,,,,,,,,,216.66769997682422,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0062,Nếu tôi đến sát giờ hẹn thay vì đến sớm 15-20 phút thì có đúng khuyến nghị không đúng không?,Không đúng khuyến nghị; bệnh nhân nên đến sớm 15-20 phút để xác nhận thông tin.,"[""D01""]",[],[],[],,,,,,,,,,316.9624000438489,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0211,"Cho hỏi nhanh, nếu tôi dùng bảo hiểm và đóng tiền QR Banking thì cần lưu ý gì cho mình bản tóm tắt được không?",Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; hệ thống hỗ trợ QR Banking và gửi thông tin thanh toán sau khi tạo lịch.,"[""D01"", ""D03""]",[],[],[],,,,,,,,,,319.9783000163734,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0023,Vừa hỏi về lịch khám vừa hỏi về thanh toán thì thông tin tổng hợp là gì cho mình check thông tin là như thế nào?,Hủy/đổi lịch cần trước giờ khám tối thiểu 1 giờ; thanh toán hiện hỗ trợ QR Banking và thông tin được gửi sau khi tạo lịch.,"[""D02"", ""D03""]",[],[],[],,,,,,,,,,263.3108000154607,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0078,Sau khi tạo lịch thì nhận thông tin thanh toán như thế nào là như thế nào?,Hệ thống hỗ trợ thanh toán chuyển khoản QR Banking; sau khi tạo lịch bệnh nhân sẽ nhận thông tin thanh toán để hoàn tất.,"[""D03""]",[],[],[],,,,,,,,,,238.20060002617538,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0230,Hãy ghép thông tin về khung giờ và chính sách hủy đổi lịch để mình xác nhận lại là như thế nào?,"Nếu muốn đổi lịch thì cần thực hiện trước giờ khám tối thiểu 1 giờ, và nên đến sớm 15-20 phút khi đi khám.","[""D01"", ""D02""]",[],[],[],,,,,,,,,,322.0382999861613,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0182,Cho tôi hỏi thông tin thanh toán được gửi vào thời điểm nào?,Hệ thống hỗ trợ thanh toán chuyển khoản QR Banking; sau khi tạo lịch bệnh nhân sẽ nhận thông tin thanh toán để hoàn tất.,"[""D03""]",[],[],[],,,,,,,,,,246.96750001749024,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0096,"Cho tôi hỏi, Phòng khám có làm việc thứ Bảy, Chủ nhật không được không?",Không tìm thấy thông tin này trong bộ tri thức hiện tại. Vui lòng liên hệ lễ tân/hỗ trợ để được cập nhật chính xác.,[],[],[],[],,,,,,,,,,318.70130001334473,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0166,Khung giờ khám ca chiều là mấy giờ đến mấy giờ đúng không?,Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; bệnh nhân nên đến sớm 15-20 phút để xác nhận thông tin.,"[""D01""]",[],[],[],,,,,,,,,,320.4213000135496,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0051,Cho tôi hỏi quyền lợi bảo hiểm được xác định dựa trên yếu tố nào?,Bệnh nhân cần mang giấy tờ hợp lệ; quyền lợi bảo hiểm phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,274.44490004563704,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0049,Mình cần biết quyền lợi BHYT có cố định hay phụ thuộc hồ sơ tiếp nhận?,Bệnh nhân cần mang giấy tờ hợp lệ; quyền lợi bảo hiểm phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,417.5112000084482,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0196,"Xin hỏi gấp: BHYT bảo hiểm cần giấy tờ hợp lệ (xin trả lời chính xác) -- từ khóa: lịch,bảo hiểm,qr,giờ là như thế nào?",Cần mang giấy tờ hợp lệ; quyền lợi phụ thuộc quy định bảo hiểm và tình trạng hồ sơ.,"[""D04""]",[],[],[],,,,,,,,,,254.864800022915,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0059,"Tư vấn giúp mình, nếu đã tạo lịch thì lúc nào nhận thông tin QR Banking được không?","Sau khi tạo lịch, bệnh nhân sẽ nhận thông tin thanh toán QR Banking để hoàn tất.","[""D03""]",[],[],[],,,,,,,,,,324.0918000228703,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0037,"Tôi muốn đổi lịch và thanh toán ngay, quy định nào cần nhớ xin trả lời ngắn gọn đúng không?",Cần đến sớm 15-20 phút để xác nhận thông tin và mang giấy tờ hợp lệ nếu dùng BHYT/bảo hiểm tư nhân.,"[""D01"", ""D04""]",[],[],[],,,,,,,,,,283.6048000026494,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0158,"Mình cần biết, khung giờ khám ca chiều là mấy giờ đến mấy giờ được không?",Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; bệnh nhân nên đến sớm 15-20 phút để xác nhận thông tin.,"[""D01""]",[],[],[],,,,,,,,,,269.49919998878613,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0130,Bảo hiểm tư nhân cần giấy tờ hợp lệ như thế nào đúng không?,Bệnh nhân cần mang giấy tờ hợp lệ; quyền lợi bảo hiểm phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,247.40200000815094,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0205,Số hotline đặt lịch là bao nhiêu đúng không?,Không tìm thấy thông tin này trong bộ tri thức hiện tại. Vui lòng liên hệ lễ tân/hỗ trợ để được cập nhật chính xác.,[],[],[],[],,,,,,,,,,222.88219997426495,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0162,"Cho hỏi nhanh, nếu tôi dùng bảo hiểm và đóng tiền QR Banking thì cần lưu ý gì cho mình check thông tin được không?",Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; hệ thống hỗ trợ QR Banking và gửi thông tin thanh toán sau khi tạo lịch.,"[""D01"", ""D03""]",[],[],[],,,,,,,,,,222.79740002704784,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0246,Nếu tôi dùng bảo hiểm và đóng tiền QR Banking thì cần lưu ý gì cho mình bản tóm tắt đúng không?,Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; hệ thống hỗ trợ QR Banking và gửi thông tin thanh toán sau khi tạo lịch.,"[""D01"", ""D03""]",[],[],[],,,,,,,,,,426.6549000167288,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0033,So sánh trường hợp hủy lịch trước 90 phút và trước 30 phút là như thế nào?,Trước 90 phút (>=1 giờ) có thể hủy/đổi; trước 30 phút (<1 giờ) hệ thống có thể từ chối thao tác.,"[""D02""]",[],[],[],,,,,,,,,,239.15739997755736,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0143,Cho hỏi nhanh hãy ghép thông tin về khung giờ và chính sách hủy đổi lịch cho mình bản tóm tắt?,Nếu cần hủy/đổi lịch phải trước giờ khám tối thiểu 1 giờ; quyền lợi bảo hiểm còn phụ thuộc quy định đơn vị bảo hiểm và hồ sơ tiếp nhận.,"[""D02"", ""D04""]",[],[],[],,,,,,,,,,233.7058000266552,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0094,"Tôi muốn đổi lịch và thanh toán ngay, quy định nào cần nhớ cho mình bản tóm tắt đúng không?","Nếu muốn đổi lịch thì cần thực hiện trước giờ khám tối thiểu 1 giờ, và nên đến sớm 15-20 phút khi đi khám.","[""D01"", ""D02""]",[],[],[],,,,,,,,,,381.3333000289276,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0125,"Cho hỏi nhanh, có thể hủy lịch trước giờ khám tối thiểu bao lâu được không?",Có thể hủy/đổi lịch nếu thực hiện trước giờ khám tối thiểu 1 giờ; qua mốc này hệ thống có thể từ chối thao tác.,"[""D02""]",[],[],[],,,,,,,,,,227.35439997632056,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0250,"Tư vấn giúp mình, nếu tôi đến sát giờ hẹn thay vì đến sớm 15-20 phút thì có đúng khuyến nghị không được không?",Không đúng khuyến nghị; bệnh nhân nên đến sớm 15-20 phút để xác nhận thông tin.,"[""D01""]",[],[],[],,,,,,,,,,222.59920003125444,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0010,"Cho mình hỏi, nếu sát giờ khám thì có chắc chắn đổi lịch được không được không?",Có thể hủy/đổi lịch nếu thực hiện trước giờ khám tối thiểu 1 giờ; qua mốc này hệ thống có thể từ chối thao tác.,"[""D02""]",[],[],[],,,,,,,,,,300.683899957221,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0002,Cho tôi hỏi vui lòng tóm tắt giúp tôi các bước chuẩn bị trước khi đến khám để mình xác nhận lại?,Nếu cần hủy/đổi lịch phải trước giờ khám tối thiểu 1 giờ; quyền lợi bảo hiểm còn phụ thuộc quy định đơn vị bảo hiểm và hồ sơ tiếp nhận.,"[""D02"", ""D04""]",[],[],[],,,,,,,,,,292.7004999946803,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0118,Cho tôi hỏi sau khi tạo lịch thì nhận thông tin thanh toán như thế nào?,Hệ thống hỗ trợ thanh toán chuyển khoản QR Banking; sau khi tạo lịch bệnh nhân sẽ nhận thông tin thanh toán để hoàn tất.,"[""D03""]",[],[],[],,,,,,,,,,237.05290001817048,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0045,Cho hỏi nhanh xin hỏi gấp: hủy đổi lịch trước 1 giờ (giữ nguyên ý nghĩa nhé)?,Hủy/đổi lịch cần trước giờ khám tối thiểu 1 giờ; qua mốc này hệ thống có thể từ chối.,"[""D02""]",[],[],[],,,,,,,,,,251.58989999908954,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0131,Thông tin thanh toán được gửi vào thời điểm nào là như thế nào?,Hệ thống hỗ trợ thanh toán chuyển khoản QR Banking; sau khi tạo lịch bệnh nhân sẽ nhận thông tin thanh toán để hoàn tất.,"[""D03""]",[],[],[],,,,,,,,,,296.6431000386365,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0232,Đổi lịch cần thực hiện trước giờ khám bao nhiêu phút là như thế nào?,Có thể hủy/đổi lịch nếu thực hiện trước giờ khám tối thiểu 1 giờ; qua mốc này hệ thống có thể từ chối thao tác.,"[""D02""]",[],[],[],,,,,,,,,,282.001500017941,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0142,Vui lòng tóm tắt giúp tôi các bước chuẩn bị trước khi đến khám cho mình bản tóm tắt đúng không?,Nếu cần hủy/đổi lịch phải trước giờ khám tối thiểu 1 giờ; quyền lợi bảo hiểm còn phụ thuộc quy định đơn vị bảo hiểm và hồ sơ tiếp nhận.,"[""D02"", ""D04""]",[],[],[],,,,,,,,,,295.73750001145527,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0201,Vừa hỏi về lịch khám vừa hỏi về thanh toán thì thông tin tổng hợp là gì trả lời đầy đủ giúp mình đúng không?,Cần đến sớm 15-20 phút để xác nhận thông tin và mang giấy tờ hợp lệ nếu dùng BHYT/bảo hiểm tư nhân.,"[""D01"", ""D04""]",[],[],[],,,,,,,,,,313.4130999678746,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0191,Tư vấn giúp mình vui lòng tóm tắt giúp tôi các bước chuẩn bị trước khi đến khám cho mình bản tóm tắt?,Nếu cần hủy/đổi lịch phải trước giờ khám tối thiểu 1 giờ; quyền lợi bảo hiểm còn phụ thuộc quy định đơn vị bảo hiểm và hồ sơ tiếp nhận.,"[""D02"", ""D04""]",[],[],[],,,,,,,,,,291.0558999865316,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0026,Sử dụng BHYT cần mang giấy tờ gì đúng không?,Bệnh nhân cần mang giấy tờ hợp lệ; quyền lợi bảo hiểm phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,213.08249997673556,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0081,Xác nhận giúp hãy ghép thông tin về khung giờ và chính sách hủy đổi lịch cho mình check thông tin?,"Nếu muốn đổi lịch thì cần thực hiện trước giờ khám tối thiểu 1 giờ, và nên đến sớm 15-20 phút khi đi khám.","[""D01"", ""D02""]",[],[],[],,,,,,,,,,310.1025000214577,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0121,Cho hỏi nhanh nếu tôi đến khám theo giờ hẹn và muốn dùng bảo hiểm thì cần gì để mình xác nhận lại?,"Nếu muốn đổi lịch thì cần thực hiện trước giờ khám tối thiểu 1 giờ, và nên đến sớm 15-20 phút khi đi khám.","[""D01"", ""D02""]",[],[],[],,,,,,,,,,295.76649999944493,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0052,"Cho tôi hỏi, sau khi tạo lịch thì nhận thông tin thanh toán như thế nào được không?",Hệ thống hỗ trợ thanh toán chuyển khoản QR Banking; sau khi tạo lịch bệnh nhân sẽ nhận thông tin thanh toán để hoàn tất.,"[""D03""]",[],[],[],,,,,,,,,,314.1948000411503,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0178,Phòng khám hoạt động trong ngày theo khung giờ nào đúng không?,Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; bệnh nhân nên đến sớm 15-20 phút để xác nhận thông tin.,"[""D01""]",[],[],[],,,,,,,,,,223.26320002321154,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0076,"Mình cần biết, tôi ghi nhanh: đổi lịch + QR Banking (mình cần gấp) -- từ khóa: lịch,bảo hiểm,qr,giờ được không?",Đổi lịch cần trước 1 giờ; thanh toán hỗ trợ QR Banking và thông tin gửi sau tạo lịch.,"[""D02"", ""D03""]",[],[],[],,,,,,,,,,282.7450999757275,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0200,Tư vấn giúp mình vừa hỏi về lịch khám vừa hỏi về thanh toán thì thông tin tổng hợp là gì cho mình check thông tin?,Hủy/đổi lịch cần trước giờ khám tối thiểu 1 giờ; thanh toán hiện hỗ trợ QR Banking và thông tin được gửi sau khi tạo lịch.,"[""D02"", ""D03""]",[],[],[],,,,,,,,,,241.04799999622628,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0234,Vừa hỏi về lịch khám vừa hỏi về thanh toán thì thông tin tổng hợp là gì xin trả lời ngắn gọn là như thế nào?,Nếu cần hủy/đổi lịch phải trước giờ khám tối thiểu 1 giờ; quyền lợi bảo hiểm còn phụ thuộc quy định đơn vị bảo hiểm và hồ sơ tiếp nhận.,"[""D02"", ""D04""]",[],[],[],,,,,,,,,,233.3951999899,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0209,"Tôi muốn đổi lịch nhưng đã qua mốc 1 giờ trước giờ khám, so với trường hợp còn hơn 1 giờ thì khác gì đúng không?",Còn hơn 1 giờ trước giờ khám có thể hủy/đổi; qua mốc này hệ thống có thể từ chối.,"[""D02""]",[],[],[],,,,,,,,,,319.9974000453949,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0047,"Tư vấn giúp mình, [gấp] giờ khám sáng chiều và đến sớm (có thể viết ngắn) -- từ khóa: lịch,bảo hiểm,qr,giờ được không?",Phòng khám 07:30-11:30 và 13:00-16:30; nên đến sớm 15-20 phút.,"[""D01""]",[],[],[],,,,,,,,,,327.717800042592,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0099,Phòng khám hoạt động trong ngày theo khung giờ nào là như thế nào?,Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; bệnh nhân nên đến sớm 15-20 phút để xác nhận thông tin.,"[""D01""]",[],[],[],,,,,,,,,,248.30589996417984,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0077,Tư vấn giúp mình trường hợp có bảo hiểm nhưng không mang đủ giấy tờ thì quyền lợi xử lý thế nào?,Cần giấy tờ hợp lệ khi sử dụng BHYT/bảo hiểm; quyền lợi phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,377.3187000188045,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0239,"Cho tôi hỏi, đổi lịch cần thực hiện trước giờ khám bao nhiêu phút được không?",Có thể hủy/đổi lịch nếu thực hiện trước giờ khám tối thiểu 1 giờ; qua mốc này hệ thống có thể từ chối thao tác.,"[""D02""]",[],[],[],,,,,,,,,,307.257300009951,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0152,"Cho tôi hỏi, quyền lợi bảo hiểm được xác định dựa trên yếu tố nào được không?",Bệnh nhân cần mang giấy tờ hợp lệ; quyền lợi bảo hiểm phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,231.3659000210464,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0236,Nếu tôi dùng bảo hiểm và đóng tiền QR Banking thì cần lưu ý gì xin trả lời ngắn gọn là như thế nào?,"Nếu muốn đổi lịch thì cần thực hiện trước giờ khám tối thiểu 1 giờ, và nên đến sớm 15-20 phút khi đi khám.","[""D01"", ""D02""]",[],[],[],,,,,,,,,,237.85939998924732,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0202,Hãy ghép thông tin về khung giờ và chính sách hủy đổi lịch để mình xác nhận lại đúng không?,Hệ thống hỗ trợ QR Banking sau khi tạo lịch; khi dùng BHYT/bảo hiểm cần có giấy tờ hợp lệ và quyền lợi phụ thuộc quy định/hồ sơ.,"[""D03"", ""D04""]",[],[],[],,,,,,,,,,300.4657000419684,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0060,Nên đến sớm bao nhiêu phút trước giờ khám để xác nhận thông tin đúng không?,Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; bệnh nhân nên đến sớm 15-20 phút để xác nhận thông tin.,"[""D01""]",[],[],[],,,,,,,,,,295.87930004345253,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0021,Xác nhận giúp vừa hỏi về lịch khám vừa hỏi về thanh toán thì thông tin tổng hợp là gì trả lời đầy đủ giúp mình?,Cần đến sớm 15-20 phút để xác nhận thông tin và mang giấy tờ hợp lệ nếu dùng BHYT/bảo hiểm tư nhân.,"[""D01"", ""D04""]",[],[],[],,,,,,,,,,236.9505999959074,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0176,Cho tôi hỏi Có chương trình ưu đãi cho sinh viên không?,Không tìm thấy thông tin này trong bộ tri thức hiện tại. Vui lòng liên hệ lễ tân/hỗ trợ để được cập nhật chính xác.,[],[],[],[],,,,,,,,,,249.81750000733882,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0172,Xác nhận giúp qua mốc 1 giờ trước giờ khám thì hệ thống xử lý hủy đổi lịch ra sao?,Có thể hủy/đổi lịch nếu thực hiện trước giờ khám tối thiểu 1 giờ; qua mốc này hệ thống có thể từ chối thao tác.,"[""D02""]",[],[],[],,,,,,,,,,236.15469998912886,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0219,Mình cần biết có hỗ trợ chuyển khoản QR Banking không?,Hệ thống hỗ trợ thanh toán chuyển khoản QR Banking; sau khi tạo lịch bệnh nhân sẽ nhận thông tin thanh toán để hoàn tất.,"[""D03""]",[],[],[],,,,,,,,,,231.1368000227958,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0083,Xác nhận giúp hãy ghép thông tin về khung giờ và chính sách hủy đổi lịch để mình xác nhận lại?,Hệ thống hỗ trợ QR Banking sau khi tạo lịch; khi dùng BHYT/bảo hiểm cần có giấy tờ hợp lệ và quyền lợi phụ thuộc quy định/hồ sơ.,"[""D03"", ""D04""]",[],[],[],,,,,,,,,,324.8609000002034,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0231,Cho hỏi nhanh so sánh trường hợp hủy lịch trước 90 phút và trước 30 phút?,Trước 90 phút (>=1 giờ) có thể hủy/đổi; trước 30 phút (<1 giờ) hệ thống có thể từ chối thao tác.,"[""D02""]",[],[],[],,,,,,,,,,262.09299999754876,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0001,"Cho hỏi nhanh tôi muốn đổi lịch và thanh toán ngay, quy định nào cần nhớ trả lời đầy đủ giúp mình?",Hệ thống hỗ trợ QR Banking sau khi tạo lịch; khi dùng BHYT/bảo hiểm cần có giấy tờ hợp lệ và quyền lợi phụ thuộc quy định/hồ sơ.,"[""D03"", ""D04""]",[],[],[],,,,,,,,,,311.3712000194937,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0213,Nếu sát giờ khám thì có chắc chắn đổi lịch được không đúng không?,Có thể hủy/đổi lịch nếu thực hiện trước giờ khám tối thiểu 1 giờ; qua mốc này hệ thống có thể từ chối thao tác.,"[""D02""]",[],[],[],,,,,,,,,,274.6857000165619,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0206,"Tư vấn giúp mình, tôi muốn đổi lịch và thanh toán ngay, quy định nào cần nhớ để mình xác nhận lại được không?",Hệ thống hỗ trợ QR Banking sau khi tạo lịch; khi dùng BHYT/bảo hiểm cần có giấy tờ hợp lệ và quyền lợi phụ thuộc quy định/hồ sơ.,"[""D03"", ""D04""]",[],[],[],,,,,,,,,,264.9809999857098,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0190,"Tư vấn giúp mình, tôi muốn đổi lịch và thanh toán ngay, quy định nào cần nhớ xin trả lời ngắn gọn được không?",Hệ thống hỗ trợ QR Banking sau khi tạo lịch; khi dùng BHYT/bảo hiểm cần có giấy tờ hợp lệ và quyền lợi phụ thuộc quy định/hồ sơ.,"[""D03"", ""D04""]",[],[],[],,,,,,,,,,254.22770000295714,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0090,Nếu đã tạo lịch thì lúc nào nhận thông tin QR Banking là như thế nào?,"Sau khi tạo lịch, bệnh nhân sẽ nhận thông tin thanh toán QR Banking để hoàn tất.","[""D03""]",[],[],[],,,,,,,,,,332.5360000017099,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0042,"Cho hỏi nhanh tôi muốn đổi lịch nhưng đã qua mốc 1 giờ trước giờ khám, so với trường hợp còn hơn 1 giờ thì khác gì?",Còn hơn 1 giờ trước giờ khám có thể hủy/đổi; qua mốc này hệ thống có thể từ chối.,"[""D02""]",[],[],[],,,,,,,,,,316.32589997025207,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0148,Cho tôi hỏi nếu tôi dùng bảo hiểm và đóng tiền QR Banking thì cần lưu ý gì cho mình check thông tin?,Hệ thống hỗ trợ QR Banking sau khi tạo lịch; khi dùng BHYT/bảo hiểm cần có giấy tờ hợp lệ và quyền lợi phụ thuộc quy định/hồ sơ.,"[""D03"", ""D04""]",[],[],[],,,,,,,,,,215.25379997910932,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0035,Qua mốc 1 giờ trước giờ khám thì hệ thống xử lý hủy đổi lịch ra sao là như thế nào?,Có thể hủy/đổi lịch nếu thực hiện trước giờ khám tối thiểu 1 giờ; qua mốc này hệ thống có thể từ chối thao tác.,"[""D02""]",[],[],[],,,,,,,,,,252.42279999656603,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0068,Cho mình hỏi nếu sát giờ khám thì có chắc chắn đổi lịch được không?,Có thể hủy/đổi lịch nếu thực hiện trước giờ khám tối thiểu 1 giờ; qua mốc này hệ thống có thể từ chối thao tác.,"[""D02""]",[],[],[],,,,,,,,,,1229.3468000134453,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0122,Cho tôi hỏi khi dùng bảo hiểm cần lưu ý điều kiện gì?,Bệnh nhân cần mang giấy tờ hợp lệ; quyền lợi bảo hiểm phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,1248.836199985817,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0153,"Xác nhận giúp, Phụ nữ mang thai có được ưu tiên xếp hàng không được không?",Không tìm thấy thông tin này trong bộ tri thức hiện tại. Vui lòng liên hệ lễ tân/hỗ trợ để được cập nhật chính xác.,[],[],[],[],,,,,,,,,,320.08410000707954,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0139,Xác nhận giúp có hỗ trợ chuyển khoản QR Banking không?,Hệ thống hỗ trợ thanh toán chuyển khoản QR Banking; sau khi tạo lịch bệnh nhân sẽ nhận thông tin thanh toán để hoàn tất.,"[""D03""]",[],[],[],,,,,,,,,,237.159900018014,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0233,"Cho hỏi nhanh, khi dùng bảo hiểm cần lưu ý điều kiện gì được không?",Bệnh nhân cần mang giấy tờ hợp lệ; quyền lợi bảo hiểm phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,325.2062000101432,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0214,Có hỗ trợ chuyển khoản QR Banking không là như thế nào?,Hệ thống hỗ trợ thanh toán chuyển khoản QR Banking; sau khi tạo lịch bệnh nhân sẽ nhận thông tin thanh toán để hoàn tất.,"[""D03""]",[],[],[],,,,,,,,,,325.39660000475124,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0212,"Tư vấn giúp mình, nếu tôi dùng bảo hiểm và đóng tiền QR Banking thì cần lưu ý gì để mình xác nhận lại được không?",Hệ thống hỗ trợ QR Banking sau khi tạo lịch; khi dùng BHYT/bảo hiểm cần có giấy tờ hợp lệ và quyền lợi phụ thuộc quy định/hồ sơ.,"[""D03"", ""D04""]",[],[],[],,,,,,,,,,268.0390999885276,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0242,Cho hỏi nhanh nên đến sớm bao nhiêu phút trước giờ khám để xác nhận thông tin?,Phòng khám hoạt động 07:30-11:30 và 13:00-16:30; bệnh nhân nên đến sớm 15-20 phút để xác nhận thông tin.,"[""D01""]",[],[],[],,,,,,,,,,327.6620000251569,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0086,"Cho hỏi nhanh, vừa hỏi về lịch khám vừa hỏi về thanh toán thì thông tin tổng hợp là gì trả lời đầy đủ giúp mình được không?",Hệ thống hỗ trợ QR Banking sau khi tạo lịch; khi dùng BHYT/bảo hiểm cần có giấy tờ hợp lệ và quyền lợi phụ thuộc quy định/hồ sơ.,"[""D03"", ""D04""]",[],[],[],,,,,,,,,,229.92740001063794,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0156,"Mình cần biết [urgent] giờ khám sáng chiều và đến sớm (giữ nguyên ý nghĩa nhé) -- từ khóa: lịch,bảo hiểm,qr,giờ?",Phòng khám 07:30-11:30 và 13:00-16:30; nên đến sớm 15-20 phút.,"[""D01""]",[],[],[],,,,,,,,,,290.976399963256,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0007,Cho hỏi nhanh nếu đã tạo lịch thì lúc nào nhận thông tin QR Banking?,"Sau khi tạo lịch, bệnh nhân sẽ nhận thông tin thanh toán QR Banking để hoàn tất.","[""D03""]",[],[],[],,,,,,,,,,326.95149997016415,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0109,Mình cần biết tôi ghi nhanh: giờ khám sáng chiều và đến sớm (tôi gọi từ mobile)?,Phòng khám 07:30-11:30 và 13:00-16:30; nên đến sớm 15-20 phút.,"[""D01""]",[],[],[],,,,,,,,,,380.9795000124723,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0024,"Cho hỏi nhanh, nếu đã tạo lịch thì lúc nào nhận thông tin QR Banking được không?","Sau khi tạo lịch, bệnh nhân sẽ nhận thông tin thanh toán QR Banking để hoàn tất.","[""D03""]",[],[],[],,,,,,,,,,325.5965000134893,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0208,Cho tôi hỏi hãy ghép thông tin về khung giờ và chính sách hủy đổi lịch cho mình check thông tin?,"Nếu muốn đổi lịch thì cần thực hiện trước giờ khám tối thiểu 1 giờ, và nên đến sớm 15-20 phút khi đi khám.","[""D01"", ""D02""]",[],[],[],,,,,,,,,,243.4413000009954,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0117,Tư vấn giúp mình nếu đã tạo lịch thì lúc nào nhận thông tin QR Banking?,"Sau khi tạo lịch, bệnh nhân sẽ nhận thông tin thanh toán QR Banking để hoàn tất.","[""D03""]",[],[],[],,,,,,,,,,205.49329998902977,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0097,"Cho tôi hỏi, khi dùng bảo hiểm cần lưu ý điều kiện gì được không?",Bệnh nhân cần mang giấy tờ hợp lệ; quyền lợi bảo hiểm phụ thuộc quy định đơn vị bảo hiểm và tình trạng hồ sơ tại thời điểm tiếp nhận.,"[""D04""]",[],[],[],,,,,,,,,,248.82359994808212,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0244,Cho mình hỏi có hỗ trợ chuyển khoản QR Banking không?,Hệ thống hỗ trợ thanh toán chuyển khoản QR Banking; sau khi tạo lịch bệnh nhân sẽ nhận thông tin thanh toán để hoàn tất.,"[""D03""]",[],[],[],,,,,,,,,,342.13479998288676,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0171,Nếu tôi dùng bảo hiểm và đóng tiền QR Banking thì cần lưu ý gì trả lời đầy đủ giúp mình là như thế nào?,Cần đến sớm 15-20 phút để xác nhận thông tin và mang giấy tờ hợp lệ nếu dùng BHYT/bảo hiểm tư nhân.,"[""D01"", ""D04""]",[],[],[],,,,,,,,,,315.08989998837933,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0128,"Tư vấn giúp mình, hãy ghép thông tin về khung giờ và chính sách hủy đổi lịch để mình xác nhận lại được không?",Hủy/đổi lịch cần trước giờ khám tối thiểu 1 giờ; thanh toán hiện hỗ trợ QR Banking và thông tin được gửi sau khi tạo lịch.,"[""D02"", ""D03""]",[],[],[],,,,,,,,,,244.94960001902655,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0116,"Xác nhận giúp, faq check: QR Banking nhận thông tin sau tạo lịch (tôi gọi từ mobile) -- từ khóa: lịch,bảo hiểm,qr,giờ được không?",Hệ thống hỗ trợ QR Banking; thông tin thanh toán gửi sau khi tạo lịch.,"[""D03""]",[],[],[],,,,,,,,,,300.1491000177339,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0245,"Tôi muốn đổi lịch và thanh toán ngay, quy định nào cần nhớ để mình xác nhận lại là như thế nào?","Nếu muốn đổi lịch thì cần thực hiện trước giờ khám tối thiểu 1 giờ, và nên đến sớm 15-20 phút khi đi khám.","[""D01"", ""D02""]",[],[],[],,,,,,,,,,323.9933999720961,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0228,"Mình cần biết, faq check: BHYT bảo hiểm cần giấy tờ hợp lệ (xin trả lời chính xác) -- từ khóa: lịch,bảo hiểm,qr,giờ được không?",Cần mang giấy tờ hợp lệ; quyền lợi phụ thuộc quy định bảo hiểm và tình trạng hồ sơ.,"[""D04""]",[],[],[],,,,,,,,,,246.47830001777038,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0029,"Xác nhận giúp, thông tin thanh toán được gửi vào thời điểm nào được không?",Hệ thống hỗ trợ thanh toán chuyển khoản QR Banking; sau khi tạo lịch bệnh nhân sẽ nhận thông tin thanh toán để hoàn tất.,"[""D03""]",[],[],[],,,,,,,,,,248.80399997346103,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0186,Mình cần biết nếu đã tạo lịch thì lúc nào nhận thông tin QR Banking?,"Sau khi tạo lịch, bệnh nhân sẽ nhận thông tin thanh toán QR Banking để hoàn tất.","[""D03""]",[],[],[],,,,,,,,,,302.3805000120774,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0154,Cho mình hỏi hãy ghép thông tin về khung giờ và chính sách hủy đổi lịch xin trả lời ngắn gọn?,Hủy/đổi lịch cần trước giờ khám tối thiểu 1 giờ; thanh toán hiện hỗ trợ QR Banking và thông tin được gửi sau khi tạo lịch.,"[""D02"", ""D03""]",[],[],[],,,,,,,,,,358.8240999961272,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0237,Xác nhận giúp vừa hỏi về lịch khám vừa hỏi về thanh toán thì thông tin tổng hợp là gì để mình xác nhận lại?,"Nếu muốn đổi lịch thì cần thực hiện trước giờ khám tối thiểu 1 giờ, và nên đến sớm 15-20 phút khi đi khám.","[""D01"", ""D02""]",[],[],[],,,,,,,,,,228.09330001473427,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0044,"Cho tôi hỏi, hệ thống đang hỗ trợ hình thức thanh toán nào được không?",Hệ thống hỗ trợ thanh toán chuyển khoản QR Banking; sau khi tạo lịch bệnh nhân sẽ nhận thông tin thanh toán để hoàn tất.,"[""D03""]",[],[],[],,,,,,,,,,217.2146999510005,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0240,[urgent] hủy đổi lịch trước 1 giờ (giữ nguyên ý nghĩa nhé) là như thế nào?,Hủy/đổi lịch cần trước giờ khám tối thiểu 1 giờ; qua mốc này hệ thống có thể từ chối.,"[""D02""]",[],[],[],,,,,,,,,,231.93629999877885,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0147,Nếu vừa cần đổi lịch vừa cần thanh toán thì nên ưu tiên bước nào để không vi phạm mốc thời gian là như thế nào?,Cần đảm bảo thao tác hủy/đổi trước giờ khám tối thiểu 1 giờ; thanh toán QR Banking được hỗ trợ và thông tin gửi sau khi tạo lịch.,"[""D02"", ""D03""]",[],[],[],,,,,,,,,,279.6630999655463,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0217,Nếu tôi đến khám theo giờ hẹn và muốn dùng bảo hiểm thì cần gì xin trả lời ngắn gọn là như thế nào?,Cần đến sớm 15-20 phút để xác nhận thông tin và mang giấy tờ hợp lệ nếu dùng BHYT/bảo hiểm tư nhân.,"[""D01"", ""D04""]",[],[],[],,,,,,,,,,270.22750000469387,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"
+n250_t0p60_k5,Q0006,"Cho hỏi nhanh, [urgent] BHYT bảo hiểm cần giấy tờ hợp lệ (tôi gọi từ mobile) được không?",Cần mang giấy tờ hợp lệ; quyền lợi phụ thuộc quy định bảo hiểm và tình trạng hồ sơ.,"[""D04""]",[],[],[],,,,,,,,,,245.03940000431612,0.6,250,5,"HTTP 401 calling https://api.openai.com/v1/embeddings: {
+    ""error"": {
+        ""message"": ""Incorrect API key provided: AIzaSyAh***************************kZpA. You can find your API key at https://platform.openai.com/account/api-keys."",
+        ""type"": ""invalid_request_error"",
+        ""param"": null,
+        ""code"": ""invalid_api_key""
+    }
+}
+"

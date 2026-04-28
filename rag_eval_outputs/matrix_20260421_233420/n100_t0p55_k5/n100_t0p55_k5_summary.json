@@ -1,0 +1,20 @@
+{
+  "run_id": "n100_t0p55_k5",
+  "timestamp_utc": "2026-04-21T23:47:03+00:00",
+  "num_rows": 100,
+  "threshold": 0.55,
+  "k": 5,
+  "model": "gpt-4o-mini",
+  "judge_model": "gpt-4o-mini",
+  "num_queries": 100,
+  "latency_ms": 2523.941008001566,
+  "retrieval_time_ms": null,
+  "gen_time_ms": null,
+  "context_precision": null,
+  "context_recall": null,
+  "faithfulness": null,
+  "answer_relevancy": null,
+  "hit_at_k": null,
+  "recall_at_k": null,
+  "mrr": null
+}

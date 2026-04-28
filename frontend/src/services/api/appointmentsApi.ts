@@ -88,6 +88,20 @@ export interface AppointmentDetailResponse {
     }>;
     updatedAt?: string | null;
   };
+  prescriptions?: Array<{
+    prescriptionId: number;
+    note?: string | null;
+    days?: number | null;
+    createdAt?: string | null;
+    medicines: Array<{
+      medicineId: number;
+      medicineName?: string | null;
+      quantity: number;
+      unit?: string | null;
+      dosage?: string | null;
+      usage?: string | null;
+    }>;
+  }>;
   cancelPolicy?: CancelPolicyResponse;
   refund?: {
     paymentCount?: number;

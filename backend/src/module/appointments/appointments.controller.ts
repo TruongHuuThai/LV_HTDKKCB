@@ -540,6 +540,23 @@ export class DoctorAppointmentsController {
     return this.appointments.getDoctorPrescriptions(user, appointmentId);
   }
 
+  @Get(':appointmentId/prescriptions/:prescriptionId/pdf')
+  async prescriptionPdf(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('appointmentId', ParseIntPipe) appointmentId: number,
+    @Param('prescriptionId', ParseIntPipe) prescriptionId: number,
+    @Res() res: Response,
+  ) {
+    const result = await this.appointments.exportDoctorPrescriptionPdf(
+      user,
+      appointmentId,
+      prescriptionId,
+    );
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${result.filename}"`);
+    res.send(result.buffer);
+  }
+
   @Patch(':appointmentId/finish-clinical')
   async finishClinical(
     @CurrentUser() user: CurrentUserPayload,

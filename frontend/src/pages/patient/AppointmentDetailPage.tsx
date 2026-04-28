@@ -111,6 +111,7 @@ export default function AppointmentDetailPage() {
 
   const appointment = detailQuery.data?.appointment as Record<string, any> | undefined;
   const paymentStatus = paymentStatusQuery.data?.payment?.normalizedStatus || 'unpaid';
+  const prescriptions = detailQuery.data?.prescriptions || [];
   const parsedClinicalSections = useMemo(
     () => parseClinicalSections(detailQuery.data?.preVisit?.note || ''),
     [detailQuery.data?.preVisit?.note],
@@ -308,6 +309,50 @@ export default function AppointmentDetailPage() {
                     </li>
                   ))}
                 </ul>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 p-4">
+              <p className="mb-2 font-medium text-slate-900">Đơn thuốc đã lập</p>
+              {prescriptions.length === 0 ? (
+                <p className="text-slate-500">Chưa có đơn thuốc cho lịch hẹn này.</p>
+              ) : (
+                <div className="space-y-3">
+                  {prescriptions.map((prescription) => (
+                    <div key={prescription.prescriptionId} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-semibold text-slate-900">Đơn #{prescription.prescriptionId}</p>
+                        <p className="text-xs text-slate-500">
+                          {prescription.createdAt ? String(prescription.createdAt).slice(0, 10) : 'Chưa có ngày tạo'}
+                        </p>
+                      </div>
+                      {prescription.days ? (
+                        <p className="mt-1 text-xs text-slate-600">Số ngày sử dụng: {prescription.days}</p>
+                      ) : null}
+                      <div className="mt-2 space-y-2">
+                        {prescription.medicines.map((medicine) => (
+                          <div key={`${prescription.prescriptionId}-${medicine.medicineId}`} className="rounded-lg border border-slate-200 bg-white p-2">
+                            <p className="font-medium text-slate-900">
+                              {medicine.medicineName || `Thuốc #${medicine.medicineId}`}
+                            </p>
+                            <p className="text-xs text-slate-600">
+                              Số lượng: {medicine.quantity} {medicine.unit || ''}
+                            </p>
+                            <p className="text-xs text-slate-600">
+                              Liều dùng: {medicine.dosage || 'Chưa cập nhật'}
+                            </p>
+                            <p className="text-xs text-slate-600">
+                              Cách dùng: {medicine.usage || 'Chưa cập nhật'}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                      {prescription.note ? (
+                        <p className="mt-2 text-xs text-slate-600">Ghi chú: {prescription.note}</p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </CardContent>

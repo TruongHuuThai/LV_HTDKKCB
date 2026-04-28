@@ -28,7 +28,13 @@ export interface DoctorExamWorkflowResponse {
     shift: string;
     slot: { id: number; start: string; end: string };
   };
-  patient: { id: number; name: string; phone: string | null };
+  patient: {
+    id: number;
+    name: string;
+    phone: string | null;
+    dateOfBirth?: string | null;
+    gender?: 'NAM' | 'NU' | null;
+  };
   doctor: { id: number; name: string | null; specialty: string | null; room: string | null };
   encounter: {
     id: number;
@@ -63,6 +69,17 @@ export interface DoctorExamWorkflowResponse {
       usage: string | null;
     }>;
   }>;
+  healthIndicators: {
+    measuredAt: string | null;
+    weightKg: number | null;
+    heightCm: number | null;
+    bmi: number | null;
+    bloodPressure: string | null;
+    heartRateBpm: number | null;
+    bodyTemperatureC: number | null;
+    bloodGlucoseMmolL: number | null;
+    note: string | null;
+  } | null;
   billing: {
     latest: any;
     normalizedStatus: string;
@@ -142,6 +159,12 @@ export const doctorClinicalApi = {
     });
   },
 
+  downloadPrescriptionPdf: async (appointmentId: number, prescriptionId: number) => {
+    await downloadPdf(`/doctor/appointments/${appointmentId}/prescriptions/${prescriptionId}/pdf`, {
+      fallbackFilename: `don-thuoc-${appointmentId}-${prescriptionId}.pdf`,
+    });
+  },
+
   previewOrderPdf: async (appointmentId: number, orderId: number) => {
     const res = await axiosClient.get<BlobPart>(
       `/doctor/appointments/${appointmentId}/orders/${orderId}/pdf`,
@@ -155,6 +178,31 @@ export const doctorClinicalApi = {
   printOrderPdf: async (appointmentId: number, orderId: number) => {
     const res = await axiosClient.get<BlobPart>(
       `/doctor/appointments/${appointmentId}/orders/${orderId}/pdf`,
+      { responseType: 'blob' },
+    );
+    const blob = new Blob([res.data], { type: 'application/pdf' });
+    const objectUrl = window.URL.createObjectURL(blob);
+    const printWindow = window.open(objectUrl, '_blank', 'noopener,noreferrer');
+    if (printWindow) {
+      const triggerPrint = () => printWindow.print();
+      printWindow.addEventListener('load', triggerPrint, { once: true });
+      setTimeout(triggerPrint, 800);
+    }
+  },
+
+  previewPrescriptionPdf: async (appointmentId: number, prescriptionId: number) => {
+    const res = await axiosClient.get<BlobPart>(
+      `/doctor/appointments/${appointmentId}/prescriptions/${prescriptionId}/pdf`,
+      { responseType: 'blob' },
+    );
+    const blob = new Blob([res.data], { type: 'application/pdf' });
+    const objectUrl = window.URL.createObjectURL(blob);
+    window.open(objectUrl, '_blank', 'noopener,noreferrer');
+  },
+
+  printPrescriptionPdf: async (appointmentId: number, prescriptionId: number) => {
+    const res = await axiosClient.get<BlobPart>(
+      `/doctor/appointments/${appointmentId}/prescriptions/${prescriptionId}/pdf`,
       { responseType: 'blob' },
     );
     const blob = new Blob([res.data], { type: 'application/pdf' });

@@ -1,0 +1,2 @@
+﻿run_id,timestamp_utc,num_rows,threshold,k,model,judge_model,num_queries,latency_ms,retrieval_time_ms,gen_time_ms,context_precision,context_recall,faithfulness,answer_relevancy,hit_at_k,recall_at_k,mrr
+n150_t0p60_k5,2026-04-22T02:02:43+00:00,150,0.6,5,gpt-4o-mini,gpt-4o-mini,150,1624.0589299960993,502.6264233281836,1121.4299713350676,0.11188811188811189,0.0944055944055944,0.14133333333333334,0.14400000000000002,0.11188811188811189,0.0944055944055944,0.11188811188811189

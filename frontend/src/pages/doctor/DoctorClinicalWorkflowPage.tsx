@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FileDown, FileSearch, Loader2, Printer, RefreshCw } from 'lucide-react';
+import { ArrowDown, FileDown, FileSearch, Loader2, Printer, RefreshCw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { doctorAppointmentsApi } from '@/services/api/doctorAppointmentsApi';
@@ -26,6 +26,24 @@ function todayIso() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(
     now.getDate(),
   ).padStart(2, '0')}`;
+}
+
+function calculateAge(dateOfBirth?: string | null) {
+  if (!dateOfBirth) return null;
+  const dob = new Date(dateOfBirth);
+  if (Number.isNaN(dob.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - dob.getFullYear();
+  const monthDiff = now.getMonth() - dob.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < dob.getDate())) {
+    age -= 1;
+  }
+  return age >= 0 ? age : null;
+}
+
+function formatIndicatorValue(value: number | null | undefined, suffix: string, digits = 1) {
+  if (value === null || value === undefined || Number.isNaN(value)) return 'Chưa cập nhật';
+  return `${Number(value).toFixed(digits)} ${suffix}`.trim();
 }
 
 function StatusBadge({
@@ -74,7 +92,6 @@ export default function DoctorClinicalWorkflowPage() {
   const [workDate, setWorkDate] = useState(todayIso());
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<number | null>(null);
   const [selectedServiceIds, setSelectedServiceIds] = useState<number[]>([]);
-  const [selectedMedicineId, setSelectedMedicineId] = useState<number | null>(null);
   const [confirmCompleteOpen, setConfirmCompleteOpen] = useState(false);
   const [orderResultSummaryByKey, setOrderResultSummaryByKey] = useState<Record<string, string>>({});
 
@@ -87,10 +104,14 @@ export default function DoctorClinicalWorkflowPage() {
     treatmentPlan: '',
   });
 
-  const [prescriptionForm, setPrescriptionForm] = useState({
+  const createEmptyPrescriptionItem = () => ({
+    medicineId: null as number | null,
     quantity: 1,
     dosage: '',
     usage: '',
+  });
+  const [prescriptionItems, setPrescriptionItems] = useState([createEmptyPrescriptionItem()]);
+  const [prescriptionForm, setPrescriptionForm] = useState({
     note: '',
     days: 0,
   });
@@ -185,24 +206,21 @@ export default function DoctorClinicalWorkflowPage() {
   const createPrescriptionMutation = useMutation({
     mutationFn: () =>
       doctorClinicalApi.createPrescription(selectedAppointmentId!, {
-        items: [
-          {
-            medicineId: selectedMedicineId!,
-            quantity: prescriptionForm.quantity,
-            dosage: prescriptionForm.dosage || undefined,
-            usage: prescriptionForm.usage || undefined,
-          },
-        ],
+        items: prescriptionItems
+          .filter((item) => Boolean(item.medicineId))
+          .map((item) => ({
+            medicineId: item.medicineId as number,
+            quantity: item.quantity,
+            dosage: item.dosage || undefined,
+            usage: item.usage || undefined,
+          })),
         note: prescriptionForm.note || undefined,
         days: prescriptionForm.days > 0 ? prescriptionForm.days : undefined,
       }),
     onSuccess: async () => {
       toast.success('Đã lập đơn thuốc.');
-      setSelectedMedicineId(null);
+      setPrescriptionItems([createEmptyPrescriptionItem()]);
       setPrescriptionForm({
-        quantity: 1,
-        dosage: '',
-        usage: '',
         note: '',
         days: 0,
       });
@@ -254,9 +272,31 @@ export default function DoctorClinicalWorkflowPage() {
   const canConfirmComplete =
     Boolean(selectedWorkflow?.encounter?.conclusion?.trim()) &&
     selectedWorkflow?.workflow.clinicalStatus !== 'HOAN_TAT';
+  const hasValidPrescriptionItems = useMemo(
+    () => prescriptionItems.some((item) => Boolean(item.medicineId)),
+    [prescriptionItems],
+  );
 
   const clinicalTag = mapClinicalLabel(selectedWorkflow?.workflow.clinicalStatus || '');
   const financialTag = mapFinancialLabel(selectedWorkflow?.workflow.financialStatus || '');
+  const patientAge = calculateAge(selectedWorkflow?.patient?.dateOfBirth || null);
+
+  const updatePrescriptionItem = (
+    index: number,
+    patch: Partial<{ medicineId: number | null; quantity: number; dosage: string; usage: string }>,
+  ) => {
+    setPrescriptionItems((prev) =>
+      prev.map((item, itemIndex) => (itemIndex === index ? { ...item, ...patch } : item)),
+    );
+  };
+
+  const addPrescriptionItem = () => {
+    setPrescriptionItems((prev) => [...prev, createEmptyPrescriptionItem()]);
+  };
+
+  const removePrescriptionItem = (index: number) => {
+    setPrescriptionItems((prev) => (prev.length === 1 ? prev : prev.filter((_, itemIndex) => itemIndex !== index)));
+  };
 
   return (
     <div className="space-y-4 p-4 md:p-6 xl:p-8">
@@ -299,6 +339,7 @@ export default function DoctorClinicalWorkflowPage() {
             <div className="grid gap-2">
               {activeItems.map((item) => {
                 const isStarted = item.DK_TRANG_THAI !== 'CHO_KHAM';
+                const isCompleted = item.DK_TRANG_THAI === 'HOAN_TAT';
                 return (
                   <div
                     key={item.DK_MA}
@@ -320,14 +361,15 @@ export default function DoctorClinicalWorkflowPage() {
                       <Button
                         size="sm"
                         onClick={() => {
+                          if (isCompleted) return;
                           setSelectedAppointmentId(item.DK_MA);
                           if (!isStarted) {
                             startExamMutation.mutate(item.DK_MA);
                           }
                         }}
-                        disabled={startExamMutation.isPending}
+                        disabled={startExamMutation.isPending || isCompleted}
                       >
-                        {isStarted ? 'Tiếp tục khám' : 'Bắt đầu khám'}
+                        {isCompleted ? 'Đã hoàn tất' : isStarted ? 'Tiếp tục khám' : 'Bắt đầu khám'}
                       </Button>
                     </div>
                   </div>
@@ -521,41 +563,66 @@ export default function DoctorClinicalWorkflowPage() {
             <CardHeader className="pb-3">
               <CardTitle className="text-base">3. Đơn thuốc</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
-              <select
-                className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm"
-                value={selectedMedicineId || ''}
-                onChange={(event) => setSelectedMedicineId(Number(event.target.value) || null)}
-              >
-                <option value="">Chọn thuốc</option>
-                {(medicineCatalogQuery.data?.items || []).map((item) => (
-                  <option key={item.T_MA} value={item.T_MA}>
-                    {item.T_TEN_THUOC}
-                  </option>
-                ))}
-              </select>
-              <Input
-                type="number"
-                min={1}
-                value={prescriptionForm.quantity}
-                onChange={(event) =>
-                  setPrescriptionForm((prev) => ({
-                    ...prev,
-                    quantity: Math.max(1, Number(event.target.value) || 1),
-                  }))
-                }
-                placeholder="Số lượng"
-              />
-              <Input
-                value={prescriptionForm.dosage}
-                onChange={(event) => setPrescriptionForm((prev) => ({ ...prev, dosage: event.target.value }))}
-                placeholder="Liều dùng"
-              />
-              <Input
-                value={prescriptionForm.usage}
-                onChange={(event) => setPrescriptionForm((prev) => ({ ...prev, usage: event.target.value }))}
-                placeholder="Cách dùng"
-              />
+            <CardContent className="space-y-3">
+              {prescriptionItems.map((item, index) => (
+                <div key={`prescription-item-${index}`} className="space-y-2 rounded-lg border border-slate-200 p-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-slate-800">Thuốc {index + 1}</p>
+                    {index > 0 ? (
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => removePrescriptionItem(index)}
+                        title="Xóa dòng thuốc"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    ) : null}
+                  </div>
+                  <select
+                    className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm"
+                    value={item.medicineId || ''}
+                    onChange={(event) =>
+                      updatePrescriptionItem(index, { medicineId: Number(event.target.value) || null })
+                    }
+                  >
+                    <option value="">Chọn thuốc</option>
+                    {(medicineCatalogQuery.data?.items || []).map((medicine) => (
+                      <option key={medicine.T_MA} value={medicine.T_MA}>
+                        {medicine.T_TEN_THUOC}
+                      </option>
+                    ))}
+                  </select>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={item.quantity}
+                    onChange={(event) =>
+                      updatePrescriptionItem(index, {
+                        quantity: Math.max(1, Number(event.target.value) || 1),
+                      })
+                    }
+                    placeholder="Số lượng"
+                  />
+                  <Input
+                    value={item.dosage}
+                    onChange={(event) => updatePrescriptionItem(index, { dosage: event.target.value })}
+                    placeholder="Liều dùng"
+                  />
+                  <Input
+                    value={item.usage}
+                    onChange={(event) => updatePrescriptionItem(index, { usage: event.target.value })}
+                    placeholder="Cách dùng"
+                  />
+                </div>
+              ))}
+              <div className="flex justify-end">
+                <Button type="button" variant="outline" onClick={addPrescriptionItem}>
+                  <ArrowDown className="mr-1 h-4 w-4" />
+                  Thêm dòng thuốc
+                </Button>
+              </div>
               <Textarea
                 value={prescriptionForm.note}
                 onChange={(event) => setPrescriptionForm((prev) => ({ ...prev, note: event.target.value }))}
@@ -563,11 +630,144 @@ export default function DoctorClinicalWorkflowPage() {
               />
               <Button
                 onClick={() => createPrescriptionMutation.mutate()}
-                disabled={!selectedMedicineId || createPrescriptionMutation.isPending}
+                disabled={!hasValidPrescriptionItems || createPrescriptionMutation.isPending}
               >
                 Lập đơn thuốc
               </Button>
               <p className="text-xs text-slate-600">Đã có {selectedWorkflow.prescriptions.length} đơn thuốc.</p>
+              {selectedWorkflow.prescriptions.length > 0 ? (
+                <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-sm font-semibold text-slate-800">Đơn thuốc đã tạo</p>
+                  {selectedWorkflow.prescriptions.map((prescription) => (
+                    <div
+                      key={prescription.prescriptionId}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 bg-white p-2"
+                    >
+                      <p className="text-sm text-slate-700">
+                        Đơn #{prescription.prescriptionId}
+                        {prescription.createdAt
+                          ? ` • ${formatDateDdMmYyyy(prescription.createdAt)}`
+                          : ''}
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            doctorClinicalApi.previewPrescriptionPdf(
+                              selectedAppointmentId!,
+                              prescription.prescriptionId,
+                            )
+                          }
+                        >
+                          <FileSearch className="mr-1 h-4 w-4" /> Xem PDF
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            doctorClinicalApi.downloadPrescriptionPdf(
+                              selectedAppointmentId!,
+                              prescription.prescriptionId,
+                            )
+                          }
+                        >
+                          <FileDown className="mr-1 h-4 w-4" /> Tải PDF
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            doctorClinicalApi.printPrescriptionPdf(
+                              selectedAppointmentId!,
+                              prescription.prescriptionId,
+                            )
+                          }
+                        >
+                          <Printer className="mr-1 h-4 w-4" /> In đơn
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          <Card className="border-slate-200">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Chỉ số sức khỏe</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+                  <p className="text-xs text-slate-500">Ngày đo gần nhất</p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {selectedWorkflow.healthIndicators?.measuredAt
+                      ? formatDateDdMmYyyy(selectedWorkflow.healthIndicators.measuredAt)
+                      : 'Chưa cập nhật'}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+                  <p className="text-xs text-slate-500">Tuổi / Giới tính</p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {patientAge !== null ? `${patientAge} tuổi` : 'Chưa rõ tuổi'} •{' '}
+                    {selectedWorkflow.patient.gender === 'NAM'
+                      ? 'Nam'
+                      : selectedWorkflow.patient.gender === 'NU'
+                        ? 'Nữ'
+                        : 'Chưa cập nhật'}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+                  <p className="text-xs text-slate-500">Cân nặng</p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {formatIndicatorValue(selectedWorkflow.healthIndicators?.weightKg, 'kg')}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+                  <p className="text-xs text-slate-500">Chiều cao</p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {formatIndicatorValue(selectedWorkflow.healthIndicators?.heightCm, 'cm')}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+                  <p className="text-xs text-slate-500">BMI</p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {formatIndicatorValue(selectedWorkflow.healthIndicators?.bmi, '', 1)}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+                  <p className="text-xs text-slate-500">Huyết áp</p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {selectedWorkflow.healthIndicators?.bloodPressure || 'Chưa cập nhật'}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+                  <p className="text-xs text-slate-500">Nhịp tim</p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {formatIndicatorValue(selectedWorkflow.healthIndicators?.heartRateBpm, 'bpm', 0)}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+                  <p className="text-xs text-slate-500">Nhiệt độ</p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {formatIndicatorValue(selectedWorkflow.healthIndicators?.bodyTemperatureC, '°C')}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 sm:col-span-2">
+                  <p className="text-xs text-slate-500">Đường huyết</p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {formatIndicatorValue(selectedWorkflow.healthIndicators?.bloodGlucoseMmolL, 'mmol/L')}
+                  </p>
+                </div>
+              </div>
+              {selectedWorkflow.healthIndicators?.note ? (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+                  <p className="text-xs text-slate-500">Ghi chú chỉ số</p>
+                  <p className="text-sm text-slate-800">{selectedWorkflow.healthIndicators.note}</p>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
 

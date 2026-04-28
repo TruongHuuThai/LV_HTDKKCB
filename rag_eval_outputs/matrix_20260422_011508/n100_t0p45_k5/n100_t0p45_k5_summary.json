@@ -1,0 +1,20 @@
+{
+  "run_id": "n100_t0p45_k5",
+  "timestamp_utc": "2026-04-22T01:20:02+00:00",
+  "num_rows": 100,
+  "threshold": 0.45,
+  "k": 5,
+  "model": "gpt-4o-mini",
+  "judge_model": "gpt-4o-mini",
+  "num_queries": 100,
+  "latency_ms": 1760.3009460034082,
+  "retrieval_time_ms": 519.748604001361,
+  "gen_time_ms": 1240.5497559980722,
+  "context_precision": 0.3105263157894737,
+  "context_recall": 0.2631578947368421,
+  "faithfulness": 0.32899999999999996,
+  "answer_relevancy": 0.34299999999999997,
+  "hit_at_k": 0.3157894736842105,
+  "recall_at_k": 0.2631578947368421,
+  "mrr": 0.3157894736842105
+}
